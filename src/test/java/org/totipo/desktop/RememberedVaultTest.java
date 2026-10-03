@@ -198,13 +198,15 @@ class RememberedVaultTest {
         launcher.passwordAction = PasswordPromptResult.Action.CHANGE_VAULT;
         Path alternate = directory.resolve("alternate"); launcher.directory = alternate;
         launcher.duringDirectory = () -> launcher.passwordAction = null;
+        launcher.duringMessage = () -> launcher.passwordAction = PasswordPromptResult.Action.EXIT;
         var app = app(access, launcher, new Window(), store);
         try {
-            edt(app::show); await(launcher.ready);
+            edt(app::show); await(launcher.disposed);
             edt(() -> {
                 assertEquals(alternate, launcher.passwordDirectory); assertEquals(1, access.opens.get());
                 assertEquals(directory, store.path); assertEquals(0, store.writes);
-                assertEquals(1, launcher.shown); assertFalse(app.executorShutdown());
+                assertEquals(0, launcher.shown); assertTrue(app.executorShutdown());
+                assertEquals(3, launcher.passwordContexts.size());
                 assertEquals(java.util.List.of("Authentication did not succeed"), launcher.titles);
             });
         } finally { stop(app, launcher); }
@@ -249,24 +251,22 @@ class RememberedVaultTest {
         } finally { stop(app, launcher); }
     }
 
-    @Test void changeVaultChooserCancellationAndFailureKeepCurrentWindowSessionAndPreference() throws Exception {
+    @Test void changeVaultChooserCancellationLocksCurrentVaultAndKeepsPreference() throws Exception {
         Store store = new Store(directory); Launcher launcher = new Launcher(); Access access = new Access();
         Session session = new Session(); access.result = new OpenResult.Opened(session); Window window = new Window();
         var app = app(access, launcher, window, store);
         try {
             edt(() -> app.begin(directory, new char[] {'p'}, false)); await(launcher.ready);
-            edt(() -> { launcher.directory = null; window.changeVault.run(); });
+            edt(() -> {
+                launcher.ready = new CountDownLatch(1);
+                launcher.directory = null; window.changeVault.run();
+            });
+            await(launcher.ready);
             assertEquals(directory, store.path); assertEquals(1, store.writes);
-            assertEquals(0, session.closes.get()); assertEquals(1, window.disposed.getCount());
+            assertEquals(1, session.closes.get()); assertEquals(0, window.disposed.getCount());
             assertFalse(app.executorShutdown()); assertEquals(1, launcher.disposed.getCount());
             assertEquals(directory, launcher.chooserLocation); assertFalse(launcher.choosingCreate);
-            edt(() -> {
-                launcher.ready = new CountDownLatch(1); launcher.password = new char[] {'p'};
-                launcher.directory = directory.resolve("other");
-                access.result = new OpenResult.AuthenticationFailed(); window.changeVault.run();
-            });
-            await(launcher.ready); assertEquals(directory, store.path); assertEquals(1, store.writes);
-            assertEquals(0, session.closes.get()); assertEquals(1, window.disposed.getCount());
+            edt(() -> { window.changeVault.run(); assertEquals(1, launcher.directories); });
         } finally { stop(app, launcher); }
     }
 

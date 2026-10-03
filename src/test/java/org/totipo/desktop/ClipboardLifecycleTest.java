@@ -22,7 +22,7 @@ class ClipboardLifecycleTest {
         }
     }
 
-    @Test void applicationSharesOneManagerAcrossWindowsAndGuardsClosingCallbacks() throws Exception {
+    @Test void changeVaultRetiresClipboardBeforeSelectionAndReusesManagerForReplacement() throws Exception {
         ClipboardProbe probe = new ClipboardProbe();
         Session a = new Session(), b = new Session();
         CopyWindow wa = new CopyWindow(), wb = new CopyWindow();
@@ -38,20 +38,26 @@ class ClipboardLifecycleTest {
                 path -> windows.getAndIncrement() == 0 ? wa : wb, probe.manager()));
         try {
             edt(() -> app.begin(Path.of("a"), new char[0], false)); await(wa.shown);
-            edt(() -> app.begin(Path.of("b"), new char[0], false)); await(wb.shown);
-            var current = onEdt(() -> {
-                assertEquals(TotpClipboard.COPIED, wa.copyNow());
-                assertEquals(TotpClipboard.COPIED, wb.copyNow());
-                var payload = probe.payload();
-                // Session retirement remains independent; user window-close now quits the application.
-                a.subscriber.onComplete();
-                return payload;
-            });
-            await(wa.disposed);
             edt(() -> {
+                assertEquals(TotpClipboard.COPIED, wa.copyNow());
+                launcher.directory = Path.of("b");
+                launcher.duringDirectory = () -> {
+                    probe.assertEmpty();
+                    assertEquals(1, a.closes.get()); assertEquals(1, wa.disposals);
+                    assertEquals(TotpClipboard.UNAVAILABLE, wa.copyNow());
+                };
+                wa.changeVault.run();
+                probe.assertEmpty();
+                assertEquals(TotpClipboard.UNAVAILABLE, wa.copyNow());
+            });
+            await(wb.shown);
+            edt(() -> {
+                assertEquals(TotpClipboard.COPIED, wb.copyNow());
+                var current = probe.payload();
+                wa.changeVault.run();
                 assertSame(current, probe.payload());
                 assertEquals(TotpClipboard.UNAVAILABLE, wa.copyNow());
-                assertEquals(2, probe.writes());
+                assertEquals(3, probe.writes());
                 app.shutdown();
                 probe.assertEmpty();
                 assertEquals(TotpClipboard.UNAVAILABLE, wb.copyNow());

@@ -41,5 +41,6 @@ public interface VaultView {
     void closing();
     void failure();
     void showWindow();
+    default void hideWindow() { }
     void dispose();
 }

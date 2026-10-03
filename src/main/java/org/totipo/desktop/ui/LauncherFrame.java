@@ -59,5 +59,15 @@ public final class LauncherFrame extends JFrame implements LauncherView {
     }
     @Override public void showWindow() { Edt.require(); setVisible(true); }
     @Override public void hideWindow() { Edt.require(); setVisible(false); }
+    @Override public void retireDialogs() {
+        Edt.require();
+        for (java.awt.Window owned : getOwnedWindows()) {
+            if (owned instanceof javax.swing.JDialog dialog && dialog.isDisplayable()) {
+                // Password prompt's close listener clears fields and records dismissal.
+                dialog.dispatchEvent(new WindowEvent(dialog, WindowEvent.WINDOW_CLOSING));
+                dialog.dispose();
+            }
+        }
+    }
     @Override public void dispose() { Edt.require(); super.dispose(); }
 }

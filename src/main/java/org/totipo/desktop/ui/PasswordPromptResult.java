@@ -1,11 +1,11 @@
 package org.totipo.desktop.ui;
 
 /** Presentation decision; submitted characters transfer to the application for clearing. */
-public final class PasswordPromptResult {
+public final class PasswordPromptResult implements AutoCloseable {
     public enum Action { SUBMIT, EXIT, CHANGE_VAULT, CANCEL }
 
     private final Action action;
-    private final char[] password;
+    private char[] password;
 
     private PasswordPromptResult(Action action, char[] password) {
         this.action = action;
@@ -23,6 +23,15 @@ public final class PasswordPromptResult {
     }
 
     public Action action() { return action; }
-    /** Caller-owned characters for SUBMIT; null for other actions. */
-    public char[] password() { return password; }
+    /** Transfer once to the immediate operation; the decision retains no array after handoff. */
+    public char[] takePassword() {
+        char[] owned = password;
+        password = null;
+        return owned;
+    }
+
+    /** Clear an abandoned submission that was never transferred to an operation. */
+    @Override public void close() {
+        if (password != null) { java.util.Arrays.fill(password, '\0'); password = null; }
+    }
 }

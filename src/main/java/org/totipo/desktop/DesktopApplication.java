@@ -16,27 +16,31 @@ import org.totipo.desktop.ui.VaultView;
 import java.nio.file.Path;
 import java.nio.file.Files;
 import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import javax.swing.SwingUtilities;
 
-/** EDT-owned launcher, application executor, and independent live vault controllers. */
+/** EDT-owned single surface and single session; session I/O stays off the EDT. */
 public final class DesktopApplication {
+    enum Surface { NONE, LAUNCHER, CHOOSER, PASSWORD_PROMPT, VAULT_WINDOW, MESSAGE }
     private final VaultAccess access;
     private final LauncherView launcher;
     private final Function<Path, VaultView> windows;
     private final ExecutorService executor;
-    private final Set<VaultWindowController> controllers = new HashSet<>();
+    private VaultWindowController controller;
+    private Surface surface = Surface.NONE;
     private boolean busy;
     private final TotpClipboard clipboard;
     private boolean shuttingDown;
     private boolean disposed;
     private int nextWindow;
     private final VaultPreferences preferences;
-    private VaultWindowController replacing;
+    private boolean chooseAfterClose;
+    // Retry routing contains no password material.
+    private record Selection(Path directory, PasswordPromptContext context) { }
+    private Selection retry;
     private Path chooserLocation;
 
     public DesktopApplication() {
@@ -71,10 +75,10 @@ public final class DesktopApplication {
 
     public void show() {
         Edt.require();
-        if (busy || shuttingDown) { return; }
+        if (busy || shuttingDown || controller != null) { return; }
         var remembered = preferences.lastVault();
         if (remembered.isEmpty()) {
-            launcher.showWindow();
+            showLauncher();
             return;
         }
         Path path = remembered.get();
@@ -96,9 +100,8 @@ public final class DesktopApplication {
                     prompt(false, path, PasswordPromptContext.REMEMBERED_STARTUP);
                 } else {
                     preferences.clearLastVault();
-                    launcher.showWindow();
                     try {
-                        launcher.message("Previous vault unavailable",
+                        message("Previous vault unavailable",
                                 "The previously used vault could not be found. Choose a vault to continue.");
                     } finally { finishOperation(); }
                 }
@@ -112,40 +115,48 @@ public final class DesktopApplication {
 
     private void prompt(boolean create, Path remembered, PasswordPromptContext context) {
         Edt.require();
-        if (busy || shuttingDown) {
+        if (busy || shuttingDown || controller != null) {
             return;
         }
         // Modal dialogs run nested EDT loops. Reserve the launcher before prompting,
         // and recheck shutdown after every dialog before accepting password ownership.
         busy = true;
+        retireLauncher();
         launcher.busy(create ? "Create Vault" : "Open Vault", true);
         char[] password = null;
         boolean handedOff = false;
         try {
             Path directory = remembered;
             while (true) {
-                if (directory == null) { directory = launcher.chooseDirectory(chooserLocation, create); }
+                if (directory == null) {
+                    directory = dialog(Surface.CHOOSER, () -> launcher.chooseDirectory(chooserLocation, create));
+                }
                 if (directory == null || shuttingDown) { return; }
-                PasswordPromptResult decision = launcher.password(directory.toAbsolutePath().normalize(), create, context);
-                password = decision.password();
-                if (shuttingDown) { return; }
-                if (decision.action() == PasswordPromptResult.Action.EXIT) {
-                    shutdown();
-                    return;
+                Path selected = directory.toAbsolutePath().normalize();
+                PasswordPromptContext origin = context;
+                try (PasswordPromptResult decision = dialog(Surface.PASSWORD_PROMPT,
+                        () -> launcher.password(selected, create, origin))) {
+                    password = decision.takePassword();
+                    if (shuttingDown) { return; }
+                    if (decision.action() == PasswordPromptResult.Action.EXIT) {
+                        shutdown();
+                        return;
+                    }
+                    if (decision.action() == PasswordPromptResult.Action.CHANGE_VAULT) {
+                        context = PasswordPromptContext.EXPLICIT;
+                        chooserLocation = directory;
+                        directory = null;
+                        continue;
+                    }
+                    if (decision.action() == PasswordPromptResult.Action.CANCEL) { return; }
                 }
-                if (decision.action() == PasswordPromptResult.Action.CHANGE_VAULT) {
-                    context = PasswordPromptContext.EXPLICIT;
-                    chooserLocation = directory;
-                    directory = null;
-                    continue;
-                }
-                if (decision.action() == PasswordPromptResult.Action.CANCEL) { return; }
                 break;
             }
             busy = false;
             char[] submittedPassword = password;
             password = null;
             handedOff = true;
+            retry = create ? null : new Selection(directory, context);
             begin(directory, submittedPassword, create);
         } finally {
             if (password != null) {
@@ -161,17 +172,18 @@ public final class DesktopApplication {
     /** Takes ownership of password even when rejected. Also used by headless lifecycle tests. */
     void begin(Path directory, char[] password, boolean create) {
         Edt.require();
-        if (busy || shuttingDown) {
+        if (busy || shuttingDown || controller != null) {
             Arrays.fill(password, '\0');
             return;
         }
+        retireLauncher();
         if (!PasswordInput.valid(password)) {
             Arrays.fill(password, '\0');
             // Keep actions disabled throughout the modal result dialog.
             busy = true;
             launcher.busy("Invalid password input", true);
             try {
-                launcher.message("Invalid password input",
+                message("Invalid password input",
                         "Enter valid Unicode using at most 1024 UTF-8 bytes.");
             } finally {
                 finishOperation();
@@ -183,7 +195,7 @@ public final class DesktopApplication {
         if (create && password.length == 0) {
             boolean confirmed = false;
             try {
-                confirmed = launcher.confirmEmptyPassword();
+                confirmed = dialog(Surface.MESSAGE, launcher::confirmEmptyPassword);
             } finally {
                 // A modal confirmation can process shutdown/reentrant launcher actions.
                 if (!confirmed || shuttingDown) {
@@ -226,12 +238,13 @@ public final class DesktopApplication {
                 return;
             }
             VaultView view = null;
-            VaultWindowController controller;
+            VaultWindowController accepted;
             try {
                 view = windows.apply(directory);
-                controller = new VaultWindowController(session, view, ++nextWindow, this::controllerClosed,
+                accepted = new VaultWindowController(session, view, ++nextWindow, this::controllerClosed,
                         reason -> {
-                            if (!shuttingDown) { launcher.message("Vault closed — reopen required", reason); }
+                            surface = Surface.NONE;
+                            if (!shuttingDown) { message("Vault closed — reopen required", reason); }
                         }, clipboard);
             } catch (RuntimeException unexpected) {
                 // No controller accepted ownership; cleanup stays on the application executor.
@@ -239,28 +252,24 @@ public final class DesktopApplication {
                     if (view != null) {
                         view.dispose();
                     }
-                    launcher.message("Application failure", "The vault window could not be created.");
+                    message("Application failure", "The vault window could not be created.");
                 } finally {
                     // Keep the launcher reserved across the modal result dialog and cleanup.
                     closeUnclaimed(session);
                 }
                 return;
             }
-            controllers.add(controller);
+            controller = accepted;
+            retry = null;
             view.quitAction(this::shutdown);
-            VaultWindowController previous = replacing;
-            view.changeVaultAction(() -> {
-                if (busy || shuttingDown) { return; }
-                replacing = controller;
-                chooserLocation = directory;
-                launcher.showWindow();
-                prompt(false);
-            });
+            view.changeVaultAction(() -> changeVault(accepted, directory));
             try {
-                if (controller.start()) {
+                activate(Surface.VAULT_WINDOW);
+                if (accepted.start()) {
                     preferences.setLastVault(directory);
                     chooserLocation = directory;
-                    if (previous != null) { previous.close(); }
+                } else {
+                    surface = Surface.NONE;
                 }
             } finally {
                 finishOperation();
@@ -270,29 +279,34 @@ public final class DesktopApplication {
         try {
             if (!shuttingDown) {
                 if (failed) {
-                    launcher.message("Application failure", "The vault operation encountered an unexpected application failure.");
+                    message("Application failure", "The vault operation encountered an unexpected application failure.");
                 } else if (open != null) {
                     present(open);
                 } else if (create != null) {
                     present(create);
                 } else {
-                    launcher.message("Application failure", "The vault operation returned no result.");
+                    message("Application failure", "The vault operation returned no result.");
                 }
             }
         } finally {
-            finishOperation();
+            Selection again = retry;
+            retry = null;
+            if (!shuttingDown && again != null) {
+                busy = false;
+                prompt(false, again.directory(), again.context());
+            } else { finishOperation(); }
         }
     }
 
     private void present(OpenResult result) {
         if (result instanceof OpenResult.Absent) {
-            launcher.message("Vault absent", "No canonical Totipo vault was observed in the selected directory.");
+            message("Vault absent", "No canonical Totipo vault was observed in the selected directory.");
         } else if (result instanceof OpenResult.Unavailable) {
-            launcher.message("Vault unavailable", "The selected directory or vault could not be reliably accessed.");
+            message("Vault unavailable", "The selected directory or vault could not be reliably accessed.");
         } else if (result instanceof OpenResult.InvalidVault) {
-            launcher.message("Invalid vault", "Vault data was observed but could not be used as a valid vault.");
+            message("Invalid vault", "Vault data was observed but could not be used as a valid vault.");
         } else if (result instanceof OpenResult.AuthenticationFailed) {
-            launcher.message("Authentication did not succeed",
+            message("Authentication did not succeed",
                     "Authentication did not succeed. This does not prove that the entered password is incorrect;\n"
                     + "authenticated vault data may also have changed or become unusable.");
         } else {
@@ -302,12 +316,12 @@ public final class DesktopApplication {
 
     private void present(CreateVaultResult result) {
         if (result instanceof CreateVaultResult.AlreadyExists) {
-            launcher.message("Vault already exists", "A vault was already observed at this location. Nothing was overwritten.\n"
+            message("Vault already exists", "A vault was already observed at this location. Nothing was overwritten.\n"
                     + "You may explicitly choose Open Vault.");
         } else if (result instanceof CreateVaultResult.Failed) {
-            launcher.message("Creation failed", "This create operation definitely failed. It was not retried.");
+            message("Creation failed", "This create operation definitely failed. It was not retried.");
         } else if (result instanceof CreateVaultResult.Uncertain) {
-            launcher.message("Creation uncertain", "Creation may have succeeded. Totipo cannot assert whether this operation became canonical.\n"
+            message("Creation uncertain", "Creation may have succeeded. Totipo cannot assert whether this operation became canonical.\n"
                     + "Do not blindly retry creation. Use Open Vault to re-observe the directory.");
         } else {
             throw new IllegalArgumentException("Unhandled create result");
@@ -326,9 +340,7 @@ public final class DesktopApplication {
                 boolean closeFailed = failed;
                 SwingUtilities.invokeLater(() -> {
                     try {
-                        if (closeFailed) {
-                            launcher.message("Session failure", "The returned vault session encountered an unexpected close failure.");
-                        }
+                        if (closeFailed) { shutdown(); }
                     } finally {
                         finishOperation();
                     }
@@ -340,12 +352,11 @@ public final class DesktopApplication {
     private void finishOperation() {
         Edt.require();
         busy = false;
+        retry = null;
         if (!shuttingDown) {
             launcher.busy(LauncherPanel.READY_TEXT, false);
-            if (controllers.isEmpty()) { launcher.showWindow(); }
-            else { launcher.hideWindow(); }
+            if (controller == null) { showLauncher(); }
         }
-        replacing = null;
         finishShutdown();
     }
 
@@ -355,28 +366,75 @@ public final class DesktopApplication {
             return;
         }
         shuttingDown = true;
+        retry = null;
+        retireLauncher();
+        launcher.retireDialogs();
+        surface = Surface.NONE;
         clipboard.shutdown();
         launcher.busy("Closing…", true);
-        for (VaultWindowController controller : Set.copyOf(controllers)) {
-            controller.close();
-        }
+        if (controller != null) { controller.close(); }
         finishShutdown();
     }
 
     private void controllerClosed(VaultWindowController controller) {
         Edt.require();
-        controllers.remove(controller);
-        if (!shuttingDown && !busy && controllers.isEmpty()) { launcher.showWindow(); }
+        if (this.controller != controller) { return; }
+        this.controller = null;
+        surface = Surface.NONE;
+        if (!controller.closeSucceeded()) { shutdown(); }
+        if (chooseAfterClose) {
+            chooseAfterClose = false;
+            busy = false;
+            if (!shuttingDown) { prompt(false); }
+        } else if (!shuttingDown && !busy) { showLauncher(); }
         finishShutdown();
     }
 
     private void finishShutdown() {
-        if (shuttingDown && !busy && controllers.isEmpty() && !disposed) {
+        if (shuttingDown && !busy && controller == null && !disposed) {
             disposed = true;
             executor.shutdown();
             launcher.dispose();
         }
     }
+
+    private void changeVault(VaultWindowController owner, Path directory) {
+        Edt.require();
+        if (busy || shuttingDown || controller != owner) { return; }
+        busy = true;
+        chooseAfterClose = true;
+        chooserLocation = directory;
+        surface = Surface.NONE;
+        owner.close(); // Retire UI/clipboard now; chooser waits for controllerClosed.
+    }
+
+    private void retireLauncher() {
+        if (surface == Surface.LAUNCHER) { launcher.hideWindow(); surface = Surface.NONE; }
+    }
+
+    private void activate(Surface next) {
+        if (surface != Surface.NONE) { throw new IllegalStateException("Previous surface is still active"); }
+        surface = next;
+    }
+
+    private void showLauncher() {
+        if (surface == Surface.LAUNCHER) { return; }
+        activate(Surface.LAUNCHER);
+        launcher.showWindow();
+    }
+
+    private <T> T dialog(Surface next, Supplier<T> operation) {
+        activate(next);
+        try { return operation.get(); }
+        finally { surface = Surface.NONE; }
+    }
+
+    private void message(String title, String text) {
+        retireLauncher();
+        dialog(Surface.MESSAGE, () -> { launcher.message(title, text); return null; });
+    }
+
+    Surface surface() { Edt.require(); return surface; }
 
     boolean executorShutdown() {
         return executor.isShutdown();

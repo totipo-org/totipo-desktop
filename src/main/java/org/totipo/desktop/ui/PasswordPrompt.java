@@ -109,13 +109,20 @@ final class PasswordPrompt {
             dialog.setVisible(true);
             if (form.decision != Action.SUBMIT) { return PasswordPromptResult.dismissed(form.decision); }
             char[] password = fields.primary.getPassword();
-            if (create && !matches(password, fields.confirmation.getPassword())) {
-                fields.clear();
-                JOptionPane.showMessageDialog(parent, "Passwords do not match.",
-                        "Create Vault", JOptionPane.INFORMATION_MESSAGE);
-                return PasswordPromptResult.dismissed(Action.CANCEL);
+            boolean transferred = false;
+            try {
+                if (create && !matches(password, fields.confirmation.getPassword())) {
+                    fields.clear();
+                    JOptionPane.showMessageDialog(parent, "Passwords do not match.",
+                            "Create Vault", JOptionPane.INFORMATION_MESSAGE);
+                    return PasswordPromptResult.dismissed(Action.CANCEL);
+                }
+                PasswordPromptResult result = PasswordPromptResult.submitted(password);
+                transferred = true;
+                return result;
+            } finally {
+                if (!transferred) { Arrays.fill(password, '\0'); }
             }
-            return PasswordPromptResult.submitted(password);
         } finally {
             fields.clear(); dialog.dispose();
         }

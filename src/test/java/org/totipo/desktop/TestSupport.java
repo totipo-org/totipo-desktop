@@ -103,7 +103,7 @@ public final class TestSupport {
         @Override public PasswordChangeResult changePassword(char[] old, char[] next) { throw new AssertionError(); }
     }
 
-    static final class Launcher implements LauncherView {
+    static class Launcher implements LauncherView {
         CountDownLatch ready = new CountDownLatch(1);
         final CountDownLatch disposed = new CountDownLatch(1);
         final List<String> titles = new ArrayList<>();

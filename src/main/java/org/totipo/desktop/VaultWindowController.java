@@ -25,6 +25,7 @@ final class VaultWindowController {
     private String retirementReason;
     private VaultState latest;
     private boolean closing;
+    private boolean closeSucceeded;
     private final Object clipboardOrigin = new Object();
     private final TotpClipboard clipboard;
 
@@ -117,13 +118,19 @@ final class VaultWindowController {
                 try { writes.closing(); }
                 finally { view.closing(); }
             }
-            if (failed) {
-                view.failure();
-            }
         } catch (RuntimeException cleanupFailure) {
             // Presentation cleanup must not prevent this or other application sessions closing.
             System.err.println("Totipo: session presentation cleanup failure (details redacted).");
         } finally {
+            // Retire visibility immediately; disposal and owner notification follow session.close().
+            try { view.hideWindow(); }
+            catch (RuntimeException cleanupFailure) {
+                System.err.println("Totipo: window hiding failure (details redacted).");
+            }
+            try { if (failed) { view.failure(); } }
+            catch (RuntimeException presentationFailure) {
+                System.err.println("Totipo: session failure presentation failure (details redacted).");
+            }
             executor.execute(() -> {
                 boolean closeFailed = false;
                 try {
@@ -134,7 +141,9 @@ final class VaultWindowController {
                 } finally {
                     executor.shutdown();
                     boolean reportFailure = closeFailed && !failed;
+                    boolean succeeded = !closeFailed;
                     SwingUtilities.invokeLater(() -> {
+                        closeSucceeded = succeeded;
                         try {
                             if (reportFailure) {
                                 view.failure();
@@ -157,4 +166,6 @@ final class VaultWindowController {
     boolean executorShutdown() {
         return executor.isShutdown();
     }
+
+    boolean closeSucceeded() { Edt.require(); return closeSucceeded; }
 }

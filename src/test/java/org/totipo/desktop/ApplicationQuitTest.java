@@ -19,13 +19,27 @@ class ApplicationQuitTest {
         void exit() { panel.menuBar().getMenu(0).getItem(0).doClick(0); }
     }
 
-    @Test void fileExitRunsApplicationCleanupExactlyOnce() throws Exception { quit(true, false); }
+    @Test void fileExitRunsApplicationCleanupExactlyOnce() throws Exception { quit(true); }
 
-    @Test void mainWindowCloseRunsSameQuitPathWithoutReturningToLauncher() throws Exception { quit(false, false); }
+    @Test void mainWindowCloseRunsSameQuitPathWithoutReturningToLauncher() throws Exception { quit(false); }
 
-    @Test void openPasswordExitRunsSameQuitPathAndClosesExistingSessionExactlyOnce() throws Exception { quit(false, true); }
+    @Test void alternatePasswordExitQuitsAfterOldSessionWasClosed() throws Exception {
+        Session session = new Session(); Launcher launcher = new Launcher(); Window window = new Window();
+        VaultAccess access = new VaultAccess() {
+            public OpenResult open(Path path, char[] password) { return new OpenResult.Opened(session); }
+            public CreateVaultResult create(Path path, char[] password) { throw new AssertionError(); }
+        };
+        var app = onEdt(() -> new DesktopApplication(access, launcher, path -> window));
+        try {
+            edt(() -> app.begin(Path.of("vault"), new char[] {'p'}, false)); await(launcher.ready);
+            edt(() -> { launcher.password = null; window.changeVault.run(); });
+            await(launcher.disposed);
+            assertEquals(1, session.closes.get()); assertEquals(1, window.disposals);
+            assertEquals(0, launcher.shown); assertTrue(app.executorShutdown());
+        } finally { edt(app::shutdown); await(launcher.disposed); }
+    }
 
-    private void quit(boolean fileExit, boolean passwordExit) throws Exception {
+    private void quit(boolean fileExit) throws Exception {
         CountDownLatch releaseClose = new CountDownLatch(1);
         Session session = new Session(releaseClose);
         Launcher launcher = new Launcher();
@@ -40,8 +54,7 @@ class ApplicationQuitTest {
             await(launcher.ready);
             int shownBeforeQuit = launcher.shown;
             edt(() -> {
-                if (passwordExit) { launcher.password = null; launcher.open.run(); }
-                else if (fileExit) { window.exit(); } else { window.close.run(); }
+                if (fileExit) { window.exit(); } else { window.close.run(); }
                 assertTrue(window.closing);
                 assertFalse(app.executorShutdown());
                 assertEquals(1, launcher.disposed.getCount());

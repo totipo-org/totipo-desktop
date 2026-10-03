@@ -14,5 +14,7 @@ public interface LauncherView {
     void message(String title, String text);
     void showWindow();
     default void hideWindow() { }
+    /** Close any owned chooser/prompt, clearing its fields; modal calls then unwind normally. */
+    default void retireDialogs() { }
     void dispose();
 }

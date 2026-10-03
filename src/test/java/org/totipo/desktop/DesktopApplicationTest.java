@@ -353,43 +353,42 @@ class DesktopApplicationTest {
         }
     }
 
-    @Test void independentWindowsCloseOnTheirOwnExecutorsAndShutdownWaitsForBoth() throws Exception {
+    @Test void anotherOpenIsRejectedWhileSessionIsOwnedOrClosing() throws Exception {
         Access access = new Access();
         CountDownLatch releaseOne = new CountDownLatch(1);
-        CountDownLatch releaseTwo = new CountDownLatch(1);
         Session one = new Session(releaseOne);
-        Session two = new Session(releaseTwo);
         AtomicInteger operations = new AtomicInteger();
-        access.open = password -> new OpenResult.Opened(operations.getAndIncrement() == 0 ? one : two);
+        access.open = password -> { operations.incrementAndGet(); return new OpenResult.Opened(one); };
         Launcher launcher = new Launcher();
-        CountDownLatch secondWindow = new CountDownLatch(1);
         AtomicInteger windows = new AtomicInteger();
         DesktopApplication app = onEdt(() -> new DesktopApplication(access, launcher, path -> {
             Window window = new Window();
-            if (windows.incrementAndGet() == 2) { secondWindow.countDown(); }
+            windows.incrementAndGet();
             return window;
         }));
         try {
             edt(() -> app.begin(DIRECTORY, new char[0], false));
             await(launcher.ready);
-            edt(() -> app.begin(DIRECTORY, new char[0], false));
-            await(secondWindow);
-            edt(app::shutdown);
+            char[] rejected = {'p'};
+            edt(() -> {
+                app.begin(DIRECTORY, rejected, false);
+                launcher.open.run(); launcher.create.run(); app.show();
+                assertArrayEquals(new char[1], rejected);
+                assertEquals(1, operations.get()); assertEquals(1, windows.get());
+                app.shutdown();
+                char[] late = {'q'};
+                app.begin(DIRECTORY, late, false);
+                assertArrayEquals(new char[1], late);
+            });
             await(one.closeEntered);
-            await(two.closeEntered);
-            assertNotEquals(one.closeThread, two.closeThread);
-            releaseOne.countDown();
-            edt(() -> { });
             assertEquals(1, launcher.disposed.getCount());
             assertFalse(app.executorShutdown());
         } finally {
             releaseOne.countDown();
-            releaseTwo.countDown();
             edt(app::shutdown);
             await(launcher.disposed);
         }
         assertEquals(1, one.closes.get());
-        assertEquals(1, two.closes.get());
         assertTrue(app.executorShutdown());
     }
 

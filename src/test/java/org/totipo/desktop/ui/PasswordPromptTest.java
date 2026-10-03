@@ -11,6 +11,19 @@ import org.totipo.desktop.ui.PasswordPromptResult.Action;
 import static org.junit.jupiter.api.Assertions.*;
 
 class PasswordPromptTest {
+    @Test void submissionTransfersExactlyOnceAndAnAbandonedDecisionClearsItsArray() {
+        char[] submitted = {'p'};
+        try (var decision = PasswordPromptResult.submitted(submitted)) {
+            assertSame(submitted, decision.takePassword());
+            assertNull(decision.takePassword());
+        }
+        assertArrayEquals(new char[] {'p'}, submitted); // Immediate operation now owns clearing.
+        java.util.Arrays.fill(submitted, '\0');
+        char[] abandoned = {'x'};
+        var decision = PasswordPromptResult.submitted(abandoned);
+        decision.close(); decision.close();
+        assertArrayEquals(new char[1], abandoned); assertNull(decision.takePassword());
+    }
     @Test void openPromptShowsOrderedAccessibleActionsAndOpenDefault() throws Exception {
         org.totipo.desktop.TestSupport.edt(() -> {
             var form = new PasswordPrompt.Form(Path.of("remembered vault"), false, PasswordPromptContext.REMEMBERED_STARTUP, () -> { });
