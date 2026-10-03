@@ -17,6 +17,10 @@ final class CountdownRing extends JPanel {
         remaining = display.remaining(); urgent = display.urgent();
         getAccessibleContext().setAccessibleName(display.seconds() + " seconds remaining"); repaint();
     }
+    void pending() {
+        remaining = 0; urgent = true;
+        getAccessibleContext().setAccessibleName("Updating code. 0 seconds remaining"); repaint();
+    }
     boolean urgent() { return urgent; }
     int remaining() { return remaining; }
     @Override protected void paintComponent(Graphics graphics) {

@@ -20,7 +20,7 @@ final class TotpDisplay {
     record Display(String label, String code, int remaining, long seconds, boolean urgent) { }
     private record Entry(String label, TotpCode code) { }
     private enum Grace { NONE, AUTHORIZED, CONSUMED }
-    private record Request(Grace grace) { }
+    private record Request(Grace grace, GraceWindow window, List<String> labels) { }
     private record GraceWindow(Instant from, Instant until) { }
     private record Reveal(VaultState base, TokenState token, List<Entry> entries, Grace grace) {
         TotpCode earliest() { return entries.stream().map(Entry::code).min(Comparator.comparing(TotpCode::validUntil)).orElseThrow(); }
@@ -46,26 +46,37 @@ final class TotpDisplay {
     void reveal(VaultState base, TokenState token) {
         Edt.require();
         requests.remove(token.id()); entries.remove(token.id());
-        if (entries.isEmpty()) { timer.stop(); }
+        if (entries.isEmpty() && requests.values().stream().noneMatch(r -> r.window() != null)) { timer.stop(); }
         request(base, token, null);
     }
 
     private void request(VaultState base, TokenState token, GraceWindow previous) {
         List<TokenAlternative> outcomes = codeAlternatives(token);
-        Request request = new Request(previous == null ? Grace.NONE : Grace.CONSUMED); requests.put(token.id(), request);
+        List<String> labels = new ArrayList<>();
+        for (int i = 0; i < outcomes.size(); i++) {
+            String identity = TokenPresentation.identity(outcomes.get(i).descriptor());
+            boolean duplicate = outcomes.stream().filter(a -> TokenPresentation.identity(a.descriptor()).equals(identity)).count() > 1;
+            labels.add(duplicate || identity.isBlank() ? "Possible code " + (i + 1) : identity);
+        }
+        Request request = new Request(previous == null ? Grace.NONE : Grace.CONSUMED, previous,
+                List.copyOf(labels));
+        requests.put(token.id(), request);
+        if (previous != null) {
+            // Publish pending only after expired material is removed and ownership is installed.
+            timer.start(); render.accept(token.id(), List.of());
+        }
         generate.generate(base, outcomes, clock.instant(), codes -> {
             Edt.require();
             if (requests.get(token.id()) != request) { return; }
             requests.remove(token.id());
+            if (entries.isEmpty() && requests.values().stream().noneMatch(r -> r.window() != null)) { timer.stop(); }
             List<Entry> revealed = new ArrayList<>();
             // A partial result must never look like a single successful conflict outcome.
             if (codes.size() != outcomes.size() || codes.stream().anyMatch(Optional::isEmpty)) {
                 render.accept(token.id(), List.of()); unavailable.accept(token.id()); return;
             }
             for (int i = 0; i < Math.min(codes.size(), outcomes.size()); i++) {
-                String identity = TokenPresentation.identity(outcomes.get(i).descriptor());
-                boolean duplicate = outcomes.stream().filter(a -> TokenPresentation.identity(a.descriptor()).equals(identity)).count() > 1;
-                String finalLabel = duplicate || identity.isBlank() ? "Possible code " + (i + 1) : identity;
+                String finalLabel = labels.get(i);
                 codes.get(i).ifPresent(code -> revealed.add(new Entry(finalLabel, code)));
             }
             Instant accepted = clock.instant();
@@ -117,17 +128,25 @@ final class TotpDisplay {
             if (revealed.stream().anyMatch(e -> !valid(e.code(), now))) {
                 TotpCode earliest = reveal.earliest();
                 // Consume before requesting: no retained expired Strings, timer retries, or per-Head requests.
-                clear(id);
+                entries.remove(id);
                 if (reveal.grace() == Grace.AUTHORIZED && !now.isBefore(earliest.validUntil())
                         && now.isBefore(nextExpiry(earliest))) {
                     // The pending request captures only interval bounds, never the expired code String.
                     request(reveal.base(), reveal.token(), new GraceWindow(earliest.validUntil(), nextExpiry(earliest)));
+                } else {
+                    render.accept(id, List.of());
                 }
                 continue;
             }
             render.accept(id, presentation(revealed, now));
         }
-        if (entries.isEmpty()) { timer.stop(); }
+        for (TokenId id : List.copyOf(requests.keySet())) {
+            Request pending = requests.get(id);
+            if (pending.window() != null && (now.isBefore(pending.window().from()) || !now.isBefore(pending.window().until()))) {
+                clear(id);
+            }
+        }
+        if (entries.isEmpty() && requests.values().stream().noneMatch(r -> r.window() != null)) { timer.stop(); }
     }
     /** Reconstruct a visible row without deriving, extending, or changing its authorization. */
     List<Display> presentation(TokenId id) {
@@ -135,7 +154,25 @@ final class TotpDisplay {
         return reveal == null || reveal.entries().stream().anyMatch(e -> !valid(e.code(), now))
                 ? List.of() : presentation(reveal.entries(), now);
     }
-    boolean pending(TokenId id) { Edt.require(); return requests.containsKey(id); }
+    boolean pending(TokenId id) {
+        Edt.require(); Request request = requests.get(id);
+        return request != null && (request.window() == null || inWindow(request.window()));
+    }
+    private boolean inWindow(GraceWindow window) {
+        Instant now = clock.instant(); return !now.isBefore(window.from()) && now.isBefore(window.until());
+    }
+    /** Non-secret pending geometry, including expiry observed just before the timer tick. */
+    List<String> graceLabels(TokenId id) {
+        Edt.require();
+        Request request = requests.get(id);
+        if (request != null && request.window() != null && inWindow(request.window())) { return request.labels(); }
+        Reveal reveal = entries.get(id); Instant now = clock.instant();
+        if (reveal != null && reveal.grace() == Grace.AUTHORIZED
+                && !now.isBefore(reveal.earliest().validUntil()) && now.isBefore(nextExpiry(reveal.earliest()))) {
+            return reveal.entries().stream().map(Entry::label).toList();
+        }
+        return List.of();
+    }
     private static List<Display> presentation(List<Entry> revealed, Instant now) {
         return revealed.stream().map(e -> {
                 double span = seconds(Duration.between(e.code().validFrom(), e.code().validUntil()));
@@ -162,11 +199,12 @@ final class TotpDisplay {
     private static double seconds(Duration d) { return d.getSeconds() + d.getNano() / 1e9; }
     void clear(TokenId id) {
         Edt.require(); requests.remove(id); entries.remove(id); render.accept(id, List.of());
-        if (entries.isEmpty()) { timer.stop(); }
+        if (entries.isEmpty() && requests.values().stream().noneMatch(r -> r.window() != null)) { timer.stop(); }
     }
     void clear() {
-        Edt.require(); requests.clear();
-        for (TokenId id : List.copyOf(entries.keySet())) { clear(id); }
+        Edt.require();
+        Set<TokenId> ids = new HashSet<>(entries.keySet()); ids.addAll(requests.keySet());
+        for (TokenId id : ids) { clear(id); }
         timer.stop();
     }
     boolean running() { return timer.isRunning(); }

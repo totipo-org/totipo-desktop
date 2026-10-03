@@ -14,16 +14,16 @@ import static org.totipo.desktop.ui.TokenBrowserTest.find;
 import static org.junit.jupiter.api.Assertions.*;
 
 class UsabilityTest {
-    @Test void matchingIsLiteralAndLimitedToIdIssuerAccountAcrossAlternatives() {
+    @Test void matchingIsLiteralAndLimitedToIssuerAccountAcrossAlternatives() {
         var conflict = token(171, active("École ISSUER"), alternative(TokenStatus.ACTIVE,
                 "<html>.*", "OtherAccount", TotpAlgorithm.SHA1, 6, 30));
-        for (String query : List.of("", "AB", "école issuer", "OTHERaccount", ".*", "<html>")) {
+        for (String query : List.of("", "école issuer", "OTHERaccount", ".*", "<html>")) {
             assertTrue(TokenSearch.matches(conflict, query), query);
         }
-        for (String query : List.of("SHA1", "ACTIVE", "Alternative", "absent", "^.*$")) {
+        for (String query : List.of("AB", "SHA1", "ACTIVE", "Alternative", "absent", "^.*$")) {
             assertFalse(TokenSearch.matches(conflict, query), query);
         }
-        assertTrue(TokenSearch.matches(token(171), "AB"));
+        assertFalse(TokenSearch.matches(token(171), "AB"));
         assertTrue(TokenSearch.matches(token(171), ""));
         assertFalse(TokenSearch.matches(token(171), "issuer"));
     }

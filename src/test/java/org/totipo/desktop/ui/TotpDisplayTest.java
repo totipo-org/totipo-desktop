@@ -142,7 +142,7 @@ class TotpDisplayTest {
             display.generator((base, alts, now, done) -> callback.set(done));
             display.reveal(new State().value, token(1, active("A"))); display.clear();
             callback.get().accept(List.of(Optional.of(new TotpCode("001234", clock.now, clock.now.plusSeconds(30)))));
-            assertFalse(display.running()); assertNull(visible.get());
+            assertFalse(display.running()); assertTrue(visible.get().isEmpty());
         });
     }
     @Test void oneTimerOwnsIndependentExplicitRevealsAndOnlyTicksLiveEntries() throws Exception {

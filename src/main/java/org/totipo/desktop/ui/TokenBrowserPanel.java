@@ -35,13 +35,12 @@ public final class TokenBrowserPanel extends JPanel {
     public TokenBrowserPanel(Clock clock) {
         Edt.require(); setLayout(new BorderLayout(8, 8));
         copyNotification = new CopyNotification(clock);
-        totp = new TotpDisplay(clock, (id, displays) -> {
-            TokenRowPanel row = row(id); if (row != null) { row.display(displays); }
-        }, id -> copyNotification.showMessage("Code unavailable. Try Show Code again."));
+        totp = new TotpDisplay(clock, this::display,
+                id -> copyNotification.showMessage("Code unavailable. Try Show Code again."));
         JPanel searchBar = new JPanel(new BorderLayout(8, 4));
         searchBar.add(SwingUsability.label("Search", search), BorderLayout.WEST);
         searchBar.add(search, BorderLayout.CENTER); searchBar.add(resultCount, BorderLayout.EAST);
-        search.getAccessibleContext().setAccessibleDescription("Filter by token ID, issuer or account. Escape clears search.");
+        search.getAccessibleContext().setAccessibleDescription("Filter by issuer or account. Escape clears search.");
         add(searchBar, BorderLayout.NORTH);
         search.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
             public void insertUpdate(javax.swing.event.DocumentEvent e) { filter(); }
@@ -102,8 +101,8 @@ public final class TokenBrowserPanel extends JPanel {
                         }
                     });
             rows.add(row); list.add(row);
-            row.display(totp.presentation(token.id()));
-            if (totp.pending(token.id())) { row.pending(); }
+            display(token.id(), totp.presentation(token.id()));
+            if (totp.pending(token.id()) && totp.graceLabels(token.id()).isEmpty()) { row.pending(); }
             SwingUsability.bind(row, WHEN_ANCESTOR_OF_FOCUSED_COMPONENT, KeyStroke.getKeyStroke("UP"), "previous-token",
                     SwingUsability.action("Previous token", () -> moveSelection(-1)));
             SwingUsability.bind(row, WHEN_ANCESTOR_OF_FOCUSED_COMPONENT, KeyStroke.getKeyStroke("DOWN"), "next-token",
@@ -116,6 +115,13 @@ public final class TokenBrowserPanel extends JPanel {
         int total = latest.tokens().size();
         resultCount.setText(search.getText().isEmpty() ? total + " tokens" : rows.size() + " of " + total + " tokens");
         updateActions(); list.revalidate(); list.repaint();
+    }
+    private void display(TokenId id, List<TotpDisplay.Display> displays) {
+        TokenRowPanel row = row(id);
+        if (row == null) { return; }
+        List<String> pending = totp.graceLabels(id);
+        if (!pending.isEmpty()) { row.gracePending(pending); }
+        else { row.display(displays); }
     }
     private void moveSelection(int offset) {
         int index = -1;

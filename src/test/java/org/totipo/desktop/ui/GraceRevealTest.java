@@ -19,7 +19,8 @@ class GraceRevealTest {
             try {
                 panel.render(state.value); panel.row(id(1)).show.doClick(0); var copy = TotpCopyTest.buttons(panel).get(0);
                 clock.now = Instant.ofEpochSecond(30); copy.doClick(0);
-                assertEquals(1, state.calls.size()); assertTrue(panel.row(id(1)).show.isVisible());
+                assertEquals(1, state.calls.size()); assertFalse(panel.row(id(1)).show.isVisible());
+                assertFalse(TotpCopyTest.buttons(panel).get(0).isEnabled());
                 panel.totp.tick(); assertEquals(2, state.calls.size()); assertFalse(panel.row(id(1)).show.isVisible());
                 clock.now = Instant.ofEpochSecond(60); panel.totp.tick(); assertEquals(2, state.calls.size());
             } finally { panel.closing(); }
