@@ -10,6 +10,17 @@ import static org.totipo.desktop.ui.TokenFixtures.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class CopyNotificationTest {
+    @Test void timeoutDismissesAtExactlyThreeSecondsAndReplacementRestartsDeadline() throws Exception {
+        edt(() -> {
+            var clock = new MutableClock(); var notification = new CopyNotification(clock);
+            try {
+                assertEquals(3000, CopyNotification.TIMEOUT_MS); notification.showMessage(CopyNotification.COPIED);
+                clock.now = clock.now.plusMillis(2999); notification.tick(); assertTrue(notification.isVisible());
+                notification.showMessage(CopyNotification.COPIED); clock.now = clock.now.plusMillis(2999); notification.tick(); assertTrue(notification.isVisible());
+                clock.now = clock.now.plusMillis(1); notification.tick(); assertFalse(notification.isVisible()); assertEquals("", notification.message.getText());
+            } finally { notification.dismiss(); }
+        });
+    }
     @Test void copyShowsOneAccessibleOverlayAndDoesNotChangeListLayout() throws Exception {
         edt(() -> {
             var clock = new MutableClock(); var panel = browser(clock); var state = new State(token(1, active("A")));
@@ -45,7 +56,8 @@ class CopyNotificationTest {
             panel.copyAction((c, f, u, n) -> TotpClipboard.COPIED);
             try {
                 panel.render(state.value); panel.row(id(1)).show.doClick(0); var notification = panel.copyNotification;
-                TotpCopyTest.buttons(panel).get(0).doClick(0); clock.now = clock.now.plusSeconds(3); notification.tick(); assertTrue(notification.isVisible());
+                assertEquals(3000, CopyNotification.TIMEOUT_MS);
+                TotpCopyTest.buttons(panel).get(0).doClick(0); clock.now = clock.now.plusMillis(2999); notification.tick(); assertTrue(notification.isVisible());
                 TotpCopyTest.buttons(panel).get(0).doClick(0); assertSame(notification, panel.copyNotification);
                 long count = java.util.Arrays.stream(notification.getParent().getComponents()).filter(CopyNotification.class::isInstance).count(); assertEquals(1, count);
                 clock.now = clock.now.plusSeconds(1); notification.tick(); assertTrue(notification.isVisible());

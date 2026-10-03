@@ -75,7 +75,7 @@ class RevealPersistenceTest {
             try {
                 panel.render(state.value); panel.row(id(1)).show.doClick(0);
                 assertTrue(panel.totp.presentation(id(1)).get(0).urgent()); panel.search.setText("absent");
-                clock.now = Instant.ofEpochSecond(30); panel.search.setText("also absent"); assertEquals(1, state.calls.size());
+                clock.now = Instant.ofEpochSecond(30); panel.search.setText("also absent"); assertEquals(2, state.calls.size());
                 panel.totp.tick(); assertEquals(2, state.calls.size()); assertTrue(panel.rows.isEmpty());
                 assertNull(TotpCopyTest.codeLabel(panel)); clock.now = Instant.ofEpochSecond(35); panel.search.setText("");
                 assertEquals("005678", panel.totp.presentation(id(1)).get(0).code());
@@ -107,7 +107,7 @@ class RevealPersistenceTest {
                 panel.diagnosticsAction = p -> { }; panel.onEdit((b, a, e) -> { });
                 try {
                     panel.render(state.value); panel.row(id(1)).show.doClick(0); panel.diagnosticsMenu.doClick(0);
-                    assertFalse(panel.totp.presentation(id(1)).isEmpty()); assertEquals(1, state.calls.size());
+                    assertFalse(panel.totp.presentation(id(1)).isEmpty()); assertEquals(2, state.calls.size());
                     switch (invalidation) {
                         case "edit" -> panel.row(id(1)).edit.doClick(0);
                         case "replacement" -> panel.render(new State(token(1, active("Changed"))).value);
@@ -116,7 +116,7 @@ class RevealPersistenceTest {
                         default -> fail();
                     }
                     clock.now = Instant.ofEpochSecond(30); panel.totp.tick();
-                    assertTrue(panel.totp.presentation(id(1)).isEmpty()); assertEquals(1, state.calls.size(), invalidation);
+                    assertTrue(panel.totp.presentation(id(1)).isEmpty()); assertEquals(2, state.calls.size(), invalidation);
                 } finally { panel.closing(); }
             }
         });

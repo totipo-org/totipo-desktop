@@ -49,6 +49,10 @@ public final class TokenBrowserPanel extends JPanel {
         });
         SwingUsability.bind(search, WHEN_FOCUSED, KeyStroke.getKeyStroke("ESCAPE"), "clear-search",
                 SwingUsability.action("Clear search", () -> search.setText("")));
+        SwingUsability.bind(search, WHEN_FOCUSED, KeyStroke.getKeyStroke("DOWN"), "enter-results",
+                SwingUsability.action("Focus token results", this::focusResults));
+        SwingUsability.bind(search, WHEN_FOCUSED, KeyStroke.getKeyStroke("ENTER"), "enter-results",
+                search.getActionMap().get("enter-results"));
         list.setLayout(new BoxLayout(list, BoxLayout.Y_AXIS));
         list.getAccessibleContext().setAccessibleName("Tokens");
         JScrollPane scroll = new JScrollPane(list, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
@@ -127,9 +131,21 @@ public final class TokenBrowserPanel extends JPanel {
         int index = -1;
         for (int i = 0; i < rows.size(); i++) { if (rows.get(i).token.id().equals(selected)) { index = i; } }
         if (rows.isEmpty()) { return; }
+        if (index == 0 && offset < 0) { focus(search); return; }
         TokenRowPanel next = rows.get(Math.max(0, Math.min(rows.size() - 1, index + offset)));
-        select(next.token.id()); next.requestFocusInWindow(); list.scrollRectToVisible(next.getBounds());
+        focusRow(next);
     }
+    private void focusResults() {
+        if (closed || rows.isEmpty()) { return; }
+        TokenRowPanel target = row(selected);
+        focusRow(target == null ? rows.get(0) : target);
+    }
+    private void focusRow(TokenRowPanel target) {
+        select(target.token.id()); focus(target); list.scrollRectToVisible(target.getBounds());
+    }
+    // Package-visible focus request seam keeps headless action-map tests deterministic.
+    transient Consumer<JComponent> focus = component -> component.requestFocusInWindow();
+    private void focus(JComponent component) { Edt.require(); focus.accept(component); }
     void select(TokenId id) {
         Edt.require(); if (closed) { return; }
         selected = row(id) == null ? null : id; updateActions();
@@ -141,7 +157,7 @@ public final class TokenBrowserPanel extends JPanel {
         Edt.require(); if (closed || row(id) == null) { return; }
         totp.clear(id); row(id).pending(); totp.reveal(latest, row(id).token);
     }
-    public void focusSearch() { search.requestFocusInWindow(); search.selectAll(); }
+    public void focusSearch() { Edt.require(); if (!closed) { focus(search); search.selectAll(); } }
     public void onEdit(VaultView.EditAction action) { Edt.require(); editAction = action; }
     public void onMerge(VaultView.MergeAction action) { Edt.require(); mergeAction = action; }
     public void totpAction(VaultView.TotpAction action) {

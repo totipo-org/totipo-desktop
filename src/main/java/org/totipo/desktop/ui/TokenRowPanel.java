@@ -80,6 +80,10 @@ final class TokenRowPanel extends JPanel {
         for (Component cell : grid.getComponents()) { cell.addMouseListener(selectionListener); }
         primary.addMouseListener(selectionListener); account.addMouseListener(selectionListener); warning.addMouseListener(selectionListener);
         selectOnFocus(this); selectOnFocus(show); selectOnFocus(edit);
+        SwingUsability.bind(this, WHEN_FOCUSED, KeyStroke.getKeyStroke("ENTER"), "primary-action",
+                SwingUsability.action("Show or copy code", this::primaryAction));
+        SwingUsability.bind(this, WHEN_FOCUSED, KeyStroke.getKeyStroke("SPACE"), "primary-action",
+                getActionMap().get("primary-action"));
         selected(false); updateAccessible(List.of());
     }
     private void addCell(JPanel cell, int column, int line, double weight, int width, int height) {
@@ -110,19 +114,50 @@ final class TokenRowPanel extends JPanel {
         code.setFont(code.getFont().deriveFont(Font.BOLD, code.getFont().getSize2D() * 1.2f)); return code;
     }
     void selected(boolean selected) {
+        boolean previous = selection;
         selection = selected;
-        Color background = selected ? UIManager.getColor("List.selectionBackground") : UIManager.getColor("List.background");
-        if (!selected && token.hasConflict()) {
+        Color background = UIManager.getColor("List.background");
+        if (token.hasConflict()) {
             Color amber = new Color(225, 155, 40);
             background = new Color((background.getRed() * 7 + amber.getRed()) / 8,
                     (background.getGreen() * 7 + amber.getGreen()) / 8, (background.getBlue() * 7 + amber.getBlue()) / 8);
         }
+        else if (selected) { background = mix(background, UIManager.getColor("List.selectionBackground"), 12); }
         setBackground(background);
-        labelColors(this, UIManager.getColor(selected ? "List.selectionForeground" : "List.foreground"));
+        labelColors(this, UIManager.getColor("List.foreground"));
         Color edge = token.hasConflict() ? new Color(190, 125, 25) : UIManager.getColor("Separator.foreground");
         setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0, token.hasConflict() ? 3 : 0, 1, 0, edge),
-                BorderFactory.createEmptyBorder(10, 10, 10, 10)));
+                BorderFactory.createCompoundBorder(selected
+                        ? BorderFactory.createLineBorder(UIManager.getColor("List.selectionBackground"), 2)
+                        : BorderFactory.createEmptyBorder(2, 2, 2, 2), BorderFactory.createEmptyBorder(8, 8, 8, 8))));
+        if (previous != selected) {
+            getAccessibleContext().firePropertyChange(javax.accessibility.AccessibleContext.ACCESSIBLE_STATE_PROPERTY,
+                    previous ? javax.accessibility.AccessibleState.SELECTED : null,
+                    selected ? javax.accessibility.AccessibleState.SELECTED : null);
+        }
         repaint();
+    }
+    private static Color mix(Color base, Color accent, int weight) {
+        return new Color((base.getRed() * (weight - 1) + accent.getRed()) / weight,
+                (base.getGreen() * (weight - 1) + accent.getGreen()) / weight,
+                (base.getBlue() * (weight - 1) + accent.getBlue()) / weight);
+    }
+    @Override public javax.accessibility.AccessibleContext getAccessibleContext() {
+        if (accessibleContext == null) { accessibleContext = new AccessibleJPanel() {
+            private static final long serialVersionUID = 1L;
+            @Override public javax.accessibility.AccessibleStateSet getAccessibleStateSet() {
+                var states = super.getAccessibleStateSet();
+                states.add(javax.accessibility.AccessibleState.SELECTABLE);
+                if (selection) { states.add(javax.accessibility.AccessibleState.SELECTED); }
+                return states;
+            }
+        }; }
+        return accessibleContext;
+    }
+    private void primaryAction() {
+        if (retired) { return; }
+        if (show.isVisible() && show.isEnabled()) { show.doClick(0); }
+        else if (!updating && outcomes.size() == 1 && outcomes.get(0).button.isEnabled()) { outcomes.get(0).button.doClick(0); }
     }
     private static void labelColors(Container root, Color foreground) {
         for (Component child : root.getComponents()) {
@@ -141,7 +176,7 @@ final class TokenRowPanel extends JPanel {
         final JPanel countdown = transparent(new FlowLayout(FlowLayout.TRAILING, 5, 0));
         final JButton button = new JButton("Copy");
         Outcome(int index, String label) {
-            countdown.add(ring); countdown.add(seconds);
+            countdown.add(seconds); countdown.add(ring);
             button.setMargin(new Insets(3, 8, 3, 8));
             button.getAccessibleContext().setAccessibleName("Copy TOTP code" + (outcomeCount > 1 ? " for " + label : ""));
             Object generation = presentation;
@@ -193,14 +228,16 @@ final class TokenRowPanel extends JPanel {
         if (displays.isEmpty()) { actionTop.add(show, BorderLayout.EAST); }
         for (int i = 0; i < displays.size(); i++) {
             var d = displays.get(i); Outcome outcome = outcomes.get(i);
+            outcome.button.setEnabled(false);
             outcome.ring.update(d); outcome.seconds.setText(d.seconds() + " sec");
             outcome.code.setText(TokenPresentation.formattedCode(d.code()));
             outcome.code.getAccessibleContext().setAccessibleName("TOTP code " + outcome.code.getText());
+            outcome.button.setEnabled(true); outcome.button.getAccessibleContext().setAccessibleDescription(null);
         }
         updateAccessible(displays); refresh();
     }
     private void refresh() {
-        labelColors(this, UIManager.getColor(selection ? "List.selectionForeground" : "List.foreground"));
+        labelColors(this, UIManager.getColor("List.foreground"));
         revalidate(); repaint();
     }
     private String identityAccessible() {

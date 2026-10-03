@@ -36,10 +36,19 @@ class TokenRowLayoutTest {
             assertNotNull(ring); assertEquals("24 seconds remaining", ring.getAccessibleContext().getAccessibleName());
             JLabel seconds = find(row.statusBottom, JLabel.class); assertEquals("24 sec", seconds.getText());
             assertSame(ring.getParent(), seconds.getParent());
+            assertSame(seconds, ring.getParent().getComponent(0)); assertSame(ring, ring.getParent().getComponent(1));
+            assertSame(ring.getParent(), ((BorderLayout) row.statusBottom.getLayout()).getLayoutComponent(BorderLayout.EAST));
             assertEquals(FlowLayout.TRAILING, ((FlowLayout) ring.getParent().getLayout()).getAlignment());
             JButton copy = TotpCopyTest.buttons(row).get(0); assertSame(row.actionTop, copy.getParent());
             assertSame(row.actionBottom, row.edit.getParent()); assertFalse(row.show.isVisible());
             assertEquals(preferred.height, row.getPreferredSize().height); assertEquals(minimum.height, row.getMinimumSize().height);
+            for (long left : new long[]{29, 11, 9, 1}) {
+                row.display(List.of(new TotpDisplay.Display("GitHub", "001234", 100, left, left < 10)));
+                assertSame(ring, find(row.statusBottom, CountdownRing.class));
+                assertSame(ring, ring.getParent().getComponent(1)); assertSame(seconds, ring.getParent().getComponent(0));
+                assertEquals(left + " sec", seconds.getText()); assertEquals(preferred.height, row.getPreferredSize().height);
+                assertSame(ring.getParent(), ((BorderLayout) row.statusBottom.getLayout()).getLayoutComponent(BorderLayout.EAST));
+            }
             row.gracePending(List.of("GitHub"));
             assertEquals("", code.getText()); assertFalse(copy.isEnabled()); assertFalse(row.show.isVisible());
             assertEquals("Updating…", find(row.statusTop, JLabel.class).getText());

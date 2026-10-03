@@ -9,6 +9,7 @@ import javax.swing.*;
 final class CopyNotification extends JPanel {
     private static final long serialVersionUID = 1L;
     static final String COPIED = "Code copied. Totipo will try to clear it when it expires.";
+    static final int TIMEOUT_MS = 3000;
     final JTextArea message = new JTextArea(2, 32);
     final JButton close = new JButton("×");
     private final transient Clock clock;
@@ -31,7 +32,7 @@ final class CopyNotification extends JPanel {
         SwingUsability.bind(this, WHEN_ANCESTOR_OF_FOCUSED_COMPONENT, KeyStroke.getKeyStroke("ESCAPE"),
                 "dismiss-notification", SwingUsability.action("Close notification", this::dismiss));
         add(message, BorderLayout.CENTER); add(close, BorderLayout.EAST);
-        timer = new Timer(4000, e -> tick()); timer.setRepeats(false); timer.setCoalesce(true);
+        timer = new Timer(TIMEOUT_MS, e -> tick()); timer.setRepeats(false); timer.setCoalesce(true);
         setVisible(false);
     }
 
@@ -39,8 +40,8 @@ final class CopyNotification extends JPanel {
         Edt.require(); message.setText(text);
         message.getAccessibleContext().setAccessibleDescription(text);
         getAccessibleContext().setAccessibleDescription(text);
-        dismissAt = clock.instant().plusSeconds(4); setVisible(true);
-        timer.setInitialDelay(4000); timer.restart();
+        dismissAt = clock.instant().plusMillis(TIMEOUT_MS); setVisible(true);
+        timer.setInitialDelay(TIMEOUT_MS); timer.restart();
         if (getParent() != null) { getParent().doLayout(); getParent().repaint(); }
     }
     void tick() {
@@ -48,7 +49,7 @@ final class CopyNotification extends JPanel {
         if (dismissAt == null) { return; }
         if (!clock.instant().isBefore(dismissAt)) { dismiss(); }
         else {
-            timer.setInitialDelay((int) Math.min(4000, Math.max(1, java.time.Duration.between(clock.instant(), dismissAt).toMillis())));
+            timer.setInitialDelay((int) Math.min(TIMEOUT_MS, Math.max(1, java.time.Duration.between(clock.instant(), dismissAt).toMillis())));
             timer.restart();
         }
     }

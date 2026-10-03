@@ -54,7 +54,7 @@ public final class VaultPanel extends JPanel {
         setMinimumSize(new java.awt.Dimension(MINIMUM_SIZE));
         SwingUsability.bind(this, WHEN_IN_FOCUSED_WINDOW, javax.swing.KeyStroke.getKeyStroke("F5"), "refresh", refreshAction);
         SwingUsability.bind(this, WHEN_IN_FOCUSED_WINDOW, javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_N, SwingUsability.menuMask()), "create", createAction);
-        SwingUsability.bind(this, WHEN_IN_FOCUSED_WINDOW, javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_F, SwingUsability.menuMask()), "find", SwingUsability.action("Find", browser::focusSearch));
+        SwingUsability.bind(this, WHEN_IN_FOCUSED_WINDOW, javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_F, java.awt.event.InputEvent.CTRL_DOWN_MASK), "find", SwingUsability.action("Find", browser::focusSearch));
         refresh.setMnemonic('R'); create.setMnemonic('N'); changePassword.setMnemonic('P');
         refresh.setToolTipText("Refresh (F5)"); create.setToolTipText("Create Token (menu shortcut + N)");
         status.getAccessibleContext().setAccessibleDescription("Vault reading status");
