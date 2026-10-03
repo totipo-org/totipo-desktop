@@ -101,5 +101,5 @@ public final class VaultFrame extends JFrame implements VaultView {
     }
     @Override public void showWindow() { Edt.require(); setVisible(true); javax.swing.SwingUtilities.invokeLater(() -> { if (isShowing()) { panel.focusSearch(); } }); }
     @Override public void hideWindow() { Edt.require(); setVisible(false); }
-    @Override public void dispose() { Edt.require(); super.dispose(); }
+    @Override public void dispose() { Edt.require(); panel.closing(); super.dispose(); }
 }

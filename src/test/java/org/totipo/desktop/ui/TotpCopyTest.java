@@ -24,10 +24,10 @@ class TotpCopyTest {
         }
         return result;
     }
-    static JLabel status(Container root) {
+    static JTextArea status(Container root) {
         for (Component child : root.getComponents()) {
-            if (child instanceof JLabel label && "TOTP clipboard status".equals(label.getAccessibleContext().getAccessibleName())) { return label; }
-            if (child instanceof Container c) { JLabel found = status(c); if (found != null) { return found; } }
+            if (child instanceof JTextArea label && "TOTP clipboard status".equals(label.getAccessibleContext().getAccessibleName())) { return label; }
+            if (child instanceof Container c) { JTextArea found = status(c); if (found != null) { return found; } }
         }
         return null;
     }
@@ -50,7 +50,7 @@ class TotpCopyTest {
                 assertNull(codeLabel(panel.row(id(1)))); assertNotNull(codeLabel(panel.row(id(2)))); assertEquals(1, buttons(panel).size());
                 JButton copy = buttons(panel).get(0); assertEquals("Copy TOTP code", copy.getAccessibleContext().getAccessibleName());
                 panel.writeAvailability(false); assertTrue(copy.isEnabled()); copy.doClick(0);
-                assertEquals(1, copies.get()); assertEquals(1, state.calls.size()); assertEquals(TotpClipboard.COPIED, status(panel).getText());
+                assertEquals(1, copies.get()); assertEquals(1, state.calls.size()); assertEquals(CopyNotification.COPIED, status(panel).getText());
                 JLabel code = codeLabel(panel.row(id(2))); panel.closing(); assertEquals("", code.getText()); assertFalse(copy.isEnabled());
                 copy.getActionListeners()[0].actionPerformed(null); assertEquals(1, copies.get());
             } finally { panel.closing(); }

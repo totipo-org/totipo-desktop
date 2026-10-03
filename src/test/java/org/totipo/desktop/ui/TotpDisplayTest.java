@@ -18,12 +18,12 @@ class TotpDisplayTest {
             var clock = new MutableClock(); var visible = new AtomicReference<List<TotpDisplay.Display>>(); var display = display(clock, visible);
             var token = token(1, active("issuer")); var state = new State(token);
             // Returned intervals, rather than a hard-coded 30-second modulo, are authoritative.
-            state.result = call -> new TotpCode("001234", call.now().minusSeconds(2), call.now().plusSeconds(8));
+            state.result = call -> new TotpCode("001234", call.now().minusSeconds(2), call.now().plusSeconds(18));
             try {
                 display.reveal(state.value, token); assertTrue(display.running()); assertEquals(1, state.calls.size());
-                assertEquals("001234", visible.get().get(0).code()); assertEquals(800, visible.get().get(0).remaining()); assertEquals(8, visible.get().get(0).seconds());
-                clock.now = clock.now.plusSeconds(3); display.tick(); display.tick(); assertEquals(500, visible.get().get(0).remaining());
-                clock.now = clock.now.plusSeconds(5).minusNanos(1); display.tick(); assertEquals(1, state.calls.size());
+                assertEquals("001234", visible.get().get(0).code()); assertEquals(900, visible.get().get(0).remaining()); assertEquals(18, visible.get().get(0).seconds());
+                clock.now = clock.now.plusSeconds(3); display.tick(); display.tick(); assertEquals(750, visible.get().get(0).remaining());
+                clock.now = clock.now.plusSeconds(15).minusNanos(1); display.tick(); assertEquals(1, state.calls.size());
                 clock.now = clock.now.plusNanos(1); display.tick(); assertTrue(visible.get().isEmpty()); assertFalse(display.running()); assertEquals(1, state.calls.size());
                 clock.now = clock.now.plusSeconds(1000); display.tick(); assertEquals(1, state.calls.size());
                 display.reveal(state.value, token); assertEquals(2, state.calls.size()); assertTrue(display.running());
@@ -44,7 +44,7 @@ class TotpDisplayTest {
             } finally { display.clear(); }
         });
     }
-    @Test void revealNearEndReturnsCurrentCodeWithoutWaitingOrRollForward() throws Exception {
+    @Test void revealNearEndShowsCurrentCodeThenRollsExactlyOnce() throws Exception {
         edt(() -> {
             var clock = new MutableClock(); clock.now = Instant.ofEpochSecond(29);
             var visible = new AtomicReference<List<TotpDisplay.Display>>(); var display = display(clock, visible);
@@ -52,7 +52,9 @@ class TotpDisplayTest {
             try {
                 display.reveal(state.value, token); assertEquals(1, visible.get().get(0).seconds()); assertEquals("001234", visible.get().get(0).code());
                 assertEquals(clock.now, state.calls.get(0).now()); clock.now = clock.now.plusSeconds(1); display.tick();
-                assertTrue(visible.get().isEmpty()); assertEquals(1, state.calls.size());
+                assertEquals(30, visible.get().get(0).seconds()); assertEquals(2, state.calls.size());
+                clock.now = Instant.ofEpochSecond(60); display.tick(); assertTrue(visible.get().isEmpty());
+                clock.now = Instant.ofEpochSecond(90); display.tick(); display.tick(); assertEquals(2, state.calls.size());
             } finally { display.clear(); }
         });
     }
@@ -85,14 +87,16 @@ class TotpDisplayTest {
         var period = alternative(TokenStatus.ACTIVE, "D", "account", TotpAlgorithm.SHA1, 6, 45);
         assertEquals(4, TotpDisplay.codeAlternatives(token(1, a, algorithm, digits, period)).size());
     }
-    @Test void mixedPeriodsHideAllOutcomesAtFirstExpiry() throws Exception {
+    @Test void mixedPeriodsReplaceWholeBatchAtFirstExpiryThenHideAtGraceEarliestExpiry() throws Exception {
         edt(() -> {
             var clock = new MutableClock(); clock.now = Instant.ofEpochSecond(25);
             TokenAlternative a = active("A"), b = alternative(TokenStatus.ACTIVE, "B", "account", TotpAlgorithm.SHA1, 6, 45);
             var token = token(1, a, b); var state = new State(token); var visible = new AtomicReference<List<TotpDisplay.Display>>(); var display = display(clock, visible);
             try {
                 display.reveal(state.value, token); assertEquals(2, visible.get().size()); assertEquals(5, visible.get().get(0).seconds()); assertEquals(20, visible.get().get(1).seconds());
-                clock.now = clock.now.plusSeconds(5); display.tick(); assertTrue(visible.get().isEmpty()); assertEquals(2, state.calls.size());
+                clock.now = clock.now.plusSeconds(5); display.tick(); assertEquals(2, visible.get().size()); assertEquals(4, state.calls.size());
+                assertEquals(30, visible.get().get(0).seconds()); assertEquals(15, visible.get().get(1).seconds());
+                clock.now = Instant.ofEpochSecond(45); display.tick(); assertTrue(visible.get().isEmpty()); assertEquals(4, state.calls.size());
             } finally { display.clear(); }
         });
     }

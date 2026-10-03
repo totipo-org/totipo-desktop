@@ -22,7 +22,7 @@ public final class TokenBrowserPanel extends JPanel {
     final JLabel empty = TokenRowPanel.literal("No tokens yet. Use Create Token to add one.");
     final JMenuItem editMenu = new JMenuItem("Edit…");
     final JMenuItem diagnosticsMenu = new JMenuItem("View Diagnostics…");
-    private final JLabel clipboardStatus = new JLabel(" ");
+    final CopyNotification copyNotification;
     private transient TotpClipboard.Copy copyAction = (code, from, until, now) -> TotpClipboard.UNAVAILABLE;
     private transient VaultView.EditAction editAction;
     private transient VaultView.MergeAction mergeAction;
@@ -34,9 +34,10 @@ public final class TokenBrowserPanel extends JPanel {
 
     public TokenBrowserPanel(Clock clock) {
         Edt.require(); setLayout(new BorderLayout(8, 8));
+        copyNotification = new CopyNotification(clock);
         totp = new TotpDisplay(clock, (id, displays) -> {
             TokenRowPanel row = row(id); if (row != null) { row.display(displays); }
-        });
+        }, id -> copyNotification.showMessage("Code unavailable. Try Show Code again."));
         JPanel searchBar = new JPanel(new BorderLayout(8, 4));
         searchBar.add(SwingUsability.label("Search", search), BorderLayout.WEST);
         searchBar.add(search, BorderLayout.CENTER); searchBar.add(resultCount, BorderLayout.EAST);
@@ -52,9 +53,21 @@ public final class TokenBrowserPanel extends JPanel {
         list.setLayout(new BoxLayout(list, BoxLayout.Y_AXIS));
         list.getAccessibleContext().setAccessibleName("Tokens");
         JScrollPane scroll = new JScrollPane(list, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-        scroll.getVerticalScrollBar().setUnitIncrement(24); add(scroll, BorderLayout.CENTER);
+        scroll.getVerticalScrollBar().setUnitIncrement(24);
+        JLayeredPane overlay = new JLayeredPane() {
+            private static final long serialVersionUID = 1L;
+            @Override public Dimension getPreferredSize() { return scroll.getPreferredSize(); }
+            @Override public Dimension getMinimumSize() { return scroll.getMinimumSize(); }
+            @Override public void doLayout() {
+                scroll.setBounds(0, 0, getWidth(), getHeight());
+                Dimension size = copyNotification.getPreferredSize();
+                int width = Math.max(0, Math.min(size.width, getWidth() - 24));
+                copyNotification.setBounds((getWidth() - width) / 2, Math.max(0, getHeight() - size.height - 12), width, size.height);
+            }
+        };
+        overlay.add(scroll, JLayeredPane.DEFAULT_LAYER);
+        overlay.add(copyNotification, JLayeredPane.POPUP_LAYER); add(overlay, BorderLayout.CENTER);
         list.add(empty);
-        clipboardStatus.getAccessibleContext().setAccessibleName("TOTP clipboard status"); add(clipboardStatus, BorderLayout.SOUTH);
         editMenu.addActionListener(e -> editSelected());
         diagnosticsMenu.addActionListener(e -> {
             TokenState token = selectedToken();
@@ -72,19 +85,25 @@ public final class TokenBrowserPanel extends JPanel {
     }
     public void render(VaultState state) {
         Edt.require(); if (closed) { return; }
-        latest = state; filter();
+        // U2's conservative observation replacement rule still invalidates all authorization.
+        totp.clear(); latest = state; filter();
     }
     private void filter() {
         Edt.require(); if (closed || latest == null) { return; }
-        // Every state/search replacement conservatively retires all old derived-code ownership.
-        totp.clear(); rows.forEach(TokenRowPanel::retire); rows.clear(); list.removeAll();
+        // Search is presentation only: detach/erase widgets, keeping live Token-ID authorization.
+        rows.forEach(TokenRowPanel::retire); rows.clear(); list.removeAll();
         for (TokenState token : latest.tokens()) {
             if (!TokenSearch.matches(token, search.getText())) { continue; }
             TokenRowPanel row = new TokenRowPanel(token, () -> select(token.id()), () -> reveal(token.id()),
                     () -> edit(token.id()), index -> {
-                        if (!closed && row(token.id()) != null) { clipboardStatus.setText(totp.copy(token.id(), index, copyAction)); }
+                        if (!closed && row(token.id()) != null) {
+                            String result = totp.copy(token.id(), index, copyAction);
+                            copyNotification.showMessage(TotpClipboard.COPIED.equals(result) ? CopyNotification.COPIED : result);
+                        }
                     });
             rows.add(row); list.add(row);
+            row.display(totp.presentation(token.id()));
+            if (totp.pending(token.id())) { row.pending(); }
             SwingUsability.bind(row, WHEN_ANCESTOR_OF_FOCUSED_COMPONENT, KeyStroke.getKeyStroke("UP"), "previous-token",
                     SwingUsability.action("Previous token", () -> moveSelection(-1)));
             SwingUsability.bind(row, WHEN_ANCESTOR_OF_FOCUSED_COMPONENT, KeyStroke.getKeyStroke("DOWN"), "next-token",
@@ -120,12 +139,7 @@ public final class TokenBrowserPanel extends JPanel {
     public void onEdit(VaultView.EditAction action) { Edt.require(); editAction = action; }
     public void onMerge(VaultView.MergeAction action) { Edt.require(); mergeAction = action; }
     public void totpAction(VaultView.TotpAction action) {
-        totp.generator((base, alternatives, now, done) -> action.generate(base, alternatives, now, codes -> {
-            if (!closed && latest == base && (codes.size() != alternatives.size() || codes.stream().anyMatch(java.util.Optional::isEmpty))) {
-                clipboardStatus.setText("Code unavailable. Try Show Code again.");
-            }
-            done.accept(codes);
-        }));
+        totp.generator(action);
     }
     public void copyAction(TotpClipboard.Copy action) { Edt.require(); copyAction = action; }
     public void writeAvailability(boolean available) { Edt.require(); writeAvailable = available; updateActions(); }
@@ -179,9 +193,9 @@ public final class TokenBrowserPanel extends JPanel {
     private void closeDialogs() { for (JDialog dialog : List.copyOf(dialogs)) { dialog.dispose(); } dialogs.clear(); }
     public void closing() {
         Edt.require(); if (closed) { return; }
-        closed = true; totp.clear(); rows.forEach(TokenRowPanel::retire); rows.clear();
+        closed = true; totp.clear(); copyNotification.dismiss(); rows.forEach(TokenRowPanel::retire); rows.clear();
         closeDialogs(); latest = null; selected = null; list.removeAll(); list.setEnabled(false);
-        clipboardStatus.setText(" "); search.setText(""); search.setEnabled(false); updateActions();
+        search.setText(""); search.setEnabled(false); updateActions();
         empty.setText("Closing…"); list.add(empty); list.revalidate(); list.repaint();
     }
 }

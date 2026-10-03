@@ -85,7 +85,7 @@ class TokenBrowserTest {
             var panel = browser(new MutableClock());
             try {
                 panel.render(new State(token(1, alternative(TokenStatus.ACTIVE, "<html>issuer", "<html>account", TotpAlgorithm.SHA1, 6, 30))).value);
-                assertNull(find(panel, JSplitPane.class)); assertNull(find(panel, JTextArea.class));
+                assertNull(find(panel, JSplitPane.class)); assertNull(find(panel.list, JTextArea.class));
                 assertEquals(1, panel.rows.size()); var row = panel.rows.get(0);
                 assertEquals("<html>issuer", row.primary.getText()); assertEquals("<html>account", row.account.getText());
                 assertNull(row.primary.getClientProperty("html")); assertEquals(Boolean.TRUE, row.primary.getClientProperty("html.disable"));
@@ -113,16 +113,16 @@ class TokenBrowserTest {
             } finally { panel.closing(); }
         });
     }
-    @Test void searchAndRefreshRetireCodesIncludingDetachedLabels() throws Exception {
+    @Test void searchRetiresWidgetsButRefreshRetiresAuthorization() throws Exception {
         edt(() -> {
             var panel = browser(new MutableClock()); State state = new State(token(1, active("A")), token(2, active("B")));
             try {
                 panel.render(state.value); panel.row(id(1)).show.doClick(0);
                 JLabel code = TotpCopyTest.codeLabel(panel.row(id(1)));
-                panel.search.setText("B"); assertEquals("", code.getText()); assertFalse(panel.totp.running());
-                panel.search.setText(""); assertTrue(panel.row(id(1)).show.isVisible()); assertEquals(1, state.calls.size());
-                panel.row(id(1)).show.doClick(0); code = TotpCopyTest.codeLabel(panel.row(id(1)));
-                panel.render(state.value); assertEquals("", code.getText()); assertTrue(panel.row(id(1)).show.isVisible()); assertEquals(2, state.calls.size());
+                panel.search.setText("B"); assertEquals("", code.getText()); assertTrue(panel.totp.running());
+                panel.search.setText(""); assertFalse(panel.row(id(1)).show.isVisible()); assertEquals(1, state.calls.size());
+                code = TotpCopyTest.codeLabel(panel.row(id(1)));
+                panel.render(state.value); assertEquals("", code.getText()); assertTrue(panel.row(id(1)).show.isVisible()); assertEquals(1, state.calls.size());
             } finally { panel.closing(); }
         });
     }

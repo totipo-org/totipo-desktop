@@ -24,7 +24,7 @@ class TokenDiagnosticsTest {
                 assertFalse(diagnostics.text.isEditable()); assertTrue(diagnostics.text.getLineWrap()); assertNotNull(find(diagnostics, JScrollPane.class));
                 // Removing/closing the read-only content has no callback into session mutation.
                 diagnostics.removeAll(); assertEquals(2, state.value.tokens().size()); assertSame(a, state.value.token(id(1)).orElseThrow().alternatives().get(0));
-                assertTrue(state.calls.isEmpty()); assertNull(find(panel, JTextArea.class));
+                assertTrue(state.calls.isEmpty()); assertNull(find(panel.list, JTextArea.class));
                 panel.select(null); assertFalse(panel.diagnosticsMenu.isEnabled());
             } finally { panel.closing(); }
         });
