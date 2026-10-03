@@ -8,33 +8,28 @@ import java.util.stream.Collectors;
 final class TokenPresentation {
     private TokenPresentation() { }
 
-    record Row(TokenId id, String text) {
-        @Override public String toString() { return text; }
-    }
-
-    static Row row(TokenState token) {
-        TokenCompetition values = token.competingValues();
-        String text = token.alternatives().isEmpty()
-                ? "Incomplete token observation — " + token.id().hex().substring(0, 12)
-                : single(values.issuer(), "issuer") + " — " + single(values.account(), "account");
-        if (token.hasConflict()) { text += "   CONFLICT"; }
-        if (!token.unresolvedReferences().isEmpty()) { text += "   UNRESOLVED"; }
-        if (values.status().values().size() == 1
-                && values.status().values().get(0).value() == TokenStatus.TOMBSTONED) {
-            text += "   TOMBSTONED";
-        }
-        return new Row(token.id(), text);
-    }
-
-    private static String single(CompetingField<?> field, String name) {
-        return switch (field.values().size()) {
-            case 0 -> "[unavailable " + name + "]";
-            case 1 -> UntrustedText.display(field.values().get(0).value().toString());
-            default -> "[conflicting " + name + "]";
-        };
+    private static String visibleValues(CompetingField<String> field) {
+        return field.values().stream().map(value -> UntrustedText.display(value.value()))
+                .filter(value -> !value.isBlank()).collect(Collectors.joining(" / "));
     }
 
     static String label(int index) { return "Alternative " + (index + 1); }
+
+    static String primary(TokenState token) {
+        if (token.alternatives().isEmpty()) { return "Token unavailable"; }
+        String issuer = visibleValues(token.competingValues().issuer());
+        return issuer.isBlank() ? "Unnamed token" : issuer;
+    }
+    static String account(TokenState token) {
+        return visibleValues(token.competingValues().account());
+    }
+    static String identity(TokenDescriptor d) {
+        return UntrustedText.display(d.issuer()) + (d.account().isBlank() ? "" : " · " + UntrustedText.display(d.account()));
+    }
+    static String formattedCode(String code) {
+        int middle = code.length() / 2;
+        return code.substring(0, middle) + " " + code.substring(middle);
+    }
 
     static String detail(TokenState token) {
         StringBuilder out = new StringBuilder("Token ID: " + token.id().hex() + "\n");
@@ -54,8 +49,8 @@ final class TokenPresentation {
                     .append("Status: ").append(d.status()).append("\nIssuer: ").append(UntrustedText.display(d.issuer()))
                     .append("\nAccount: ").append(UntrustedText.display(d.account())).append("\nAlgorithm: ").append(d.algorithm())
                     .append("\nDigits: ").append(d.digits()).append("\nPeriod: ").append(d.period()).append('\n');
-            out.append("Carried by current causal heads:\n");
-            alternative.heads().forEach(head -> out.append(head.revision().hex()).append('\n'));
+            out.append("  Heads (provenance):\n");
+            alternative.heads().forEach(head -> head(out, head, "    "));
         }
         TokenCompetition c = token.competingValues();
         out.append("\nField competition\n");
@@ -74,17 +69,26 @@ final class TokenPresentation {
             out.append("Secret group ").append(i + 1).append(" — ")
                     .append(labels(c.secret().groups().get(i).alternatives(), alternatives)).append('\n');
         }
-        out.append("\nTechnical details — current causal heads\n");
         for (TokenHead head : token.heads()) {
-            out.append(head.revision().hex()).append('\n');
-            head.metadata().clientName().ifPresent(name -> out.append("Client-provided name: ").append(UntrustedText.display(name)).append('\n'));
-            head.metadata().clientTimeBits().ifPresent(bits -> out.append("Client-provided raw unsigned time: ")
-                    .append(Long.toUnsignedString(bits)).append('\n'));
+            boolean mapped = alternatives.stream().flatMap(a -> a.heads().stream())
+                    .anyMatch(member -> member.revision().equals(head.revision()));
+            if (!mapped) {
+                out.append("\nCurrent Head not mapped to a complete Alternative by the API:\n");
+                head(out, head, "  ");
+            }
         }
         out.append("\nUnresolved causal references: ").append(token.unresolvedReferences().size()).append('\n');
         token.unresolvedReferences().forEach(ref -> out.append("Child: ").append(ref.child().hex())
                 .append("\nReferenced parent: ").append(ref.parent().hex()).append('\n'));
         return out.toString();
+    }
+
+    private static void head(StringBuilder out, TokenHead head, String indent) {
+        out.append(indent).append("Head ").append(head.revision().hex()).append('\n');
+        head.metadata().clientName().ifPresent(name -> out.append(indent).append("Client-provided name: ")
+                .append(UntrustedText.display(name)).append('\n'));
+        head.metadata().clientTimeBits().ifPresent(bits -> out.append(indent).append("Client-provided raw unsigned time: ")
+                .append(Long.toUnsignedString(bits)).append('\n'));
     }
 
     private static void field(StringBuilder out, String name, CompetingField<?> field,

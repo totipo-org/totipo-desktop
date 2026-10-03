@@ -44,7 +44,7 @@ class VaultPanelTest {
         edt(() -> {
             VaultPanel panel = new VaultPanel();
             var bar = panel.menuBar();
-            assertEquals(2, bar.getMenuCount());
+            assertEquals(3, bar.getMenuCount());
             var file = bar.getMenu(0);
             assertEquals("File", file.getText()); assertNotEquals(0, file.getMnemonic());
             assertEquals(1, file.getItemCount());
@@ -66,7 +66,7 @@ class VaultPanelTest {
             assertEquals("Refresh", ((JButton) row.getComponent(0)).getText());
             assertEquals("Create Token", ((JButton) row.getComponent(1)).getText());
             assertNull(javax.swing.SwingUtilities.getAncestorOfClass(VaultPanel.class, panel.changePassword));
-            assertTrue(panel.getMinimumSize().width >= 900); assertTrue(panel.getMinimumSize().height >= 600);
+            assertEquals(640, panel.getMinimumSize().width); assertEquals(520, panel.getMinimumSize().height);
             panel.closing(); assertFalse(menu.getItem(0).isEnabled()); assertFalse(menu.getItem(1).isEnabled());
         });
     }
@@ -76,8 +76,8 @@ class VaultPanelTest {
             VaultPanel panel = new VaultPanel();
             try {
                 panel.render(new State(token(1, active("one"), active("two"))).value);
-                assertTrue(panel.notification.isVisible());
-                assertTrue(find(panel.notification, javax.swing.JTextArea.class).getText().contains("conflicting versions"));
+                assertFalse(panel.notification.isVisible());
+                assertTrue(find(panel, TokenBrowserPanel.class).row(id(1)).token.hasConflict());
                 panel.render(new State().value); assertFalse(panel.notification.isVisible());
                 panel.publicationUncertain(false, false, () -> {}, () -> {});
                 assertTrue(panel.notification.isVisible());

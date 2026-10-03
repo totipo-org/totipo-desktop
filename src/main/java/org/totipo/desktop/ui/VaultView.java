@@ -7,6 +7,12 @@ import org.totipo.TokenAlternative;
 
 /** Vault presentation boundary; all calls are on the EDT. */
 public interface VaultView {
+    @FunctionalInterface
+    interface TotpAction {
+        void generate(VaultState base, java.util.List<TokenAlternative> alternatives, java.time.Instant now,
+                      java.util.function.Consumer<java.util.List<java.util.Optional<org.totipo.TotpCode>>> done);
+    }
+    default void totpAction(TotpAction action) { }
     /** Application quit is separate from controller/session retirement. */
     default void quitAction(Runnable action) { }
     default void changeVaultAction(Runnable action) { }

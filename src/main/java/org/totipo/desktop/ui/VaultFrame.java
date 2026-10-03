@@ -24,8 +24,9 @@ public final class VaultFrame extends JFrame implements VaultView {
         setContentPane(panel);
         setJMenuBar(panel.menuBar());
         setMinimumSize(panel.getMinimumSize());
-        setPreferredSize(new java.awt.Dimension(1000, 700));
-        SwingUsability.fit(this, 1000, 700);
+        setPreferredSize(new java.awt.Dimension(VaultPanel.INITIAL_SIZE));
+        pack();
+        SwingUsability.fit(this, VaultPanel.INITIAL_SIZE.width, VaultPanel.INITIAL_SIZE.height);
         setLocationByPlatform(true);
     }
 
@@ -90,6 +91,7 @@ public final class VaultFrame extends JFrame implements VaultView {
     @Override public void abandonedPublication(boolean abandoned) { panel.abandonedPublication(abandoned); }
     @Override public void writeMessage(String message) { panel.writeMessage(message); }
     @Override public void writeWarning(String detail, String message) { panel.writeWarning(message); }
+    @Override public void totpAction(TotpAction action) { panel.totpAction(action); }
     @Override public void render(VaultState state) { panel.render(state); }
     @Override public void closing() { panel.closing(); }
     @Override public void failure() {

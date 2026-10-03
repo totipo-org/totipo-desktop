@@ -8,42 +8,24 @@ import static org.totipo.desktop.ui.TokenFixtures.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class PasswordBrowserTest {
-    @Test void passwordReservationAndRunningWorkLeaveSelectionStateTotpAndRefreshLive() throws Exception {
+    @Test void passwordReservationLeavesSelectionRefreshAndExplicitRevealLive() throws Exception {
         edt(() -> {
-            var vault = new VaultPanel();
-            var browser = find(vault, TokenBrowserPanel.class);
-            var display = TokenEditingBrowserTest.display(browser);
+            var vault = new VaultPanel(); var browser = find(vault, TokenBrowserPanel.class);
+            browser.totpAction(TokenFixtures::generate);
             var first = new State(token(1, active("issuer"), active("conflict")));
             var second = new State(token(1, active("issuer"), active("conflict")));
             var form = new PasswordChangePanel(submission -> submission.close(), () -> {});
             try {
-                vault.render(first.value); find(browser, JList.class).setSelectedIndex(0);
-                find(browser, JComboBox.class).setSelectedIndex(0);
-                vault.writeAvailability(false);
-                assertTrue(display.running()); display.tick();
-                assertTrue(button(vault, "Refresh").isEnabled());
-                assertFalse(button(vault, "Create Token").isEnabled());
-                assertFalse(vault.changePassword.isEnabled());
-                assertFalse(button(browser, "Edit Alternative…").isEnabled());
-                assertFalse(button(browser, "Resolve Conflict…").isEnabled());
-                form.busy(true, "Changing vault password…");
-                vault.render(second.value);
-                assertEquals(0, find(browser, JList.class).getSelectedIndex());
-                assertTrue(display.running()); display.tick(); assertFalse(second.calls.isEmpty());
-                form.retire(); vault.writeAvailability(true);
-                assertTrue(display.running()); assertTrue(vault.changePassword.isEnabled());
-                assertTrue(button(vault, "Create Token").isEnabled());
-                vault.closing(); assertFalse(display.running()); assertFalse(button(vault, "Refresh").isEnabled());
+                vault.render(first.value); browser.select(id(1)); browser.row(id(1)).show.doClick(0);
+                vault.writeAvailability(false); assertTrue(browser.totp.running()); browser.totp.tick();
+                assertTrue(vault.refreshAction.isEnabled()); assertFalse(vault.createAction.isEnabled());
+                assertFalse(vault.changePassword.isEnabled()); assertFalse(browser.row(id(1)).edit.isEnabled()); assertFalse(browser.editMenu.isEnabled());
+                form.busy(true, "Changing vault password…"); vault.render(second.value);
+                assertEquals(id(1), browser.selectedId()); assertFalse(browser.totp.running()); assertTrue(second.calls.isEmpty());
+                browser.row(id(1)).show.doClick(0); assertTrue(browser.totp.running()); assertEquals(1, second.calls.size());
+                form.retire(); vault.writeAvailability(true); assertTrue(vault.changePassword.isEnabled()); assertTrue(vault.createAction.isEnabled());
+                vault.closing(); assertFalse(browser.totp.running()); assertFalse(vault.refreshAction.isEnabled());
             } finally { form.retire(); vault.closing(); }
         });
-    }
-    private static JButton button(java.awt.Container root, String label) {
-        for (var child : root.getComponents()) {
-            if (child instanceof JButton button && button.getText().equals(label)) { return button; }
-            if (child instanceof java.awt.Container container) {
-                JButton found = button(container, label); if (found != null) { return found; }
-            }
-        }
-        return null;
     }
 }

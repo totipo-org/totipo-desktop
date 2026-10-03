@@ -1,110 +1,109 @@
 package org.totipo.desktop.ui;
 
-import org.totipo.desktop.clipboard.TotpClipboard;
-
 import org.totipo.*;
+import org.totipo.desktop.clipboard.TotpClipboard;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.function.Consumer;
+import java.util.*;
+import java.util.function.BiConsumer;
 import javax.swing.Timer;
 
-/** EDT-only ephemeral code lifetime. The Swing timer merely invokes tick(). */
+/** EDT-owned derived codes only. One timer for all explicit reveals; ticks never derive. */
 final class TotpDisplay {
-    record Display(String label, String code, int remaining, String countdown, boolean available) { }
+    record Display(String label, String code, int remaining, long seconds, boolean urgent) { }
+    private record Entry(String label, TotpCode code) { }
     private final Clock clock;
-    private final Consumer<List<Display>> render;
+    private final BiConsumer<TokenId, List<Display>> render;
     private final Timer timer;
-    private final List<Entry> entries = new ArrayList<>();
-    private VaultState state;
+    private final Map<TokenId, List<Entry>> entries = new LinkedHashMap<>();
+    private final Map<TokenId, Object> requests = new HashMap<>();
+    private VaultView.TotpAction generate = (base, alternatives, now, done) -> done.accept(List.of());
 
-    private static final class Entry {
-        private final TokenAlternative alternative;
-        private final String label;
-        private TotpCode code;
-        private boolean failed;
-        Entry(TokenAlternative alternative, String label) { this.alternative = alternative; this.label = label; }
+    TotpDisplay(Clock clock, BiConsumer<TokenId, List<Display>> render) {
+        this.clock = clock; this.render = render;
+        timer = new Timer(250, event -> tick()); timer.setCoalesce(true);
     }
+    void generator(VaultView.TotpAction action) { Edt.require(); generate = action; }
 
-    TotpDisplay(Clock clock, Consumer<List<Display>> render) {
-        this.clock = clock;
-        this.render = render;
-        timer = new Timer(250, event -> tick());
-        timer.setCoalesce(true);
-    }
-
-    void select(VaultState current, TokenState token) {
+    void reveal(VaultState base, TokenState token) {
         Edt.require();
-        clear();
-        state = current;
-        for (int i = 0; i < token.alternatives().size(); i++) {
-            TokenAlternative alternative = token.alternatives().get(i);
-            if (alternative.descriptor().status() == TokenStatus.ACTIVE) {
-                entries.add(new Entry(alternative, TokenPresentation.label(i)));
+        requests.remove(token.id()); entries.remove(token.id());
+        if (entries.isEmpty()) { timer.stop(); }
+        List<TokenAlternative> outcomes = codeAlternatives(token);
+        Object request = new Object(); requests.put(token.id(), request);
+        generate.generate(base, outcomes, clock.instant(), codes -> {
+            Edt.require();
+            if (requests.get(token.id()) != request) { return; }
+            requests.remove(token.id());
+            List<Entry> revealed = new ArrayList<>();
+            // A partial result must never look like a single successful conflict outcome.
+            if (codes.size() != outcomes.size() || codes.stream().anyMatch(Optional::isEmpty)) {
+                render.accept(token.id(), List.of()); return;
             }
-        }
-        tick();
-        if (entries.stream().anyMatch(entry -> !entry.failed)) { timer.start(); }
+            for (int i = 0; i < Math.min(codes.size(), outcomes.size()); i++) {
+                String identity = TokenPresentation.identity(outcomes.get(i).descriptor());
+                boolean duplicate = outcomes.stream().filter(a -> TokenPresentation.identity(a.descriptor()).equals(identity)).count() > 1;
+                String finalLabel = duplicate || identity.isBlank() ? "Possible code " + (i + 1) : identity;
+                codes.get(i).ifPresent(code -> revealed.add(new Entry(finalLabel, code)));
+            }
+            if (!revealed.isEmpty()) { entries.put(token.id(), List.copyOf(revealed)); timer.start(); }
+            tick();
+            if (revealed.isEmpty()) { render.accept(token.id(), List.of()); }
+        });
     }
 
+    /** Public secret-equality groups plus descriptor fields prove code-producing equality. */
+    static List<TokenAlternative> codeAlternatives(TokenState token) {
+        List<TokenAlternative> result = new ArrayList<>();
+        for (TokenAlternative candidate : token.alternatives()) {
+            if (candidate.descriptor().status() != TokenStatus.ACTIVE) { continue; }
+            boolean same = result.stream().anyMatch(previous -> {
+                TokenDescriptor a = previous.descriptor(), b = candidate.descriptor();
+                return a.algorithm() == b.algorithm() && a.digits() == b.digits() && a.period().equals(b.period())
+                        && token.competingValues().secret().groups().stream().anyMatch(group ->
+                        group.alternatives().contains(previous) && group.alternatives().contains(candidate));
+            });
+            if (!same) { result.add(candidate); }
+        }
+        return List.copyOf(result);
+    }
     void tick() {
         Edt.require();
-        if (state == null || entries.isEmpty()) { return; }
         Instant now = clock.instant();
-        List<Display> displays = new ArrayList<>();
-        for (Entry entry : entries) {
-            if (!entry.failed) {
-                try {
-                    if (entry.code == null || now.isBefore(entry.code.validFrom())
-                            || !now.isBefore(entry.code.validUntil())) {
-                        entry.code = state.generateTotp(entry.alternative, now);
-                    }
-                    TotpCode code = entry.code;
-                    double span = seconds(Duration.between(code.validFrom(), code.validUntil()));
-                    double left = seconds(Duration.between(now, code.validUntil()));
-                    if (span <= 0 || now.isBefore(code.validFrom()) || !now.isBefore(code.validUntil())) {
-                        throw new IllegalStateException("Invalid code interval");
-                    }
-                    displays.add(new Display(entry.label, code.code(),
-                            (int) Math.max(0, Math.min(1000, 1000 * left / span)),
-                            (long) Math.ceil(left) + " seconds remaining", true));
-                } catch (RuntimeException unavailable) {
-                    entry.code = null;
-                    entry.failed = true;
-                }
-            }
-            if (entry.failed) { displays.add(new Display(entry.label, "Code unavailable", 0, "", false)); }
+        for (TokenId id : List.copyOf(entries.keySet())) {
+            List<Entry> revealed = entries.get(id);
+            // Mixed periods retire the entire token reveal at the earliest outcome expiry.
+            if (revealed.stream().anyMatch(e -> !valid(e.code(), now))) { clear(id); continue; }
+            render.accept(id, revealed.stream().map(e -> {
+                double span = seconds(Duration.between(e.code().validFrom(), e.code().validUntil()));
+                double left = seconds(Duration.between(now, e.code().validUntil()));
+                return new Display(e.label(), e.code().code(), (int) Math.min(1000, 1000 * left / span),
+                        (long) Math.ceil(left), left < 10);
+            }).toList());
         }
-        if (entries.stream().noneMatch(entry -> !entry.failed)) { timer.stop(); }
-        render.accept(List.copyOf(displays));
+        if (entries.isEmpty()) { timer.stop(); }
     }
-
-    String copy(int index, TotpClipboard.Copy action) {
-        Edt.require();
-        if (index < 0 || index >= entries.size()) { return "Code unavailable; code was not copied."; }
-        Entry entry = entries.get(index);
-        Instant now = clock.instant();
-        if (!entry.failed && (entry.code == null || now.isBefore(entry.code.validFrom())
-                || !now.isBefore(entry.code.validUntil()))) { tick(); }
-        now = clock.instant();
-        TotpCode code = entry.code;
-        if (code == null || now.isBefore(code.validFrom()) || !now.isBefore(code.validUntil())) {
-            return "Code unavailable; code was not copied.";
-        }
+    String copy(TokenId id, int index, TotpClipboard.Copy action) {
+        Edt.require(); tick();
+        List<Entry> revealed = entries.get(id);
+        if (revealed == null || index < 0 || index >= revealed.size()) { return "Code unavailable; code was not copied."; }
+        TotpCode code = revealed.get(index).code(); Instant now = clock.instant();
+        if (!valid(code, now)) { clear(id); return "Code unavailable; code was not copied."; }
         return action.copy(code.code(), code.validFrom(), code.validUntil(), now);
     }
-
-    private static double seconds(Duration duration) { return duration.getSeconds() + duration.getNano() / 1e9; }
-
-    void clear() {
-        Edt.require();
-        timer.stop();
-        entries.clear();
-        state = null;
-        render.accept(List.of());
+    private static boolean valid(TotpCode code, Instant now) {
+        return !now.isBefore(code.validFrom()) && now.isBefore(code.validUntil());
     }
-
+    private static double seconds(Duration d) { return d.getSeconds() + d.getNano() / 1e9; }
+    void clear(TokenId id) {
+        Edt.require(); requests.remove(id); entries.remove(id); render.accept(id, List.of());
+        if (entries.isEmpty()) { timer.stop(); }
+    }
+    void clear() {
+        Edt.require(); requests.clear();
+        for (TokenId id : List.copyOf(entries.keySet())) { clear(id); }
+        timer.stop();
+    }
     boolean running() { return timer.isRunning(); }
 }

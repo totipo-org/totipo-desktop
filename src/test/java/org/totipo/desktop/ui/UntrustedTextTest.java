@@ -19,7 +19,7 @@ class UntrustedTextTest {
         assertTrue(text.contains("Account:  account\\u{000D}\\u{0009}\\u{202E} "));
         assertTrue(text.contains("Client-provided name: client\\u{000A}Account: forged\\u{007F}"));
         assertFalse(text.contains("\nAccount: forged"));
-        assertTrue(TokenPresentation.row(token).text().contains("\\u{000A}"));
+        assertTrue(TokenPresentation.primary(token).contains("\\u{000A}"));
         assertEquals(issuer, alternative.descriptor().issuer());
         assertEquals(account, alternative.descriptor().account());
         assertEquals(client, head.metadata().clientName().orElseThrow());

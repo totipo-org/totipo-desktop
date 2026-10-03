@@ -57,9 +57,24 @@ final class TokenFixtures {
                 all.stream().flatMap(a -> a.heads().stream()).toList(), List.of(), all.size() > 1);
     }
     record Call(TokenAlternative alternative, Instant now) { }
+    static void generate(VaultState base, List<TokenAlternative> alternatives, Instant now,
+                         java.util.function.Consumer<List<Optional<TotpCode>>> done) {
+        done.accept(alternatives.stream().map(a -> {
+            try { return Optional.of(base.generateTotp(a, now)); }
+            catch (RuntimeException unavailable) { return Optional.<TotpCode>empty(); }
+        }).toList());
+    }
+    static TokenBrowserPanel browser(MutableClock clock) {
+        TokenBrowserPanel panel = new TokenBrowserPanel(clock); panel.totpAction(TokenFixtures::generate); return panel;
+    }
     static final class State {
         final List<Call> calls = new ArrayList<>();
         boolean fail;
+        Function<Call, TotpCode> result = call -> {
+            long period = call.alternative().descriptor().period().getSeconds();
+            Instant from = Instant.ofEpochSecond(call.now().getEpochSecond() / period * period);
+            return new TotpCode("001234", from, from.plusSeconds(period));
+        };
         final VaultState value;
         State(TokenState... tokens) {
             value = (VaultState) Proxy.newProxyInstance(VaultState.class.getClassLoader(), new Class<?>[]{VaultState.class},
@@ -73,8 +88,7 @@ final class TokenFixtures {
                             Instant now = (Instant) args[1];
                             calls.add(new Call((TokenAlternative) args[0], now));
                             if (fail) { throw new IllegalStateException("Private failure details"); }
-                            // Deliberately unrelated to descriptor periods or wall-clock modulo boundaries.
-                            yield new TotpCode("001234", now.minusSeconds(2), now.plusSeconds(8));
+                            yield result.apply(new Call((TokenAlternative) args[0], now));
                         }
                         default -> throw new AssertionError("Forbidden API: " + method.getName());
                     });

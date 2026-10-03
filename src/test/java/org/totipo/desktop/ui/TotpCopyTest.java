@@ -2,27 +2,24 @@ package org.totipo.desktop.ui;
 
 import org.totipo.*;
 import org.totipo.desktop.clipboard.*;
-import java.awt.Component;
-import java.awt.Container;
-import java.awt.event.InputEvent;
-import java.awt.event.KeyEvent;
-import java.lang.reflect.Proxy;
-import java.time.*;
-import java.util.*;
+import java.awt.*;
+import java.awt.event.*;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.*;
 import org.junit.jupiter.api.Test;
 import static org.totipo.desktop.TestSupport.edt;
 import static org.totipo.desktop.ui.TokenFixtures.*;
 import static org.totipo.desktop.ui.TokenBrowserTest.find;
-import static org.totipo.desktop.ui.TokenEditingBrowserTest.display;
 import static org.junit.jupiter.api.Assertions.*;
 
 class TotpCopyTest {
     static List<JButton> buttons(Container root) {
         List<JButton> result = new ArrayList<>();
         for (Component child : root.getComponents()) {
-            if (child instanceof JButton b && b.getText().equals("Copy code") && b.isVisible()) { result.add(b); }
+            if (child instanceof JButton b && b.getText().equals("Copy") && b.isVisible()) { result.add(b); }
             if (child instanceof Container c) { result.addAll(buttons(c)); }
         }
         return result;
@@ -30,230 +27,134 @@ class TotpCopyTest {
     static JLabel status(Container root) {
         for (Component child : root.getComponents()) {
             if (child instanceof JLabel label && "TOTP clipboard status".equals(label.getAccessibleContext().getAccessibleName())) { return label; }
-            if (child instanceof Container c) {
-                JLabel found = status(c); if (found != null) { return found; }
-            }
+            if (child instanceof Container c) { JLabel found = status(c); if (found != null) { return found; } }
         }
         return null;
     }
-    @Test void normalCopyIsExplicitAccessibleAndIndependentOfWriteAvailability() throws Exception {
+    static JLabel codeLabel(Container root) {
+        for (Component child : root.getComponents()) {
+            if (child instanceof JLabel label && label.getText().equals("001 234")) { return label; }
+            if (child instanceof Container c) { JLabel found = codeLabel(c); if (found != null) { return found; } }
+        }
+        return null;
+    }
+    @Test void explicitRevealOnlyDerivesRequestedTokenAndCopiesItsCanonicalDigits() throws Exception {
         edt(() -> {
-            MutableClock clock = new MutableClock();
-            TokenBrowserPanel panel = new TokenBrowserPanel(clock);
+            var clock = new MutableClock(); var panel = browser(clock);
+            State state = new State(token(1, active("A")), token(2, active("B")));
             AtomicInteger copies = new AtomicInteger();
-            State state = new State(token(1, active("issuer")));
-            panel.copyAction((code, from, until, now) -> {
-                assertTrue("001234".equals(code));
-                assertEquals(clock.now, now);
-                copies.incrementAndGet(); return TotpClipboard.COPIED;
-            });
+            panel.copyAction((code, from, until, now) -> { assertEquals("001234", code); assertEquals(clock.now, now); copies.incrementAndGet(); return TotpClipboard.COPIED; });
             try {
-                panel.render(state.value); find(panel, JList.class).setSelectedIndex(0);
-                assertEquals(0, copies.get());
-                JButton copy = buttons(panel).getFirst();
-                assertEquals("Copy TOTP code", copy.getAccessibleContext().getAccessibleName());
-                assertFalse(copy.getAccessibleContext().getAccessibleName().contains("001234"));
-                assertNull(copy.getAccessibleContext().getAccessibleDescription());
-                panel.writeAvailability(false); assertTrue(copy.isEnabled());
-                copy.doClick(0); assertEquals(1, copies.get());
-                assertEquals(TotpClipboard.COPIED, status(panel).getText());
-                assertFalse(status(panel).getText().contains("001234"));
-                assertEquals(1, state.calls.size());
-                panel.closing();
-                copy.getActionListeners()[0].actionPerformed(null);
-                assertEquals(1, copies.get()); assertFalse(copy.isEnabled());
+                panel.render(state.value); assertTrue(buttons(panel).isEmpty());
+                panel.row(id(2)).show.doClick(0); assertEquals(1, state.calls.size()); assertSame(panel.row(id(2)).token.alternatives().get(0), state.calls.get(0).alternative());
+                assertNull(codeLabel(panel.row(id(1)))); assertNotNull(codeLabel(panel.row(id(2)))); assertEquals(1, buttons(panel).size());
+                JButton copy = buttons(panel).get(0); assertEquals("Copy TOTP code", copy.getAccessibleContext().getAccessibleName());
+                panel.writeAvailability(false); assertTrue(copy.isEnabled()); copy.doClick(0);
+                assertEquals(1, copies.get()); assertEquals(1, state.calls.size()); assertEquals(TotpClipboard.COPIED, status(panel).getText());
+                JLabel code = codeLabel(panel.row(id(2))); panel.closing(); assertEquals("", code.getText()); assertFalse(copy.isEnabled());
+                copy.getActionListeners()[0].actionPerformed(null); assertEquals(1, copies.get());
             } finally { panel.closing(); }
         });
     }
-
-    @Test void expiryAndBackwardClockRefreshThroughExistingTickBeforeCopy() throws Exception {
+    @Test void expiredCopyHidesCodeAndNeverGeneratesNextPeriod() throws Exception {
         edt(() -> {
-            for (boolean backwards : new boolean[]{false, true}) {
-                MutableClock clock = new MutableClock();
-                TokenState token = token(1, active("issuer"));
-                State state = new State(token);
-                TotpDisplay display = new TotpDisplay(clock, ignored -> {});
-                try {
-                    display.select(state.value, token);
-                    clock.now = clock.now.plusSeconds(backwards ? -3 : 8);
-                    AtomicInteger copied = new AtomicInteger();
-                    display.copy(0, (code, from, until, now) -> {
-                        assertEquals(2, state.calls.size());
-                        assertEquals(clock.now, state.calls.getLast().now());
-                        assertFalse(now.isBefore(from)); assertTrue(now.isBefore(until));
-                        copied.incrementAndGet(); return TotpClipboard.COPIED;
-                    });
-                    assertEquals(1, copied.get());
-                } finally { display.clear(); }
-            }
-        });
-    }
-
-    @Test void copyRefreshFailureHidesButtonAndDoesNotRetryGeneration() throws Exception {
-        edt(() -> {
-            MutableClock clock = new MutableClock();
-            TokenBrowserPanel panel = new TokenBrowserPanel(clock);
-            State state = new State(token(1, active("issuer")));
-            panel.copyAction((c, f, u, n) -> { fail("Unavailable code copied"); return ""; });
+            var clock = new MutableClock(); var panel = browser(clock); var state = new State(token(1, active("A")));
+            panel.copyAction((c, f, u, n) -> { fail("Expired copy"); return ""; });
             try {
-                panel.render(state.value); find(panel, JList.class).setSelectedIndex(0);
-                state.fail = true; clock.now = clock.now.plusSeconds(8);
-                JButton copy = buttons(panel).getFirst(); copy.doClick(0);
-                assertTrue(buttons(panel).isEmpty());
+                panel.render(state.value); panel.row(id(1)).show.doClick(0); JButton copy = buttons(panel).get(0);
+                clock.now = Instant.ofEpochSecond(30); copy.doClick(0);
+                assertTrue(buttons(panel).isEmpty()); assertTrue(panel.row(id(1)).show.isVisible()); assertEquals(1, state.calls.size());
                 assertEquals("Code unavailable; code was not copied.", status(panel).getText());
-                display(panel).copy(0, (c, f, u, n) -> { fail(); return ""; });
-                display(panel).tick(); assertEquals(2, state.calls.size());
+                panel.totp.tick(); assertEquals(1, state.calls.size()); panel.row(id(1)).show.doClick(0); assertEquals(2, state.calls.size());
             } finally { panel.closing(); }
         });
     }
-
-    @Test void timeAdvancingDuringGenerationCannotCopyReturnedExpiredCode() throws Exception {
+    @Test void backwardsClockCannotCopyOrRegenerate() throws Exception {
         edt(() -> {
-            MutableClock clock = new MutableClock();
-            TokenState token = token(1, active("issuer"));
-            VaultState state = (VaultState) Proxy.newProxyInstance(VaultState.class.getClassLoader(),
-                    new Class<?>[]{VaultState.class}, (proxy, method, args) -> {
-                        if (!method.getName().equals("generateTotp")) { throw new AssertionError("Unexpected API"); }
-                        Instant instant = (Instant) args[1];
-                        clock.now = instant.plusSeconds(8);
-                        return new TotpCode("001234", instant.minusSeconds(2), instant.plusSeconds(8));
-                    });
-            TotpDisplay display = new TotpDisplay(clock, ignored -> {});
+            var clock = new MutableClock(); var panel = browser(clock); var state = new State(token(1, active("A")));
+            panel.copyAction((c, f, u, n) -> { fail(); return ""; });
             try {
-                display.select(state, token);
-                display.copy(0, (c, f, u, n) -> { fail("Expired code copied"); return ""; });
-            } finally { display.clear(); }
+                panel.render(state.value); panel.row(id(1)).show.doClick(0); JButton copy = buttons(panel).get(0);
+                clock.now = Instant.ofEpochSecond(-1); copy.doClick(0); assertTrue(buttons(panel).isEmpty()); assertEquals(1, state.calls.size());
+            } finally { panel.closing(); }
         });
     }
-
-    @Test void conflictButtonsChooseEachSemanticAlternativeEvenWhenDigitsAreEqual() throws Exception {
+    @Test void eachConflictOutcomeCopiesItsOwnDigitsAndCoincidenceRetainsWarning() throws Exception {
         edt(() -> {
             for (boolean same : new boolean[]{false, true}) {
-                MutableClock clock = new MutableClock();
-                TokenAlternative a = active("A"), b = active("B");
-                TokenState token = token(1, a, b);
-                State backing = new State(token);
-                VaultState state = (VaultState) Proxy.newProxyInstance(VaultState.class.getClassLoader(),
-                        new Class<?>[]{VaultState.class}, (proxy, method, args) -> {
-                            if (method.getName().equals("generateTotp")) {
-                                Instant now = (Instant) args[1];
-                                return new TotpCode(args[0] == a || same ? "001234" : "005678",
-                                        now.minusSeconds(2), now.plusSeconds(8));
-                            }
-                            return method.invoke(backing.value, args);
-                        });
-                TokenBrowserPanel panel = new TokenBrowserPanel(clock);
-                List<String> copied = new ArrayList<>();
-                panel.copyAction((c, f, u, n) -> { copied.add(c); return TotpClipboard.COPIED; });
+                var clock = new MutableClock(); var panel = browser(clock); TokenAlternative a = active("A"), b = active("B");
+                var token = token(1, List.of(a, b), List.of(new SecretGroup(List.of(a)), new SecretGroup(List.of(b))), List.of(), List.of(), true);
+                var state = new State(token); state.result = call -> new TotpCode(call.alternative() == a || same ? "001234" : "005678", call.now(), call.now().plusSeconds(30));
+                List<String> copied = new ArrayList<>(); panel.copyAction((c, f, u, n) -> { copied.add(c); return TotpClipboard.COPIED; });
                 try {
-                    panel.render(state); find(panel, JList.class).setSelectedIndex(0);
-                    List<JButton> buttons = buttons(panel);
-                    assertEquals(2, buttons.size());
-                    for (int i = 0; i < 2; i++) {
-                        assertEquals("Copy TOTP code for Alternative " + (i + 1),
-                                buttons.get(i).getAccessibleContext().getAccessibleName());
-                        buttons.get(i).doClick(0);
-                    }
-                    assertTrue("001234".equals(copied.get(0)));
-                    assertTrue((same ? "001234" : "005678").equals(copied.get(1)));
+                    panel.render(state.value); panel.row(id(1)).show.doClick(0); assertEquals(2, state.calls.size());
+                    assertEquals(2, buttons(panel).size()); buttons(panel).forEach(button -> button.doClick(0));
+                    assertEquals(List.of("001234", same ? "001234" : "005678"), copied);
+                    assertTrue(panel.row(id(1)).getAccessibleContext().getAccessibleName().contains("conflicting versions"));
+                    assertNotNull(panel.row(id(1)).warning.getParent());
                 } finally { panel.closing(); }
             }
         });
     }
-
-    @Test void onlyActiveCompleteDisplayedAlternativesOfferCopy() throws Exception {
+    @Test void metadataOnlyConflictRetainsWarningAndOffersSingleCode() throws Exception {
         edt(() -> {
-            TokenAlternative dead = alternative(TokenStatus.TOMBSTONED, "", "", TotpAlgorithm.SHA1, 6, 30);
-            TokenState[] tokens = {token(1, active("A")), token(1, active("A"), active("B")),
-                    token(1, dead, active("A")), token(1, dead), token(1)};
-            int[] counts = {1, 2, 1, 0, 0};
-            TokenBrowserPanel panel = new TokenBrowserPanel(new MutableClock());
+            var panel = browser(new MutableClock()); var state = new State(token(1, active("A"), active("B")));
             try {
-                for (int i = 0; i < tokens.length; i++) {
-                    panel.render(new State(tokens[i]).value); find(panel, JList.class).setSelectedIndex(0);
-                    assertEquals(counts[i], buttons(panel).size());
-                }
+                panel.render(state.value); var row = panel.row(id(1)); Color warningBackground = row.getBackground();
+                row.show.doClick(0); assertEquals(1, buttons(row).size()); assertEquals(1, state.calls.size());
+                assertTrue(row.getAccessibleContext().getAccessibleName().contains("conflicting versions"));
+                assertNotNull(row.warning.getParent()); panel.select(null); assertEquals(warningBackground, row.getBackground());
+                assertFalse(row.primary.getText().contains("Alternative"));
             } finally { panel.closing(); }
         });
     }
-
-    @Test void selectionFilterObservationAndRolloverDoNotChangeCopiedPayload() throws Exception {
+    @Test void refreshSearchSelectionAndExpiryLeaveClipboardPolicyInControl() throws Exception {
         edt(() -> {
-            MutableClock clock = new MutableClock();
-            TokenBrowserPanel panel = new TokenBrowserPanel(clock);
-            ClipboardProbe clipboard = new ClipboardProbe();
-            Object origin = new Object();
+            var clock = new MutableClock(); var panel = browser(clock); var clipboard = new ClipboardProbe(); Object origin = new Object();
             panel.copyAction((c, f, u, n) -> clipboard.manager().copy(origin, c, f, u, n));
-            State state = new State(token(1, active("A")), token(2, active("B")));
+            var state = new State(token(1, active("A")), token(2, active("B")));
             try {
-                panel.render(state.value); find(panel, JList.class).setSelectedIndex(0);
-                buttons(panel).getFirst().doClick(0);
-                var payload = clipboard.payload();
-                clock.now = clock.now.plusSeconds(8); display(panel).tick();
-                assertSame(payload, clipboard.payload()); assertEquals(1, clipboard.writes());
-                find(panel, JList.class).setSelectedIndex(1);
-                panel.search.setText("absent"); panel.render(state.value);
-                assertSame(payload, clipboard.payload()); assertEquals(1, clipboard.writes());
+                panel.render(state.value); panel.row(id(1)).show.doClick(0); buttons(panel).get(0).doClick(0); var payload = clipboard.payload();
+                clock.now = Instant.ofEpochSecond(30); panel.totp.tick(); panel.select(id(2)); panel.search.setText("absent"); panel.render(state.value);
+                assertSame(payload, clipboard.payload()); assertEquals(1, clipboard.writes()); assertEquals(1, state.calls.size());
                 clipboard.expire(); clipboard.assertEmpty();
             } finally { panel.closing(); clipboard.manager().shutdown(); }
         });
     }
-
-    @Test void staleDetachedButtonCannotCopyNewSelectionAndFailureStatusIsNonSecret() throws Exception {
+    @Test void staleDetachedButtonCannotCopyAnotherRowsReveal() throws Exception {
         edt(() -> {
-            TokenBrowserPanel panel = new TokenBrowserPanel(new MutableClock());
-            AtomicInteger copies = new AtomicInteger();
-            panel.copyAction((c, f, u, n) -> { copies.incrementAndGet(); return TotpClipboard.UNAVAILABLE; });
+            var panel = browser(new MutableClock()); AtomicInteger copied = new AtomicInteger();
+            panel.copyAction((c, f, u, n) -> { copied.incrementAndGet(); return TotpClipboard.UNAVAILABLE; });
+            var state = new State(token(1, active("A")), token(2, active("B")));
             try {
-                panel.render(new State(token(1, active("A")), token(2, active("B"))).value);
-                JList<?> list = find(panel, JList.class); list.setSelectedIndex(0);
-                JButton old = buttons(panel).getFirst(); list.setSelectedIndex(1);
-                old.getActionListeners()[0].actionPerformed(null); assertEquals(0, copies.get());
-                buttons(panel).getFirst().doClick(0);
-                assertEquals(TotpClipboard.UNAVAILABLE, status(panel).getText());
-                assertFalse(status(panel).getText().contains("001234"));
+                panel.render(state.value); panel.row(id(1)).show.doClick(0); JButton old = buttons(panel).get(0);
+                panel.render(state.value); panel.row(id(2)).show.doClick(0);
+                old.getActionListeners()[0].actionPerformed(null); assertEquals(0, copied.get()); assertFalse(old.isEnabled());
+                buttons(panel).get(0).doClick(0); assertEquals(1, copied.get()); assertEquals(TotpClipboard.UNAVAILABLE, status(panel).getText());
             } finally { panel.closing(); }
         });
     }
-
+    @Test void sixAndEightDigitFormattingNeverChangesCopiedValue() throws Exception {
+        edt(() -> {
+            assertEquals("123 456", TokenPresentation.formattedCode("123456")); assertEquals("1234 5678", TokenPresentation.formattedCode("12345678"));
+            var panel = browser(new MutableClock()); var state = new State(token(1, alternative(TokenStatus.ACTIVE, "A", "account", TotpAlgorithm.SHA1, 8, 45)));
+            state.result = call -> new TotpCode("00123456", call.now(), call.now().plusSeconds(45));
+            AtomicInteger copied = new AtomicInteger(); panel.copyAction((c, f, u, n) -> { assertEquals("00123456", c); copied.incrementAndGet(); return TotpClipboard.COPIED; });
+            try { panel.render(state.value); panel.row(id(1)).show.doClick(0); buttons(panel).get(0).doClick(0); assertEquals(1, copied.get()); }
+            finally { panel.closing(); }
+        });
+    }
     @Test void noGlobalCopyBindingAndOrdinaryTextCopyIsUntouched() throws Exception {
         edt(() -> {
             VaultPanel panel = new VaultPanel();
             try {
                 for (int modifier : new int[]{InputEvent.CTRL_DOWN_MASK, InputEvent.META_DOWN_MASK}) {
-                    assertNull(panel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
-                            .get(KeyStroke.getKeyStroke(KeyEvent.VK_C, modifier)));
+                    assertNull(panel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).get(KeyStroke.getKeyStroke(KeyEvent.VK_C, modifier)));
                 }
-                JTextField search = find(panel, JTextField.class);
-                JTextField normal = new JTextField();
+                JTextField search = find(panel, JTextField.class), normal = new JTextField();
                 KeyStroke copy = KeyStroke.getKeyStroke(KeyEvent.VK_C, SwingUsability.menuMask());
-                assertEquals(normal.getInputMap().get(copy), search.getInputMap().get(copy));
-                assertNotNull(search.getActionMap().get(search.getInputMap().get(copy)));
+                assertEquals(normal.getInputMap().get(copy), search.getInputMap().get(copy)); assertNotNull(search.getActionMap().get(search.getInputMap().get(copy)));
             } finally { panel.closing(); }
-        });
-    }
-
-    @Test void exactExpiryCopiesNewCoreStringRatherThanOldLabel() throws Exception {
-        edt(() -> {
-            MutableClock clock = new MutableClock();
-            TokenState token = token(1, active("issuer"));
-            AtomicInteger generations = new AtomicInteger();
-            VaultState state = (VaultState) Proxy.newProxyInstance(VaultState.class.getClassLoader(),
-                    new Class<?>[]{VaultState.class}, (proxy, method, args) -> {
-                        Instant now = (Instant) args[1];
-                        return new TotpCode(generations.incrementAndGet() == 1 ? "001234" : "005678",
-                                now.minusSeconds(2), now.plusSeconds(8));
-                    });
-            TotpDisplay display = new TotpDisplay(clock, ignored -> {});
-            try {
-                display.select(state, token);
-                clock.now = clock.now.plusSeconds(8);
-                AtomicInteger copies = new AtomicInteger();
-                display.copy(0, (c, f, u, n) -> {
-                    assertTrue("005678".equals(c)); copies.incrementAndGet(); return TotpClipboard.COPIED;
-                });
-                assertEquals(1, copies.get()); assertEquals(2, generations.get());
-            } finally { display.clear(); }
         });
     }
 }

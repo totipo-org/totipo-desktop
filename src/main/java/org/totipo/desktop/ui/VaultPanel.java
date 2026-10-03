@@ -31,11 +31,11 @@ public final class VaultPanel extends JPanel {
     private boolean decisionWarning;
     private final JPanel reading = new JPanel(new BorderLayout(8, 8));
     private final JPanel messages = new JPanel(new BorderLayout(0, 12));
-    private boolean conflictWarning;
     final JMenuItem changeVault = new JMenuItem("Change Vault…");
     final JMenuItem changePassword = new JMenuItem("Change Password…");
     final JMenuItem exit = new JMenuItem("Exit");
-    static final java.awt.Dimension MINIMUM_SIZE = new java.awt.Dimension(900, 600);
+    static final java.awt.Dimension MINIMUM_SIZE = new java.awt.Dimension(640, 520);
+    static final java.awt.Dimension INITIAL_SIZE = new java.awt.Dimension(760, 820);
     private transient Runnable refreshCallback = () -> { };
     private transient Runnable createCallback = () -> { };
     final transient javax.swing.Action refreshAction = SwingUsability.action("Refresh", () -> refreshCallback.run());
@@ -92,6 +92,8 @@ public final class VaultPanel extends JPanel {
         JMenu vault = new JMenu("Vault"); vault.setMnemonic('V');
         changeVault.setMnemonic('V');
         vault.add(changeVault); vault.add(changePassword); bar.add(vault);
+        JMenu token = new JMenu("Token"); token.setMnemonic('T');
+        token.add(browser.editMenu); token.add(browser.diagnosticsMenu); bar.add(token);
         return bar;
     }
     public void exitAction(Runnable action) {
@@ -103,6 +105,7 @@ public final class VaultPanel extends JPanel {
 
     public void focusSearch() { browser.focusSearch(); }
     public void copyAction(TotpClipboard.Copy action) { browser.copyAction(action); }
+    public void totpAction(VaultView.TotpAction action) { browser.totpAction(action); }
 
     public void passwordAction(Runnable action) {
         Edt.require(); changePassword.addActionListener(event -> action.run());
@@ -141,7 +144,6 @@ public final class VaultPanel extends JPanel {
         String warning = observationWarning;
         if (!operationWarning.isEmpty()) { warning += (warning.isEmpty() ? "" : " ") + operationWarning; }
         if (decisionWarning) { warning += (warning.isEmpty() ? "" : " ") + "The vault changed while saving. Review the token before continuing."; }
-        if (conflictWarning) { warning += (warning.isEmpty() ? "" : " ") + "A token has conflicting versions and needs attention."; }
         if (uncertainWarning || abandonedWarning) {
             warning += (warning.isEmpty() ? "" : " ") + "A change may already have been saved. Review the save options before trying again.";
         }
@@ -231,7 +233,6 @@ public final class VaultPanel extends JPanel {
         observationWarning = !state.diagnostics().isEmpty()
                 || observation instanceof ObservationProgress.Finished finished && finished.hasDiagnostics()
                 ? "Some vault data could not be read. Refresh to try again." : "";
-        conflictWarning = state.tokens().stream().anyMatch(org.totipo.TokenState::hasConflict);
         updateNotification();
         browser.render(state);
     }

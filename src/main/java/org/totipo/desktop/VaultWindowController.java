@@ -62,6 +62,17 @@ final class VaultWindowController {
         Edt.require();
         try {
             view.actions(this::refresh, this::close);
+            view.totpAction((base, alternatives, now, done) -> {
+                Edt.require();
+                if (closing || base != latest) { return; }
+                executor.execute(() -> {
+                    var codes = alternatives.stream().map(alternative -> {
+                        try { return java.util.Optional.of(base.generateTotp(alternative, now)); }
+                        catch (RuntimeException unavailable) { return java.util.Optional.<org.totipo.TotpCode>empty(); }
+                    }).toList();
+                    SwingUtilities.invokeLater(() -> { if (!closing && base == latest) { done.accept(codes); } });
+                });
+            });
             if (clipboard != null) {
                 view.copyAction((code, from, until, now) -> closing
                         ? TotpClipboard.UNAVAILABLE

@@ -1,9 +1,10 @@
 package org.totipo.desktop.ui;
 
 import org.totipo.*;
-import java.awt.Component;
-import java.awt.Container;
-import java.util.*;
+import java.awt.*;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.*;
 import org.junit.jupiter.api.Test;
 import static org.totipo.desktop.TestSupport.edt;
@@ -15,137 +16,183 @@ class TokenBrowserTest {
         for (Component child : root.getComponents()) {
             if (type.isInstance(child)) { return type.cast(child); }
             if (child instanceof Container container) {
-                T found = find(container, type);
-                if (found != null) { return found; }
+                T found = find(container, type); if (found != null) { return found; }
             }
         }
         return null;
     }
-
-    @Test void logicalRowsOrderLiteralTextAndSelectionFollowLatestIdentity() throws Exception {
+    @Test void renderingSelectionSearchRefreshAndDiagnosticsNeverGenerate() throws Exception {
         edt(() -> {
-            TokenBrowserPanel panel = new TokenBrowserPanel(new MutableClock());
+            var panel = browser(new MutableClock());
+            State state = new State(token(1, active("A")), token(2, active("B")));
+            AtomicInteger viewed = new AtomicInteger();
+            panel.diagnosticsAction = diagnostics -> { assertTrue(diagnostics.text.getText().contains(id(1).hex())); viewed.incrementAndGet(); };
             try {
-                TokenState first = token(1, alternative(TokenStatus.ACTIVE, "<html>issuer", "<html>account",
-                        TotpAlgorithm.SHA1, 6, 30));
-                TokenState second = token(2, active("other"), active("third"));
-                State old = new State(first, second);
-                panel.render(old.value);
-                JList<?> list = find(panel, JList.class);
-                JTextArea detail = find(panel, JTextArea.class);
-                assertEquals(2, list.getModel().getSize());
-                assertEquals(-1, list.getSelectedIndex());
-                assertEquals("Select a token to view details.", detail.getText());
-                assertEquals(id(1), ((TokenPresentation.Row) list.getModel().getElementAt(0)).id());
-                assertTrue(list.getModel().getElementAt(0).toString().startsWith("<html>issuer"));
-                assertTrue(list.getModel().getElementAt(1).toString().contains("[conflicting issuer]"));
-                assertLiteralRenderer(list);
-                list.setSelectedIndex(0);
-                assertTrue(detail.getText().contains("Issuer: <html>issuer\nAccount: <html>account"));
-                assertEquals(1, old.calls.size());
-                TokenAlternative replacement = active("replacement");
-                State next = new State(second, token(1, replacement));
-                panel.render(next.value);
-                assertEquals(1, list.getSelectedIndex());
-                assertTrue(detail.getText().contains("Issuer: replacement"));
-                assertSame(replacement, next.calls.get(0).alternative());
-                list.setSelectedIndex(0);
-                assertEquals(3, next.calls.size());
-                panel.render(new State(first).value);
-                assertEquals(-1, list.getSelectedIndex());
-                assertEquals("Select a token to view details.", detail.getText());
-                panel.closing();
-                assertFalse(list.isEnabled());
-                panel.render(old.value);
-                assertEquals(0, list.getModel().getSize());
-                assertNull(find(panel, JProgressBar.class));
+                panel.render(state.value); assertNull(panel.selectedId()); assertFalse(panel.diagnosticsMenu.isEnabled());
+                panel.select(id(1)); assertTrue(panel.diagnosticsMenu.isEnabled()); panel.diagnosticsMenu.doClick(0);
+                panel.select(id(2)); panel.search.setText("A"); panel.search.setText(""); panel.render(state.value);
+                panel.setSize(640, 520); panel.doLayout(); panel.list.doLayout();
+                panel.list.scrollRectToVisible(new Rectangle(0, 40, 300, 40));
+                assertEquals(1, viewed.get()); assertTrue(state.calls.isEmpty());
             } finally { panel.closing(); }
         });
     }
-
-    private static <T> void assertLiteralRenderer(JList<T> list) {
-        Component rendered = list.getCellRenderer().getListCellRendererComponent(list,
-                list.getModel().getElementAt(0), 0, false, false);
-        JLabel label = assertInstanceOf(JLabel.class, rendered);
-        assertEquals(Boolean.TRUE, label.getClientProperty("html.disable"));
-        assertNull(label.getClientProperty("html"));
-        assertTrue(label.getText().startsWith("<html>issuer"));
-        assertTrue(label.getText().contains("<html>account"));
+    @Test void refreshActionAndOpeningEditorDoNotDerive() throws Exception {
+        edt(() -> {
+            var vault = new VaultPanel(); var browser = find(vault, TokenBrowserPanel.class);
+            browser.totpAction(TokenFixtures::generate); var state = new State(token(1, active("A")));
+            AtomicInteger refreshes = new AtomicInteger(), edits = new AtomicInteger();
+            vault.onRefresh(() -> { refreshes.incrementAndGet(); vault.render(state.value); });
+            vault.tokenActions(() -> fail(), (base, alternative, explanation) -> edits.incrementAndGet());
+            try {
+                vault.render(state.value); browser.select(id(1));
+                vault.refreshAction.actionPerformed(null); browser.editMenu.doClick(0); browser.row(id(1)).edit.doClick(0);
+                assertEquals(1, refreshes.get()); assertEquals(2, edits.get()); assertTrue(state.calls.isEmpty());
+                assertTrue(browser.row(id(1)).show.isVisible());
+            } finally { vault.closing(); }
+        });
     }
-
-    @Test void equalHeadsAreOneSemanticValueAndRawMetadataIsLiteral() {
-        TokenHead one = head(10, ClientMetadata.empty());
-        TokenHead two = head(11, new ClientMetadata(Optional.of("<html>client"), Optional.of(-1L)));
-        TokenAlternative a = alternative(TokenStatus.ACTIVE, "<html>issuer", "<html>account",
-                TotpAlgorithm.SHA1, 6, 30, one, two);
-        TokenState token = token(1, a);
-        String detail = TokenPresentation.detail(token);
-        assertFalse(TokenPresentation.row(token).text().contains("CONFLICT"));
-        assertTrue(detail.contains("2 current causal heads carry the same token value."));
-        assertTrue(detail.contains("Client-provided raw unsigned time: 18446744073709551615"));
-        assertTrue(detail.contains("Client-provided name: <html>client"));
-        assertTrue(detail.contains("Account: <html>account"));
-        assertTrue(detail.contains(one.revision().hex()));
-        assertTrue(detail.contains(two.revision().hex()));
+    @Test void keyboardSelectionMovesAmongRowsWithoutRevealAndSelectionDiffersFromConflict() throws Exception {
+        edt(() -> {
+            var panel = browser(new MutableClock()); var state = new State(token(1, active("A")), token(2, active("B"), active("C")));
+            try {
+                panel.render(state.value); var normal = panel.row(id(1)); var conflict = panel.row(id(2));
+                Color amber = conflict.getBackground(); panel.select(id(1)); assertNotEquals(amber, normal.getBackground());
+                UsabilityTest.invoke(normal, JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT, KeyStroke.getKeyStroke("DOWN"));
+                assertEquals(id(2), panel.selectedId()); assertNotNull(conflict.warning.getParent());
+                UsabilityTest.invoke(conflict, JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT, KeyStroke.getKeyStroke("UP"));
+                assertEquals(id(1), panel.selectedId()); assertTrue(state.calls.isEmpty());
+            } finally { panel.closing(); }
+        });
     }
-
-    @Test void everyCompetingFieldMapsToAllAlternativesAndSecretGroups() {
-        TokenAlternative a = alternative(TokenStatus.ACTIVE, "issuer A", "account A", TotpAlgorithm.SHA1, 6, 30);
-        TokenAlternative b = alternative(TokenStatus.TOMBSTONED, "issuer B", "account B", TotpAlgorithm.SHA256, 8, 45);
-        TokenAlternative c = alternative(TokenStatus.ACTIVE, "issuer A", "account A", TotpAlgorithm.SHA1, 6, 30);
-        TokenState token = token(1, List.of(a, b, c), List.of(new SecretGroup(List.of(a, c)), new SecretGroup(List.of(b))),
-                List.of(), List.of(), true);
+    @Test void longIdentityClipsWithinViewportWithFullAccessibleTooltipAndControlledHeight() throws Exception {
+        edt(() -> {
+            var panel = browser(new MutableClock());
+            try {
+                panel.render(new State(token(1, active("A")), token(2, active("<html>long issuer ".repeat(1000)))).value);
+                panel.list.setSize(600, 400); panel.list.doLayout();
+                var shortRow = panel.rows.get(0); var longRow = panel.rows.get(1);
+                assertEquals(shortRow.getHeight(), longRow.getHeight()); assertTrue(longRow.getWidth() <= panel.list.getWidth());
+                assertEquals(longRow.primary.getText(), longRow.primary.getToolTipText());
+                assertEquals(Boolean.TRUE, longRow.primary.createToolTip().getClientProperty("html.disable"));
+                assertEquals(0, longRow.primary.getMinimumSize().width);
+                assertTrue(longRow.getAccessibleContext().getAccessibleName().contains("long issuer"));
+            } finally { panel.closing(); }
+        });
+    }
+    @Test void listContainsLiteralTwoLineIdentityAndRealInlineButtonsWithoutDetails() throws Exception {
+        edt(() -> {
+            var panel = browser(new MutableClock());
+            try {
+                panel.render(new State(token(1, alternative(TokenStatus.ACTIVE, "<html>issuer", "<html>account", TotpAlgorithm.SHA1, 6, 30))).value);
+                assertNull(find(panel, JSplitPane.class)); assertNull(find(panel, JTextArea.class));
+                assertEquals(1, panel.rows.size()); var row = panel.rows.get(0);
+                assertEquals("<html>issuer", row.primary.getText()); assertEquals("<html>account", row.account.getText());
+                assertNull(row.primary.getClientProperty("html")); assertEquals(Boolean.TRUE, row.primary.getClientProperty("html.disable"));
+                assertEquals("Show Code", row.show.getText()); assertEquals("Edit", row.edit.getText());
+                assertTrue(row.show.isVisible()); assertNull(find(row, CountdownRing.class));
+                assertTrue(row.isFocusable()); assertTrue(row.getAccessibleContext().getAccessibleName().contains("<html>account"));
+                JScrollPane scroll = find(panel, JScrollPane.class);
+                assertSame(panel.list, scroll.getViewport().getView());
+                assertEquals(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER, scroll.getHorizontalScrollBarPolicy());
+                assertTrue(panel.list.getScrollableTracksViewportWidth());
+            } finally { panel.closing(); }
+        });
+    }
+    @Test void selectionFollowsIdentityAcrossReplacementWithoutDerivation() throws Exception {
+        edt(() -> {
+            var panel = browser(new MutableClock());
+            try {
+                State old = new State(token(1, active("first")), token(2, active("second")));
+                panel.render(old.value); panel.select(id(1));
+                State next = new State(token(2, active("second")), token(1, active("replacement")));
+                panel.render(next.value); assertEquals(id(1), panel.selectedId()); assertEquals("replacement", panel.row(id(1)).primary.getText());
+                panel.render(new State(token(2, active("second"))).value); assertNull(panel.selectedId());
+                assertTrue(old.calls.isEmpty()); assertTrue(next.calls.isEmpty());
+                panel.closing(); panel.render(old.value); assertTrue(panel.rows.isEmpty()); assertFalse(panel.diagnosticsMenu.isEnabled());
+            } finally { panel.closing(); }
+        });
+    }
+    @Test void searchAndRefreshRetireCodesIncludingDetachedLabels() throws Exception {
+        edt(() -> {
+            var panel = browser(new MutableClock()); State state = new State(token(1, active("A")), token(2, active("B")));
+            try {
+                panel.render(state.value); panel.row(id(1)).show.doClick(0);
+                JLabel code = TotpCopyTest.codeLabel(panel.row(id(1)));
+                panel.search.setText("B"); assertEquals("", code.getText()); assertFalse(panel.totp.running());
+                panel.search.setText(""); assertTrue(panel.row(id(1)).show.isVisible()); assertEquals(1, state.calls.size());
+                panel.row(id(1)).show.doClick(0); code = TotpCopyTest.codeLabel(panel.row(id(1)));
+                panel.render(state.value); assertEquals("", code.getText()); assertTrue(panel.row(id(1)).show.isVisible()); assertEquals(2, state.calls.size());
+            } finally { panel.closing(); }
+        });
+    }
+    @Test void emptyStateNoSelectionMenusAndWindowSizeStrategy() throws Exception {
+        edt(() -> {
+            var panel = new VaultPanel();
+            try {
+                var browser = find(panel, TokenBrowserPanel.class); panel.render(new State().value);
+                assertTrue(browser.empty.getText().contains("No tokens yet")); assertNotNull(browser.empty.getParent());
+                assertFalse(browser.editMenu.isEnabled()); assertFalse(browser.diagnosticsMenu.isEnabled());
+                var menus = panel.menuBar(); assertEquals(3, menus.getMenuCount()); assertEquals("Token", menus.getMenu(2).getText());
+                assertEquals(2, menus.getMenu(2).getItemCount()); assertSame(browser.editMenu, menus.getMenu(2).getItem(0));
+                assertEquals(new Dimension(640, 520), panel.getMinimumSize()); assertEquals(new Dimension(760, 820), VaultPanel.INITIAL_SIZE);
+                assertNull(find(panel, JSplitPane.class));
+            } finally { panel.closing(); }
+        });
+    }
+    @Test void equalHeadsAreOrdinaryAndDiagnosticsPreserveLiteralProvenance() throws Exception {
+        edt(() -> {
+            TokenHead one = head(10, ClientMetadata.empty());
+            TokenHead two = head(11, new ClientMetadata(Optional.of("<html>client"), Optional.of(-1L)));
+            var a = alternative(TokenStatus.ACTIVE, "issuer", "account", TotpAlgorithm.SHA1, 6, 30, one, two);
+            var state = new State(token(1, a)); var panel = browser(new MutableClock());
+            try {
+                panel.render(state.value); var row = panel.row(id(1));
+                assertFalse(row.token.hasConflict()); assertNull(row.warning.getParent());
+                row.show.doClick(0); assertEquals(1, state.calls.size()); assertEquals(1, TotpCopyTest.buttons(row).size());
+                String detail = TokenPresentation.detail(row.token);
+                assertTrue(detail.contains("2 current causal heads carry the same token value."));
+                assertTrue(detail.contains(one.revision().hex())); assertTrue(detail.contains(two.revision().hex()));
+                assertTrue(detail.contains("Client-provided name: <html>client"));
+                assertTrue(detail.contains("18446744073709551615"));
+            } finally { panel.closing(); }
+        });
+    }
+    @Test void everyCompetingFieldMapsToAlternativesAndSecretGroups() {
+        var a = alternative(TokenStatus.ACTIVE, "issuer A", "account A", TotpAlgorithm.SHA1, 6, 30);
+        var b = alternative(TokenStatus.TOMBSTONED, "issuer B", "account B", TotpAlgorithm.SHA256, 8, 45);
+        var c = alternative(TokenStatus.ACTIVE, "issuer A", "account C", TotpAlgorithm.SHA1, 6, 30);
+        var token = token(1, List.of(a, b, c), List.of(new SecretGroup(List.of(a, c)), new SecretGroup(List.of(b))), List.of(), List.of(), true);
         String text = TokenPresentation.detail(token);
-        for (String value : List.of("ACTIVE", "issuer A", "account A", "SHA1", "6", "PT30S")) {
+        for (String value : List.of("ACTIVE", "issuer A", "SHA1", "6", "PT30S")) {
             assertTrue(text.contains(value + " — Alternative 1, Alternative 3"), value);
         }
+        assertTrue(text.contains("account A — Alternative 1"));
+        assertTrue(text.contains("account C — Alternative 3"));
         for (String value : List.of("TOMBSTONED", "issuer B", "account B", "SHA256", "8", "PT45S")) {
             assertTrue(text.contains(value + " — Alternative 2"), value);
         }
         assertTrue(text.contains("Secret group 1 — Alternative 1, Alternative 3"));
         assertTrue(text.contains("Secret group 2 — Alternative 2"));
-        assertTrue(TokenPresentation.row(token).text().contains("[conflicting issuer]"));
-        assertTrue(TokenPresentation.row(token).text().contains("[conflicting account]"));
     }
-
-    @Test void secretOnlyConflictAndAgreedSecretAreCoreProjected() {
-        TokenAlternative a = active("same");
-        TokenAlternative b = active("same");
-        assertEquals(a.descriptor(), b.descriptor());
-        TokenState different = token(1, List.of(a, b), List.of(new SecretGroup(List.of(a)), new SecretGroup(List.of(b))),
-                List.of(), List.of(), true);
-        assertTrue(TokenPresentation.row(different).text().contains("CONFLICT"));
-        assertTrue(TokenPresentation.detail(different).contains("2 distinct secret values"));
-        assertTrue(TokenPresentation.detail(different).contains("Alternative 2"));
-        assertTrue(TokenPresentation.detail(token(1, a, b)).contains("All current alternatives use the same secret."));
-    }
-
-    @Test void incompleteAndUnresolvedRemainVisibleWithoutInventedConflict() throws Exception {
+    @Test void incompleteUnresolvedAndTombstoneOfferDiagnosticsWithoutInventedConflict() throws Exception {
         edt(() -> {
             var ref = new UnresolvedReference(revision(20), revision(21));
-            TokenState incomplete = token(1, List.of(), List.of(), List.of(head(20, ClientMetadata.empty())), List.of(ref), false);
-            String row = TokenPresentation.row(incomplete).text();
-            String detail = TokenPresentation.detail(incomplete);
-            assertTrue(row.contains("Incomplete token observation"));
-            assertTrue(row.contains("UNRESOLVED"));
-            assertFalse(row.contains("CONFLICT"));
-            assertTrue(detail.contains("No complete token value"));
-            assertTrue(detail.contains("Child: " + ref.child().hex()));
-            assertTrue(detail.contains("Referenced parent: " + ref.parent().hex()));
-            for (String field : List.of("Status", "Issuer", "Account", "Algorithm", "Digits", "Period")) {
-                assertTrue(detail.contains(field + ":\nNo complete observed value"));
-            }
-            State state = new State(incomplete);
-            TokenBrowserPanel panel = new TokenBrowserPanel(new MutableClock());
+            var token = token(1, List.of(), List.of(), List.of(head(20, ClientMetadata.empty())), List.of(ref), false);
+            State state = new State(token); var panel = browser(new MutableClock());
             try {
-                panel.render(state.value);
-                find(panel, JList.class).setSelectedIndex(0);
-                assertTrue(find(panel, JTextArea.class).getText().contains("Unresolved causal references: 1"));
-                assertEquals(0, state.calls.size());
+                panel.render(state.value); panel.select(id(1));
+                assertTrue(panel.diagnosticsMenu.isEnabled()); assertFalse(panel.editMenu.isEnabled()); assertFalse(panel.row(id(1)).show.isEnabled());
+                assertFalse(panel.row(id(1)).token.hasConflict());
+                String detail = new TokenDiagnosticsPanel(token).text.getText();
+                assertTrue(detail.contains("No complete token value")); assertTrue(detail.contains("Child: " + ref.child().hex()));
+                assertTrue(detail.contains("Referenced parent: " + ref.parent().hex()));
+                for (String field : List.of("Status", "Issuer", "Account", "Algorithm", "Digits", "Period")) {
+                    assertTrue(detail.contains(field + ":\nNo complete observed value"));
+                }
+                panel.render(new State(token(2, alternative(TokenStatus.TOMBSTONED, "old", "account", TotpAlgorithm.SHA1, 6, 30))).value);
+                assertFalse(panel.row(id(2)).show.isEnabled()); assertTrue(state.calls.isEmpty());
             } finally { panel.closing(); }
-            TokenState partial = token(2, List.of(active("available")), List.of(), List.of(), List.of(ref), false);
-            assertTrue(TokenPresentation.row(partial).text().contains("UNRESOLVED"));
-            assertFalse(TokenPresentation.row(partial).text().contains("CONFLICT"));
         });
     }
 }

@@ -42,26 +42,25 @@ class UsabilityTest {
             var state = new State(token(3, active("match")), token(1, active("other")), token(2, active("match"), active("else")));
             try {
                 panel.render(state.value);
-                JList<?> list = find(panel, JList.class);
                 assertEquals("3 tokens", panel.resultCount.getText());
                 panel.search.setText("MATCH");
                 assertEquals("2 of 3 tokens", panel.resultCount.getText());
-                assertEquals(id(3), ((TokenPresentation.Row) list.getModel().getElementAt(0)).id());
-                assertEquals(id(2), ((TokenPresentation.Row) list.getModel().getElementAt(1)).id());
-                assertTrue(list.getModel().getElementAt(1).toString().contains("CONFLICT"));
+                assertEquals(id(3), panel.rows.get(0).token.id());
+                assertEquals(id(2), panel.rows.get(1).token.id());
+                assertTrue(panel.rows.get(1).token.hasConflict());
                 assertTrue(state.calls.isEmpty());
-                list.setSelectedIndex(0);
+                panel.select(id(3));
                 panel.render(new State(token(2, active("match")), token(3, active("match newest"))).value);
                 assertEquals("MATCH", panel.search.getText());
-                assertEquals(1, list.getSelectedIndex());
+                assertEquals(id(3), panel.selectedId());
                 panel.search.setText("absent");
-                assertEquals(-1, list.getSelectedIndex());
-                assertEquals("No tokens match this search.", find(panel, JTextArea.class).getText());
+                assertNull(panel.selectedId());
+                assertEquals("No tokens match this search.", panel.empty.getText());
                 invoke(panel.search, JComponent.WHEN_FOCUSED, KeyStroke.getKeyStroke("ESCAPE"));
                 assertEquals("", panel.search.getText());
-                assertEquals(-1, list.getSelectedIndex());
+                assertNull(panel.selectedId());
                 panel.render(new State().value);
-                assertEquals("No tokens are currently observed.", find(panel, JTextArea.class).getText());
+                assertTrue(panel.empty.getText().contains("No tokens yet"));
             } finally { panel.closing(); }
         });
     }
@@ -164,19 +163,19 @@ class UsabilityTest {
             var a = alternative(TokenStatus.ACTIVE, "long issuer ".repeat(1000), "long account ".repeat(1000),
                     TotpAlgorithm.SHA1, 6, 30, heads.toArray(TokenHead[]::new));
             var token = token(1, List.of(a), List.of(new SecretGroup(List.of(a))), heads, refs, false);
-            var panel = new TokenBrowserPanel(new MutableClock());
-            panel.render(new State(token).value); find(panel, JList.class).setSelectedIndex(0);
-            String detail = find(panel, JTextArea.class).getText();
+            var panel = browser(new MutableClock());
+            panel.render(new State(token).value); panel.select(id(1));
+            var diagnosticPanel = new TokenDiagnosticsPanel(token);
+            String detail = diagnosticPanel.text.getText();
             assertTrue(detail.contains("Unresolved causal references: 99"));
             assertTrue(detail.contains(revision(99).hex()));
-            JProgressBar remaining = find(panel, JProgressBar.class);
-            assertEquals("TOTP time remaining", remaining.getAccessibleContext().getAccessibleName());
-            JLabel code = all(panel).stream().filter(JLabel.class::isInstance).map(JLabel.class::cast)
-                    .filter(l -> l.getText().contains("001234")).findFirst().orElseThrow();
-            assertTrue(code.getAccessibleContext().getAccessibleName().contains("001234"));
-            assertFalse(code.getAccessibleContext().getAccessibleDescription().contains("001234"));
+            panel.row(id(1)).show.doClick(0);
+            CountdownRing remaining = find(panel, CountdownRing.class);
+            assertEquals("23 seconds remaining", remaining.getAccessibleContext().getAccessibleName());
+            JLabel code = TotpCopyTest.codeLabel(panel);
+            assertTrue(code.getAccessibleContext().getAccessibleName().contains("001 234"));
             panel.closing(); assertEquals("", code.getText());
-            assertFalse(code.getAccessibleContext().getAccessibleName().contains("001234"));
+            assertFalse(code.getAccessibleContext().getAccessibleName().contains("001 234"));
             VaultPanel vault = new VaultPanel();
             String[] diagnostics = new String[200]; java.util.Arrays.fill(diagnostics, "DIAGNOSTIC");
             vault.render(org.totipo.desktop.TestSupport.state(new ObservationProgress.Finished(200, true), diagnostics));
@@ -203,10 +202,11 @@ class UsabilityTest {
             var longValue = "<html>long issuer account ".repeat(1000);
             panel.render(new State(token(1, active(longValue), active(longValue + "second"), active("third"))).value);
             assertNotNull(find(panel, JScrollPane.class));
-            assertNotNull(find(panel, JList.class).getAccessibleContext().getAccessibleName());
-            find(panel, JList.class).setSelectedIndex(0);
-            assertTrue(find(find(panel, TokenBrowserPanel.class), JTextArea.class).getText().contains("CONFLICT"));
-            assertTrue(find(find(panel, TokenBrowserPanel.class), JTextArea.class).getLineWrap());
+            var browser = find(panel, TokenBrowserPanel.class);
+            assertNotNull(browser.list.getAccessibleContext().getAccessibleName());
+            browser.select(id(1));
+            assertTrue(browser.row(id(1)).getAccessibleContext().getAccessibleName().contains("conflicting versions"));
+            assertTrue(new TokenDiagnosticsPanel(browser.row(id(1)).token).text.getLineWrap());
             panel.closing();
         });
     }
