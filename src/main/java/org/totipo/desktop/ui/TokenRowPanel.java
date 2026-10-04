@@ -129,16 +129,11 @@ final class TokenRowPanel extends JPanel {
         boolean previous = selection;
         selection = selected;
         Color background = UIManager.getColor("List.background");
-        if (token.hasConflict()) {
-            Color amber = new Color(225, 155, 40);
-            background = new Color((background.getRed() * 7 + amber.getRed()) / 8,
-                    (background.getGreen() * 7 + amber.getGreen()) / 8, (background.getBlue() * 7 + amber.getBlue()) / 8);
-        }
-        else if (selected) { background = mix(background, UIManager.getColor("List.selectionBackground"), 12); }
+        if (selected) { background = mix(background, UIManager.getColor("List.selectionBackground"), 12); }
         setBackground(background);
         labelColors(this, UIManager.getColor("List.foreground"));
-        Color edge = token.hasConflict() ? new Color(190, 125, 25) : UIManager.getColor("Separator.foreground");
-        setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0, token.hasConflict() ? 3 : 0, 1, 0, edge),
+        Color edge = UIManager.getColor("Separator.foreground");
+        setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, edge),
                 BorderFactory.createCompoundBorder(selected
                         ? BorderFactory.createLineBorder(UIManager.getColor("List.selectionBackground"), 2)
                         : BorderFactory.createEmptyBorder(2, 2, 2, 2), BorderFactory.createEmptyBorder(8, 8, 8, 8))));

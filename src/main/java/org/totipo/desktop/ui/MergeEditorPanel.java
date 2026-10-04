@@ -44,12 +44,13 @@ public final class MergeEditorPanel extends JPanel {
         add(intro, BorderLayout.NORTH);
         issuer = new TextChoice("Issuer", inputs.selectedCompetition().issuer());
         account = new TextChoice("Account", inputs.selectedCompetition().account());
-        addField("Issuer", issuer.panel); addField("Account", account.panel);
+        addSection("Issuer", issuer.panel); addSection("Account", account.panel);
         var statuses = inputs.selectedCompetition().status().values();
         if (statuses.size() == 1) { status.select(statuses.get(0).value()); }
         else { status.clearSelection(); }
         status.options.values().forEach(button -> button.addActionListener(e -> validateForm()));
-        addField("Status", status);
+        status.setLayout(new GridLayout(0, 1, 0, 8));
+        addSection("Status", status);
         ButtonGroup setupGroup = new ButtonGroup();
         JPanel setupChoices = new JPanel(new GridLayout(0, 1, 0, 8));
         for (TokenAlternative alternative : inputs.selected()) {
@@ -72,7 +73,9 @@ public final class MergeEditorPanel extends JPanel {
         }
         setupGroup.add(customSetup); setupChoices.add(customSetup);
         if (setups.size() == 1) { setupButtons.get(0).setSelected(true); }
-        addField("Authenticator Setup", setupChoices);
+        JPanel setupSection = new JPanel(new BorderLayout(0, 12));
+        setupSection.add(setupChoices, BorderLayout.NORTH);
+        setupSection.add(customFields, BorderLayout.CENTER);
         for (var pair : List.of(new Object[]{"Secret", custom.secret}, new Object[]{"Algorithm", custom.algorithm},
                 new Object[]{"Digits", custom.digits}, new Object[]{"Period (seconds)", custom.period})) {
             JComponent control = (JComponent) pair[1]; customFields.add(SwingUsability.label((String) pair[0], control)); customFields.add(control);
@@ -83,7 +86,7 @@ public final class MergeEditorPanel extends JPanel {
         custom.algorithm.options.values().forEach(button -> button.addActionListener(e -> chooseCustom()));
         custom.digits.options.values().forEach(button -> button.addActionListener(e -> chooseCustom()));
         custom.period.addChangeListener(e -> chooseCustom());
-        customSetup.addActionListener(e -> validateForm()); addField("", customFields);
+        customSetup.addActionListener(e -> validateForm()); addSection("Authenticator Setup", setupSection);
         JPanel wrapper = new TokenEditorPanel.FormBody(); wrapper.add(body, BorderLayout.NORTH);
         JScrollPane scroll = new JScrollPane(wrapper, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         scroll.getVerticalScrollBar().setUnitIncrement(16); add(scroll, BorderLayout.CENTER);
@@ -104,13 +107,21 @@ public final class MergeEditorPanel extends JPanel {
     }
     private static String metadata(TokenDescriptor d) { return d.algorithm() + " · " + d.digits() + " digits · " + d.period().getSeconds() + " seconds"; }
     private void chooseCustom() { if (!busy && !retired) { customSetup.setSelected(true); validateForm(); } }
-    private void addField(String label, JComponent control) {
+    private void addSection(String title, JComponent control) {
+        JPanel section = new JPanel(new BorderLayout()) {
+            private static final long serialVersionUID = 1L;
+            @Override public Dimension getMinimumSize() { return new Dimension(0, super.getMinimumSize().height); }
+        };
+        section.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createTitledBorder(title),
+                BorderFactory.createEmptyBorder(8, 8, 8, 8)));
+        section.getAccessibleContext().setAccessibleName(title);
+        section.getAccessibleContext().setAccessibleDescription("Choose the " + title.toLowerCase() + " to keep.");
+        section.add(control, BorderLayout.CENTER);
         GridBagConstraints c = new GridBagConstraints(); c.gridx = 0; c.gridy = row++; c.weightx = 1;
-        c.fill = GridBagConstraints.HORIZONTAL; c.insets = new Insets(8, 0, 4, 0); body.add(SwingUsability.label(label, control), c);
-        c.gridy = row++; c.insets = new Insets(0, 0, 4, 0); body.add(control, c);
+        c.fill = GridBagConstraints.HORIZONTAL; c.insets = new Insets(0, 0, 12, 0); body.add(section, c);
     }
     private final class TextChoice {
-        final JPanel panel = new JPanel(new GridLayout(0, 1, 0, 6));
+        final JPanel panel = new JPanel(new GridLayout(0, 1, 0, 8));
         final List<String> values = new ArrayList<>();
         final List<JRadioButton> radios = new ArrayList<>();
         final JTextField customField = new JTextField(24);
@@ -121,6 +132,7 @@ public final class MergeEditorPanel extends JPanel {
             agreed = values.size() == 1;
             customField.getDocument().putProperty("filterNewlines", Boolean.FALSE);
             customField.getAccessibleContext().setAccessibleName("Enter a different " + name.toLowerCase() + " value");
+            customField.getAccessibleContext().setAccessibleDescription(customField.getAccessibleContext().getAccessibleName());
             if (agreed) { customField.setText(values.get(0)); panel.add(customField); }
             else {
                 ButtonGroup group = new ButtonGroup();

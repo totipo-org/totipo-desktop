@@ -111,13 +111,15 @@ public final class TokenBrowserPanel extends JPanel {
                     private static final long serialVersionUID = 1L;
                     @Override public Dimension getMaximumSize() { return new Dimension(Integer.MAX_VALUE, getPreferredSize().height); }
                 }; group.setLayout(new BoxLayout(group, BoxLayout.Y_AXIS));
-                group.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0, 3, 1, 0, new Color(190, 130, 35)), BorderFactory.createEmptyBorder(8, 8, 8, 8)));
-                group.setBackground(new Color(255, 244, 221));
+                group.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0, 3, 0, 0, conflictAccent()), BorderFactory.createEmptyBorder(8, 8, 8, 8)));
+                group.setBackground(UIManager.getColor("List.background"));
                 group.getAccessibleContext().setAccessibleName("This token has conflicting versions");
-                JPanel header = new JPanel(new BorderLayout()); header.setOpaque(false);
+                JPanel header = new JPanel(new BorderLayout()); header.setOpaque(false); header.setFocusable(false);
                 JLabel warning = TokenRowPanel.literal("⚠ Conflict"); warning.setToolTipText("This token has conflicting versions");
+                warning.setForeground(UIManager.getColor("List.foreground"));
+                warning.setFont(warning.getFont().deriveFont(Font.BOLD));
                 warning.getAccessibleContext().setAccessibleName("This token has conflicting versions");
-                JButton resolve = new JButton("Resolve"); resolveButtons.add(resolve);
+                JButton resolve = new JButton("Resolve"); resolve.setMargin(new Insets(3, 8, 3, 8)); resolveButtons.add(resolve);
                 resolve.addActionListener(e -> {
                     if (!closed && writeAvailable && mergeAction != null && latest.token(token.id()).orElse(null) == token) {
                         if (token.alternatives().size() < 2 || !token.unresolvedReferences().isEmpty()) {
@@ -278,6 +280,15 @@ public final class TokenBrowserPanel extends JPanel {
             @Override public void windowClosed(java.awt.event.WindowEvent e) { dialogs.remove(dialog); }
         });
         dialogs.add(dialog); dialog.setLocationRelativeTo(this); dialog.setVisible(true);
+    }
+    /** A single semantic edge; use the L&F warning palette without importing its dialog surface. */
+    static Color conflictAccent() {
+        Color warning = UIManager.getColor("OptionPane.warningDialog.titlePane.background");
+        if (warning == null) { warning = UIManager.getColor("nimbusOrange"); }
+        if (warning == null) { return Color.ORANGE; }
+        return new Color((warning.getRed() + Color.ORANGE.getRed()) / 2,
+                (warning.getGreen() + Color.ORANGE.getGreen()) / 2,
+                (warning.getBlue() + Color.ORANGE.getBlue()) / 2);
     }
     private void closeDialogs() { for (JDialog dialog : List.copyOf(dialogs)) { dialog.dispose(); } dialogs.clear(); }
     public void closing() {

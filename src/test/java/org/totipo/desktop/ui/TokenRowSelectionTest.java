@@ -26,17 +26,20 @@ class TokenRowSelectionTest {
             row.selected(false); assertFalse(row.getAccessibleContext().getAccessibleStateSet().contains(AccessibleState.SELECTED)); row.retire();
         });
     }
-    @Test void conflictTintAccentAndWarningRemainIndependentlyRepresentedWhenSelected() throws Exception {
+    @Test void conflictChildUsesOrdinarySelectionSurfaceAndRetainsAccessibleWarning() throws Exception {
         edt(() -> {
             var row = new TokenRowPanel(token(1, active("A"), active("B")), () -> { }, () -> { }, () -> { }, i -> { });
             Color conflict = row.getBackground(); var height = row.getPreferredSize().height;
-            var conflictBorder = (MatteBorder) ((CompoundBorder) row.getBorder()).getOutsideBorder();
-            assertEquals(3, conflictBorder.getBorderInsets(row).left); assertNotEquals(UIManager.getColor("List.background"), conflict);
-            row.selected(true); assertEquals(conflict, row.getBackground()); assertTrue(hasSelectionOutline(row.getBorder()));
-            assertEquals(conflictBorder.getMatteColor(), ((MatteBorder)((CompoundBorder)row.getBorder()).getOutsideBorder()).getMatteColor());
+            var ordinary = new TokenRowPanel(token(2, active("C")), () -> { }, () -> { }, () -> { }, i -> { });
+            var separator = (MatteBorder) ((CompoundBorder) row.getBorder()).getOutsideBorder();
+            assertEquals(0, separator.getBorderInsets(row).left); assertEquals(UIManager.getColor("List.background"), conflict);
+            row.selected(true); ordinary.selected(true);
+            assertEquals(ordinary.getBackground(), row.getBackground()); assertNotEquals(conflict, row.getBackground());
+            assertTrue(hasSelectionOutline(row.getBorder()));
+            assertEquals(UIManager.getColor("Separator.foreground"), ((MatteBorder)((CompoundBorder)row.getBorder()).getOutsideBorder()).getMatteColor());
             assertSame(row.identityBottom, row.warning.getParent()); assertTrue(row.getAccessibleContext().getAccessibleName().contains("conflicting versions"));
             assertTrue(row.getAccessibleContext().getAccessibleStateSet().contains(AccessibleState.SELECTED)); assertEquals(height, row.getPreferredSize().height);
-            assertEquals(UIManager.getColor("List.foreground"), row.primary.getForeground()); assertNotEquals(conflict, row.primary.getForeground()); row.retire();
+            assertEquals(UIManager.getColor("List.foreground"), row.primary.getForeground()); assertNotEquals(conflict, row.primary.getForeground()); row.retire(); ordinary.retire();
         });
     }
 }

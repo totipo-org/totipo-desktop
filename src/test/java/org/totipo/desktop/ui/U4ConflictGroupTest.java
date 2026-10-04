@@ -7,12 +7,117 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import javax.swing.*;
+import javax.swing.border.CompoundBorder;
+import javax.swing.border.MatteBorder;
+import javax.accessibility.AccessibleState;
 import org.junit.jupiter.api.Test;
 import static org.totipo.desktop.TestSupport.edt;
 import static org.totipo.desktop.ui.TokenFixtures.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class U4ConflictGroupTest {
+    @Test void parentOwnsConflictAccentWhileChildrenShareOrdinarySurfacesAndSelection() throws Exception {
+        edt(() -> {
+            var panel = browser(new MutableClock());
+            var a = alternative(TokenStatus.ACTIVE, "Alpha", "a", TotpAlgorithm.SHA1, 6, 30,
+                    head(1, ClientMetadata.empty()), head(2, ClientMetadata.empty()));
+            var conflict = token(1, a, active("Beta"));
+            try {
+                panel.render(new State(conflict, token(2, active("Gamma"))).value);
+                assertEquals(2, panel.list.getComponentCount()); assertEquals(3, panel.rows.size());
+                var group = (JPanel) panel.list.getComponent(0);
+                var header = (JPanel) group.getComponent(0);
+                var first = panel.rows.get(0); var second = panel.rows.get(1); var ordinary = panel.rows.get(2);
+                assertSame(group, first.getParent().getParent()); assertSame(group, second.getParent().getParent());
+                assertEquals(3, group.getComponentCount()); // header plus one child per Alternative, despite two Heads
+                assertEquals(1, buttons(header, "Resolve").size());
+                assertTrue(buttons(header, "Show Code").isEmpty()); assertTrue(buttons(header, "Edit").isEmpty());
+                assertFalse(header.isFocusable()); assertFalse(header.isOpaque());
+                var warning = TokenBrowserTest.find(header, JLabel.class);
+                assertEquals("⚠ Conflict", warning.getText());
+                assertEquals(UIManager.getColor("List.foreground"), warning.getForeground());
+                assertEquals("This token has conflicting versions", warning.getAccessibleContext().getAccessibleName());
+                assertEquals(warning.getAccessibleContext().getAccessibleName(), group.getAccessibleContext().getAccessibleName());
+                assertEquals(UIManager.getColor("List.background"), group.getBackground());
+                assertEquals(ordinary.getBackground(), second.getBackground());
+                var border = group.getBorder();
+                var edge = (MatteBorder) ((CompoundBorder) border).getOutsideBorder();
+                assertEquals(3, edge.getBorderInsets(group).left); assertEquals(0, edge.getBorderInsets(group).bottom);
+                assertEquals(TokenBrowserPanel.conflictAccent(), edge.getMatteColor());
+                var insets = first.getInsets(); var height = first.getPreferredSize().height;
+                first.selected(false); ordinary.selected(false);
+                assertEquals(ordinary.getBackground(), first.getBackground());
+                assertEquals(UIManager.getColor("List.background"), first.getBackground());
+                first.selected(true); ordinary.selected(true);
+                assertEquals(ordinary.getBackground(), first.getBackground());
+                assertNotEquals(UIManager.getColor("List.selectionBackground"), first.getBackground());
+                assertTrue(TokenRowSelectionTest.hasSelectionOutline(first.getBorder()));
+                assertSame(border, group.getBorder()); assertTrue(first.token.hasConflict());
+                assertTrue(first.getAccessibleContext().getAccessibleStateSet().contains(AccessibleState.SELECTED));
+                assertTrue(first.getAccessibleContext().getAccessibleName().contains("conflicting versions"));
+                assertEquals(insets, first.getInsets()); assertEquals(height, first.getPreferredSize().height);
+                assertTrue(first.show.isEnabled()); assertTrue(second.show.isEnabled());
+                assertTrue(first.edit.isEnabled()); assertTrue(second.edit.isEnabled());
+            } finally { panel.closing(); }
+        });
+    }
+
+    @Test void lightAndDarkListPalettesKeepWarningAndSelectionIndependentOfConflictEdge() throws Exception {
+        edt(() -> {
+            var background = UIManager.get("List.background"); var foreground = UIManager.get("List.foreground");
+            var selection = UIManager.get("List.selectionBackground");
+            try {
+                for (Color surface : List.of(Color.WHITE, Color.BLACK)) {
+                    UIManager.put("List.background", surface);
+                    UIManager.put("List.foreground", surface.equals(Color.WHITE) ? Color.BLACK : Color.WHITE);
+                    UIManager.put("List.selectionBackground", Color.BLUE);
+                    var panel = browser(new MutableClock());
+                    try {
+                        panel.render(new State(token(1, active("A"), active("B")), token(2, active("C"))).value);
+                        var group = (JPanel) panel.list.getComponent(0);
+                        var warning = TokenBrowserTest.find((JPanel) group.getComponent(0), JLabel.class);
+                        assertEquals(surface, group.getBackground());
+                        assertEquals(UIManager.getColor("List.foreground"), warning.getForeground());
+                        assertNotEquals(surface, warning.getForeground());
+                        var edge = group.getBorder();
+                        var child = panel.rows.get(0); var ordinary = panel.rows.get(2);
+                        child.selected(false); ordinary.selected(false); assertEquals(surface, child.getBackground());
+                        child.selected(true); ordinary.selected(true); assertEquals(ordinary.getBackground(), child.getBackground());
+                        assertNotEquals(Color.BLUE, child.getBackground()); assertNotEquals(surface, child.getBackground());
+                        assertTrue(TokenRowSelectionTest.hasSelectionOutline(child.getBorder())); assertSame(edge, group.getBorder());
+                    } finally { panel.closing(); }
+                }
+            } finally {
+                UIManager.put("List.background", background); UIManager.put("List.foreground", foreground); UIManager.put("List.selectionBackground", selection);
+            }
+        });
+    }
+
+    @Test void conflictAccentUsesLookAndFeelWarningPaletteWithSemanticFallback() throws Exception {
+        edt(() -> {
+            var warning = UIManager.get("OptionPane.warningDialog.titlePane.background");
+            var nimbus = UIManager.get("nimbusOrange");
+            var defaults = UIManager.getLookAndFeelDefaults();
+            var defaultWarning = defaults.get("OptionPane.warningDialog.titlePane.background");
+            var defaultNimbus = defaults.get("nimbusOrange");
+            try {
+                UIManager.put("OptionPane.warningDialog.titlePane.background", Color.ORANGE);
+                assertEquals(Color.ORANGE, TokenBrowserPanel.conflictAccent());
+                UIManager.put("OptionPane.warningDialog.titlePane.background", Color.YELLOW);
+                assertNotEquals(Color.ORANGE, TokenBrowserPanel.conflictAccent());
+                UIManager.put("OptionPane.warningDialog.titlePane.background", null);
+                defaults.remove("OptionPane.warningDialog.titlePane.background");
+                UIManager.put("nimbusOrange", Color.ORANGE);
+                assertEquals(Color.ORANGE, TokenBrowserPanel.conflictAccent());
+                UIManager.put("nimbusOrange", null);
+                defaults.remove("nimbusOrange");
+                assertEquals(Color.ORANGE, TokenBrowserPanel.conflictAccent());
+            } finally {
+                defaults.put("OptionPane.warningDialog.titlePane.background", defaultWarning); defaults.put("nimbusOrange", defaultNimbus);
+                UIManager.put("OptionPane.warningDialog.titlePane.background", warning); UIManager.put("nimbusOrange", nimbus);
+            }
+        });
+    }
     @Test void cancelResolverPreservesChildRevealsAndIncompleteObservationCannotResolve() throws Exception {
         edt(() -> {
             var panel = browser(new MutableClock()); var a = active("Alpha"); var b = active("Beta");
