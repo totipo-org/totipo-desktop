@@ -38,7 +38,7 @@ class TokenSearchTest {
             try {
                 panel.render(state.value);
                 for (String query : List.of("north", "SOUTH", "owner", "other", "o")) {
-                    panel.search.setText(query); assertEquals(1, panel.rows.size());
+                    panel.search.setText(query); assertEquals(2, panel.rows.size());
                     assertSame(token, panel.rows.get(0).token); assertTrue(panel.rows.get(0).token.hasConflict());
                     assertEquals("1 of 2 tokens", panel.resultCount.getText());
                 }

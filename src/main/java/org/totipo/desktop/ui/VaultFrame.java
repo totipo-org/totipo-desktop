@@ -62,7 +62,10 @@ public final class VaultFrame extends JFrame implements VaultView {
         editor.addWindowListener(new WindowAdapter() {
             @Override public void windowClosing(WindowEvent event) { content.cancel(); }
         });
-        SwingUsability.fit(editor, 850, 800); editor.setLocationRelativeTo(this); editor.setVisible(true);
+        SwingUsability.fit(editor, TokenEditorPanel.PREFERRED_SIZE.width, TokenEditorPanel.PREFERRED_SIZE.height);
+        editor.setMinimumSize(new java.awt.Dimension(Math.min(TokenEditorPanel.MINIMUM_SIZE.width, editor.getWidth()),
+                Math.min(TokenEditorPanel.MINIMUM_SIZE.height, editor.getHeight())));
+        editor.setLocationRelativeTo(this); editor.setVisible(true);
     }
     @Override public void additionalConflict(Runnable review, Runnable publish, Runnable cancel) {
         panel.additionalConflict(review, publish, cancel);

@@ -73,8 +73,7 @@ class MergeControllerTest {
         void open() throws Exception { edt(() -> view.merge.open(fake.state, fake.token)); event("editor"); }
         void save() throws Exception {
             edt(() -> {
-                button(view.editor, "Continue").doClick();
-                for (var box : boxes(view.editor)) { box.setSelectedIndex(0); }
+                MergeEditorTest.chooseFirst(view.editor);
                 assertTrue(button(view.editor, "Save").isEnabled()); button(view.editor, "Save").doClick();
                 view.passwordBlocked();
             });
@@ -130,15 +129,14 @@ class MergeControllerTest {
             h.fake.ownedSecret = new byte[1]; h.fake.results.add(new SaveResult.AdditionalConflict(latest.state, partial));
             h.open(); MergeEditorPanel old = onEdt(() -> h.view.editor);
             edt(() -> {
-                button(old, "Continue").doClick(); boxes(old).forEach(box -> box.setSelectedIndex(0));
-                boxes(old).getLast().setSelectedIndex(3); password(old).setText("MY"); button(old, "Save").doClick();
+                MergeEditorTest.chooseFirst(old); password(old).setText("MY"); button(old, "Save").doClick();
             });
             h.event("decision");
             assertThrows(IllegalStateException.class, () -> ((NewSecret) h.fake.values.get("secret")).copy());
             edt(() -> assertEquals(0, password(old).getPassword().length));
             edt(h.view.review); h.event("finished"); h.event("editor");
             edt(() -> {
-                button(h.view.editor, "Continue").doClick(); assertEquals(-1, boxes(h.view.editor).getLast().getSelectedIndex());
+                assertFalse(button(h.view.editor, "Save").isEnabled());
                 assertEquals(0, password(h.view.editor).getPassword().length);
             });
             assertEquals(0, partial.saves); assertEquals(1, partial.closes);
@@ -152,7 +150,7 @@ class MergeControllerTest {
             assertFalse(h.fake.calls.contains("save")); assertTrue(h.fake.calls.contains("close"));
         }
     }
-    @Test void subsetOmissionIsNotDesktopAdditionalConflictButLaterCoreConflictIsHonored() throws Exception {
+    @Test void fullFrontierAndLaterCoreConflictIsHonored() throws Exception {
         for (boolean laterConflict : List.of(false, true)) {
             try (Harness h = new Harness()) {
                 var abc = h.fake.token.alternatives();
@@ -160,14 +158,12 @@ class MergeControllerTest {
                 Partial partial = new Partial();
                 h.fake.results.add(laterConflict ? new SaveResult.AdditionalConflict(abcd.state, partial) : saved());
                 h.open();
-                edt(() -> components(h.view.editor).stream().filter(JCheckBox.class::isInstance)
-                        .map(JCheckBox.class::cast).toList().get(2).doClick());
                 h.save(); h.event(laterConflict ? "decision" : "finished");
-                assertEquals(List.of(abc.get(0), abc.get(1)), h.fake.factories.get(0));
+                assertEquals(ID, h.fake.factories.get(0));
                 assertEquals(0, partial.saves);
                 if (laterConflict) {
                     edt(h.view.review); h.event("finished"); h.event("editor");
-                    edt(() -> assertEquals(4, components(h.view.editor).stream().filter(JCheckBox.class::isInstance).count()));
+                    edt(() -> assertEquals(4, components(h.view.editor).stream().filter(JRadioButton.class::isInstance).map(JRadioButton.class::cast).filter(button -> button.getText().startsWith("Setup used by")).count()));
                     assertEquals(1, partial.closes);
                 }
             }
@@ -188,19 +184,18 @@ class MergeControllerTest {
             assertEquals(1, partial.closes); assertEquals(0, partial.saves); edt(() -> assertFalse(h.view.sticky));
         }
     }
-    @Test void reviewUsesSuppliedLatestResetsSubsetChoicesAndRepeatsWithoutLimit() throws Exception {
+    @Test void reviewUsesSuppliedLatestResetsChoicesAndRepeatsWithoutLimit() throws Exception {
         try (Harness h = new Harness()) {
             Recording b = new Recording(), c = new Recording(); Partial ab = new Partial(), bc = new Partial();
             h.fake.results.add(new SaveResult.AdditionalConflict(b.state, ab)); h.open();
             MergeEditorPanel original = onEdt(() -> h.view.editor);
-            edt(() -> components(original).stream().filter(JCheckBox.class::isInstance).map(JCheckBox.class::cast).toList().get(2).setSelected(false));
-            h.save(); h.event("decision"); assertEquals(2, ((List<?>) h.fake.factories.get(0)).size());
+            h.save(); h.event("decision"); assertEquals(ID, h.fake.factories.get(0));
             edt(() -> h.session.subscriber.onNext(c.state)); edt(() -> {});
             edt(h.view.review); h.event("finished"); h.event("editor");
             assertEquals(1, ab.closes); assertEquals(0, ab.saves);
             edt(() -> {
                 assertSame(c.state, h.view.rendered.getLast());
-                assertTrue(components(h.view.editor).stream().filter(JCheckBox.class::isInstance).map(JCheckBox.class::cast).allMatch(JCheckBox::isSelected));
+                assertFalse(button(h.view.editor, "Save").isEnabled());
                 assertEquals(0, password(original).getPassword().length);
             });
             b.results.add(new SaveResult.AdditionalConflict(c.state, bc)); h.save(); h.event("decision");
@@ -282,7 +277,7 @@ class MergeControllerTest {
     @Test void closeUnsavedEditorClearsNewSecretWithoutCreatingBuilder() throws Exception {
         try (Harness h = new Harness()) {
             h.open(); MergeEditorPanel panel = onEdt(() -> h.view.editor);
-            edt(() -> { button(panel, "Continue").doClick(); var secret = boxes(panel).getLast(); secret.setSelectedIndex(secret.getItemCount() - 1);
+            edt(() -> {
                 password(panel).setText("MY"); h.controller.close(); assertEquals(0, password(panel).getPassword().length); });
             await(h.retired); assertTrue(h.fake.calls.isEmpty());
         }

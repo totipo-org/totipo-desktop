@@ -112,11 +112,11 @@ class TokenKeyboardTest {
                 var clock = new MutableClock(); clock.now = Instant.ofEpochSecond(7); var panel = browser(clock); var state = new State(token); var copies = new ArrayList<String>();
                 panel.copyAction((c, f, u, n) -> { copies.add(c); return TotpClipboard.COPIED; });
                 try {
-                    panel.render(state.value); rowKey(panel.row(id(1)), "ENTER"); assertEquals(sameSecret ? 1 : 2, state.calls.size()); assertTrue(copies.isEmpty());
+                    panel.render(state.value); rowKey(panel.row(id(1)), "ENTER"); assertEquals(1, state.calls.size()); assertTrue(copies.isEmpty());
                     assertSame(a, state.calls.get(0).alternative()); rowKey(panel.row(id(1)), "ENTER"); rowKey(panel.row(id(1)), "SPACE");
-                    assertEquals(sameSecret ? 2 : 0, copies.size());
+                    assertEquals(2, copies.size());
                     for (var button : TotpCopyTest.buttons(panel)) { button.doClick(0); }
-                    assertEquals(sameSecret ? 3 : 2, copies.size()); assertEquals(sameSecret ? 1 : 2, state.calls.size());
+                    assertEquals(3, copies.size()); assertEquals(1, state.calls.size());
                 } finally { panel.closing(); }
             }
         });

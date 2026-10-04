@@ -178,14 +178,14 @@ class GraceRevealTest {
                 var state = new State(token); var batches = new ArrayList<List<TokenAlternative>>();
                 panel.totpAction((b, alts, n, done) -> {
                     batches.add(alts);
-                    if (partial && batches.size() == 2) { done.accept(List.of(code("005678", 30, 60).get(0), Optional.empty())); }
+                    if (partial && batches.size() == 2) { done.accept(List.of(Optional.empty())); }
                     else { generate(b, alts, n, done); }
                 });
                 try {
-                    panel.render(state.value); panel.row(id(1)).show.doClick(0); assertEquals(List.of(List.of(a, other), List.of(a, other)), batches);
-                    assertEquals(2, TotpCopyTest.buttons(panel).size());
-                    clock.now = Instant.ofEpochSecond(30); panel.totp.tick(); assertEquals(partial ? 0 : 2, TotpCopyTest.buttons(panel).size());
-                    clock.now = Instant.ofEpochSecond(60); panel.totp.tick(); assertEquals(2, batches.size()); assertTrue(TotpCopyTest.buttons(panel).isEmpty());
+                    panel.render(state.value); panel.row(id(1)).show.doClick(0); assertEquals(List.of(List.of(a), List.of(a)), batches);
+                    assertEquals(1, TotpCopyTest.buttons(panel).size());
+                    clock.now = Instant.ofEpochSecond(30); panel.owner(panel.row(id(1))).tick(); assertEquals(partial ? 0 : 1, TotpCopyTest.buttons(panel).size());
+                    clock.now = Instant.ofEpochSecond(60); panel.owner(panel.row(id(1))).tick(); assertEquals(2, batches.size()); assertTrue(TotpCopyTest.buttons(panel).isEmpty());
                 } finally { panel.closing(); }
             }
         });

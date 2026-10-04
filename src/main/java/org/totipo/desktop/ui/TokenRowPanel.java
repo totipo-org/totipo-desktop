@@ -1,6 +1,8 @@
 package org.totipo.desktop.ui;
 
 import org.totipo.TokenState;
+import org.totipo.TokenAlternative;
+import org.totipo.TokenStatus;
 import java.awt.*;
 import java.awt.event.*;
 import java.util.ArrayList;
@@ -12,6 +14,7 @@ import javax.swing.*;
 final class TokenRowPanel extends JPanel {
     private static final long serialVersionUID = 1L;
     final transient TokenState token;
+    final transient TokenAlternative alternative;
     final JButton show = new JButton("Show Code");
     final JButton edit = new JButton("Edit");
     final JLabel primary;
@@ -38,9 +41,18 @@ final class TokenRowPanel extends JPanel {
         JPanel panel = new JPanel(layout); panel.setOpaque(false); return panel;
     }
     TokenRowPanel(TokenState token, Runnable select, Runnable reveal, Runnable editAction, IntConsumer copy) {
+        this(token, token.alternatives().size() == 1 ? token.alternatives().get(0) : null, select, reveal, editAction, copy);
+    }
+    TokenRowPanel(TokenState token, TokenAlternative alternative, Runnable select, Runnable reveal, Runnable editAction, IntConsumer copy) {
         this.token = token; this.copy = copy; this.select = select;
+        this.alternative = alternative;
         setLayout(new BorderLayout(0, 6)); setFocusable(true);
         primary = literal(TokenPresentation.primary(token)); account = literal(TokenPresentation.account(token));
+        if (alternative != null) {
+            var descriptor = alternative.descriptor();
+            primary.setText(descriptor.issuer().isBlank() ? "Unnamed token" : UntrustedText.display(descriptor.issuer()));
+            account.setText(UntrustedText.display(descriptor.account()) + (descriptor.status() == TokenStatus.TOMBSTONED ? " · Deleted" : ""));
+        }
         primary.setFont(primary.getFont().deriveFont(Font.BOLD));
         primary.setToolTipText(primary.getText()); account.setToolTipText(account.getText());
         primary.setMinimumSize(new Dimension(0, primary.getPreferredSize().height));
@@ -72,7 +84,7 @@ final class TokenRowPanel extends JPanel {
         expanded.setLayout(new BoxLayout(expanded, BoxLayout.Y_AXIS)); add(expanded, BorderLayout.CENTER);
         show.addActionListener(e -> { if (!retired) { select.run(); reveal.run(); } });
         edit.addActionListener(e -> { if (!retired) { select.run(); editAction.run(); } });
-        show.setEnabled(!TotpDisplay.codeAlternatives(token).isEmpty());
+        show.setEnabled(codeEligible()); show.setVisible(codeEligible());
         MouseAdapter selectionListener = new MouseAdapter() {
             @Override public void mousePressed(MouseEvent e) { select.run(); requestFocusInWindow(); }
         };
@@ -223,8 +235,8 @@ final class TokenRowPanel extends JPanel {
     void display(List<TotpDisplay.Display> displays) {
         if (retired) { return; }
         prepare(displays.stream().map(TotpDisplay.Display::label).toList(), false);
-        show.setVisible(displays.isEmpty()); show.setText("Show Code");
-        show.setEnabled(!retired && !TotpDisplay.codeAlternatives(token).isEmpty());
+        show.setVisible(displays.isEmpty() && codeEligible()); show.setText("Show Code");
+        show.setEnabled(!retired && codeEligible());
         if (displays.isEmpty()) { actionTop.add(show, BorderLayout.EAST); }
         for (int i = 0; i < displays.size(); i++) {
             var d = displays.get(i); Outcome outcome = outcomes.get(i);
@@ -239,6 +251,9 @@ final class TokenRowPanel extends JPanel {
     private void refresh() {
         labelColors(this, UIManager.getColor("List.foreground"));
         revalidate(); repaint();
+    }
+    private boolean codeEligible() {
+        return alternative != null ? alternative.descriptor().status() == TokenStatus.ACTIVE : !TotpDisplay.codeAlternatives(token).isEmpty();
     }
     private String identityAccessible() {
         return primary.getText() + " " + account.getText()

@@ -101,13 +101,13 @@ class PendingGraceTest {
             var clock = new MutableClock(); clock.now = Instant.ofEpochSecond(25); var a = active("A"); var b = active("B");
             var token = token(1, List.of(a, b), List.of(new SecretGroup(List.of(a)), new SecretGroup(List.of(b))), List.of(), List.of(), true);
             var panel = browser(clock); var state = new State(token); var callbacks = new ArrayList<Consumer<List<Optional<TotpCode>>>>();
-            panel.totpAction((base, alts, n, done) -> { assertEquals(List.of(a, b), alts); if (n.equals(clock.now)) { generate(base, alts, n, done); } else { callbacks.add(done); } });
+            panel.totpAction((base, alts, n, done) -> { assertEquals(1, alts.size()); assertSame(a, alts.get(0)); if (n.equals(clock.now)) { generate(base, alts, n, done); } else { callbacks.add(done); } });
             try {
                 panel.render(state.value); var row = panel.row(id(1)); row.show.doClick(0); int height = row.getPreferredSize().height;
-                clock.now = Instant.ofEpochSecond(30); panel.totp.tick(); assertEquals(height, row.getPreferredSize().height); assertFalse(row.show.isVisible());
-                assertEquals(2, TotpCopyTest.buttons(row).size()); assertTrue(TotpCopyTest.buttons(row).stream().noneMatch(JButton::isEnabled));
+                clock.now = Instant.ofEpochSecond(30); panel.owner(row).tick(); assertEquals(height, row.getPreferredSize().height); assertFalse(row.show.isVisible());
+                assertEquals(1, TotpCopyTest.buttons(row).size()); assertTrue(TotpCopyTest.buttons(row).stream().noneMatch(JButton::isEnabled));
                 assertSame(row.identityBottom, row.warning.getParent()); assertSame(row.actionBottom, row.edit.getParent());
-                callbacks.get(0).accept(List.of(next().get(0), next().get(0))); assertEquals(2, TotpCopyTest.buttons(row).size()); assertFalse(row.show.isVisible()); assertTrue(TotpCopyTest.buttons(row).stream().allMatch(JButton::isEnabled));
+                callbacks.get(0).accept(next()); assertEquals(1, TotpCopyTest.buttons(row).size()); assertFalse(row.show.isVisible()); assertTrue(TotpCopyTest.buttons(row).stream().allMatch(JButton::isEnabled));
             } finally { panel.closing(); }
         });
     }

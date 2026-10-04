@@ -55,6 +55,11 @@ public final class TokenEditorPanel extends JPanel {
         setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
         setPreferredSize(PREFERRED_SIZE);
         setMinimumSize(MINIMUM_SIZE);
+        if (!create && explanation != null && explanation.startsWith("You are editing this version only.")) {
+            JTextArea warning = wrappedText("You are editing this version only. Saving does not resolve the other conflicting versions.");
+            warning.getAccessibleContext().setAccessibleName("Editing one conflicting version");
+            add(warning, BorderLayout.NORTH);
+        }
         configurePeriod();
         if (!create) {
             status.select(descriptor.status());
@@ -196,7 +201,7 @@ public final class TokenEditorPanel extends JPanel {
         fields.add(control, constraint); row++;
     }
 
-    private static final class FormBody extends JPanel implements Scrollable {
+    static final class FormBody extends JPanel implements Scrollable {
         private static final long serialVersionUID = 1L;
         FormBody() { super(new BorderLayout()); }
         @Override public Dimension getPreferredScrollableViewportSize() { return getPreferredSize(); }

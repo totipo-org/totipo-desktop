@@ -19,14 +19,14 @@ class PasswordBrowserTest {
             var form = new PasswordChangePanel(submission -> submission.close(), () -> {});
             try {
                 vault.render(first.value); browser.select(id(1)); browser.row(id(1)).show.doClick(0);
-                vault.writeAvailability(false); assertTrue(browser.totp.running()); browser.totp.tick();
+                vault.writeAvailability(false); assertTrue(browser.owner(browser.row(id(1))).running()); browser.owner(browser.row(id(1))).tick();
                 assertTrue(vault.refreshAction.isEnabled()); assertFalse(vault.createAction.isEnabled());
                 assertFalse(vault.changePassword.isEnabled()); assertFalse(browser.row(id(1)).edit.isEnabled()); assertFalse(browser.editMenu.isEnabled());
                 form.busy(true, "Changing vault password…"); vault.render(second.value);
-                assertEquals(id(1), browser.selectedId()); assertFalse(browser.totp.running()); assertTrue(second.calls.isEmpty());
-                browser.row(id(1)).show.doClick(0); assertTrue(browser.totp.running()); assertEquals(1, second.calls.size());
+                assertEquals(id(1), browser.selectedId()); assertFalse(browser.owner(browser.row(id(1))).running()); assertTrue(second.calls.isEmpty());
+                browser.row(id(1)).show.doClick(0); assertTrue(browser.owner(browser.row(id(1))).running()); assertEquals(1, second.calls.size());
                 form.retire(); vault.writeAvailability(true); assertTrue(vault.changePassword.isEnabled()); assertTrue(vault.createAction.isEnabled());
-                vault.closing(); assertFalse(browser.totp.running()); assertFalse(vault.refreshAction.isEnabled());
+                var owner = browser.owner(browser.row(id(1))); vault.closing(); assertFalse(owner.running()); assertFalse(vault.refreshAction.isEnabled());
             } finally { form.retire(); vault.closing(); }
         });
     }

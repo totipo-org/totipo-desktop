@@ -141,8 +141,7 @@ class UsabilityTest {
             var panel = new MergeEditorPanel(org.totipo.desktop.MergeInputs.capture(state.value, token),
                     draft -> fail(), cancelled::incrementAndGet);
             JRootPane root = new JRootPane(); root.setContentPane(panel); panel.installDialog(root);
-            assertEquals("Continue", root.getDefaultButton().getText());
-            root.getDefaultButton().doClick(); assertEquals("Save", root.getDefaultButton().getText());
+            assertEquals("Save", root.getDefaultButton().getText());
             assertLabels(panel); assertNotNull(find(panel, JScrollPane.class));
             JPasswordField secret = find(panel, JPasswordField.class); secret.setText("MY");
             panel.busy(true, "Saving merge…");

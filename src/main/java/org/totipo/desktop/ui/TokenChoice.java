@@ -36,6 +36,7 @@ final class TokenChoice<T> extends JPanel {
         if (button == null) { throw new IllegalArgumentException("Unsupported choice."); }
         button.setSelected(true);
     }
+    void clearSelection() { group.clearSelection(); }
 
     @Override public void setEnabled(boolean enabled) {
         super.setEnabled(enabled);

@@ -65,7 +65,7 @@ class TotpCopyTest {
                 clock.now = Instant.ofEpochSecond(30); copy.doClick(0);
                 assertTrue(buttons(panel).isEmpty()); assertTrue(panel.row(id(1)).show.isVisible()); assertEquals(1, state.calls.size());
                 assertEquals("Code unavailable; code was not copied.", status(panel).getText());
-                panel.totp.tick(); assertEquals(1, state.calls.size()); panel.row(id(1)).show.doClick(0); assertEquals(2, state.calls.size());
+                panel.totp.tick(); assertEquals(1, state.calls.size()); panel.rows.forEach(row -> row.show.doClick(0)); assertEquals(2, state.calls.size());
             } finally { panel.closing(); }
         });
     }
@@ -87,7 +87,7 @@ class TotpCopyTest {
                 var state = new State(token); state.result = call -> new TotpCode(call.alternative() == a || same ? "001234" : "005678", call.now(), call.now().plusSeconds(30));
                 List<String> copied = new ArrayList<>(); panel.copyAction((c, f, u, n) -> { copied.add(c); return TotpClipboard.COPIED; });
                 try {
-                    panel.render(state.value); panel.row(id(1)).show.doClick(0); assertEquals(2, state.calls.size());
+                    panel.render(state.value); panel.rows.forEach(row -> row.show.doClick(0)); assertEquals(2, state.calls.size());
                     assertEquals(2, buttons(panel).size()); buttons(panel).forEach(button -> button.doClick(0));
                     assertEquals(List.of("001234", same ? "001234" : "005678"), copied);
                     assertTrue(panel.row(id(1)).getAccessibleContext().getAccessibleName().contains("conflicting versions"));

@@ -11,7 +11,8 @@ import java.util.function.Consumer;
 import javax.swing.Timer;
 
 /**
- * EDT-owned reveal authorization, keyed by Token ID rather than row visibility.
+ * EDT-owned reveal authorization independent of row visibility. The browser gives each
+ * conflicting semantic Alternative its own owner; Token IDs identify entries within an owner.
  * Show Code authorizes the current period. An accepted result with strictly less than ten
  * seconds to its earliest expiry also authorizes exactly one immediately following period.
  * Search visibility never changes that authorization; no further automatic derivation is allowed.
@@ -45,14 +46,19 @@ final class TotpDisplay {
     void generator(VaultView.TotpAction action) { Edt.require(); generate = action; }
 
     void reveal(VaultState base, TokenState token) {
+        reveal(base, token, codeAlternatives(token));
+    }
+    void reveal(VaultState base, TokenState token, TokenAlternative alternative) {
+        reveal(base, token, List.of(alternative));
+    }
+    private void reveal(VaultState base, TokenState token, List<TokenAlternative> outcomes) {
         Edt.require();
         requests.remove(token.id()); entries.remove(token.id()); staged.remove(token.id());
         if (entries.isEmpty() && requests.values().stream().noneMatch(r -> r.window() != null)) { timer.stop(); }
-        request(base, token);
+        request(base, token, outcomes);
     }
 
-    private void request(VaultState base, TokenState token) {
-        List<TokenAlternative> outcomes = codeAlternatives(token);
+    private void request(VaultState base, TokenState token, List<TokenAlternative> outcomes) {
         List<String> labels = new ArrayList<>();
         for (int i = 0; i < outcomes.size(); i++) {
             String identity = TokenPresentation.identity(outcomes.get(i).descriptor());

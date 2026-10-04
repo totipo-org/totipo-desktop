@@ -35,13 +35,9 @@ class TextRoundTripTest {
         var submitted = new AtomicReference<MergeDraft>();
         edt(() -> {
             var panel = new MergeEditorPanel(fake.inputs(), submitted::set, () -> {});
-            button(panel, "Continue").doClick();
-            var choices = MergeControllerTest.boxes(panel); choices.forEach(box -> box.setSelectedIndex(0));
-            choices.get(1).setSelectedIndex(choices.get(1).getItemCount() - 1);
-            choices.get(2).setSelectedIndex(choices.get(2).getItemCount() - 1);
-            var custom = components(panel).stream().filter(c -> c instanceof JTextField && !(c instanceof JPasswordField))
-                    .map(JTextField.class::cast).toList();
-            custom.get(0).setText(ISSUER); custom.get(1).setText(ACCOUNT);
+            MergeEditorTest.chooseFirst(panel);
+            MergeEditorTest.customText(panel, "issuer").setText(ISSUER);
+            MergeEditorTest.customText(panel, "account").setText(ACCOUNT);
             button(panel, "Save").doClick(); panel.retire();
         });
         assertInstanceOf(SaveResult.Saved.class, MergeWrites.save(submitted.get()));
