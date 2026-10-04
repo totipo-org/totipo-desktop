@@ -272,7 +272,8 @@ fresh secret input when the operation needs it.
 The browser offers Edit Token for one complete semantic alternative, including
 multiple equal heads. A conflicted token offers an initially unselected
 Alternative N selector and Edit Alternative…; explanatory text appears before
-opening the editor and in the editor. No complete alternative means no edit.
+opening the editor in that choice dialog. The normal editor has only a concise
+deletion-history helper. No complete alternative means no edit.
 
 Opening captures the exact receiving VaultState and TokenAlternative. New state
 emissions neither rewrite the draft nor replace this basis. Historical same-session

@@ -46,9 +46,11 @@ explicit Open Vault. Password-change UNCERTAIN has no retry capability, automati
 retry, rollback, or preferred recovery password. Earlier unresolved token-publication
 warnings remain independent.
 
-Updates can change status (ACTIVE/TOMBSTONED) and optionally replace the secret;
-existing secrets are never exported. Conflicted tokens require explicit
-alternative selection for **Edit Alternative…**, which changes only that alternative.
+Updates can change status (Active / Deleted, corresponding to ACTIVE / TOMBSTONED)
+and optionally replace the secret; existing secrets are never exported. An edit
+is based on the token value observed when the editor opened. Later concurrent
+changes are not automatically folded into that draft. Conflicted tokens require
+explicit alternative selection for **Edit Alternative…**, which changes only that alternative.
 **Resolve Conflict…** separately offers all captured alternatives or a deliberate
 subset, then explicit field-by-field resolution and secret equality-group selection.
 No automatic winner or automatic merge is chosen. New relevant information stops
@@ -56,9 +58,9 @@ normal merge publication and offers fresh review, cancellation, or explicitly
 confirmed publication of the frozen original resolution. The latter may leave
 competing alternatives.
 
-Tombstoning is logical deletion: tombstones and immutable history retain secrets,
-and storage/synchronization providers may retain copies. Password change rewraps
-the same root key; it does not rotate the root, revoke old bootstrap copies,
+Deleted (TOMBSTONED) is logical deletion: tombstones and immutable history retain
+secrets, and storage/synchronization provider copies are not erased. Password
+change rewraps the same root key; it does not rotate the root, revoke old bootstrap copies,
 provide rollback protection, or recover from root compromise.
 
 Creating with an empty password requires a separate explicit confirmation.

@@ -280,7 +280,7 @@ class PasswordChangeTest {
             edt(() -> { h.view.sticky = false; h.session.lifecycle.subscriber.onNext(recording.state); });
             edt(() -> {
                 h.view.create.run(); h.view.password.run(); assertNull(h.view.panel);
-                password(h.view.tokenEditor).setText("MY"); button(h.view.tokenEditor, "Save").doClick();
+                password(h.view.tokenEditor).setText("MY"); button(h.view.tokenEditor, "Create").doClick();
             });
             assertEquals("uncertain", h.view.tokenEvents.poll(10, TimeUnit.SECONDS));
             edt(() -> { h.view.password.run(); assertNull(h.view.panel); h.view.stop.run(); });

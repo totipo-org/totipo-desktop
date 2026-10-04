@@ -33,7 +33,7 @@ class TokenWriteControllerTest {
         @Override public void tokenActions(Runnable create, EditAction edit) { this.create = create; this.edit = edit; }
         @Override public void editToken(TokenEditorPanel editor, boolean create) {
             Edt.require(); this.editor = editor; events.add("editor");
-            button(editor, "Save").addPropertyChangeListener("enabled", event -> {
+            button(editor, create ? "Create" : "Save").addPropertyChangeListener("enabled", event -> {
                 if (Boolean.TRUE.equals(event.getNewValue())) { events.add("editable"); }
             });
         }
@@ -86,7 +86,7 @@ class TokenWriteControllerTest {
         }
         void open() throws Exception { edt(view.create); event("editor"); }
         void save() throws Exception {
-            edt(() -> { password(view.editor).setText("MY"); button(view.editor, "Save").doClick(); view.passwordBlocked(); });
+            edt(() -> { password(view.editor).setText("MY"); button(view.editor, "Create").doClick(); view.passwordBlocked(); });
         }
         void event(String expected) throws Exception {
             assertEquals(expected, view.events.poll(10, TimeUnit.SECONDS));
@@ -117,7 +117,7 @@ class TokenWriteControllerTest {
         try (Harness h = new Harness()) {
             h.recording.results.add(saved()); h.recording.release = new CountDownLatch(1);
             h.open(); TokenEditorPanel panel = onEdt(() -> h.view.editor); h.save(); await(h.recording.entered);
-            edt(() -> { button(panel, "Save").doClick(); h.view.create.run(); assertFalse(h.view.available); });
+            edt(() -> { button(panel, "Create").doClick(); h.view.create.run(); assertFalse(h.view.available); });
             h.recording.release.countDown(); h.event("finished");
             edt(() -> { assertNull(h.view.editor); assertTrue(h.view.available); assertFalse(h.view.sticky); });
             assertEquals(1, h.recording.calls.stream().filter("createToken"::equals).count());
@@ -252,8 +252,8 @@ class TokenWriteControllerTest {
             h.event("editor");
             edt(() -> h.session.subscriber.onNext(state(new ObservationProgress.Finished(0, false))));
             edt(() -> {
-                components(h.view.editor).stream().filter(JComboBox.class::isInstance).map(JComboBox.class::cast)
-                        .filter(box -> box.getSelectedItem() == TokenStatus.TOMBSTONED).findFirst().orElseThrow().setSelectedItem(TokenStatus.ACTIVE);
+                components(h.view.editor).stream().filter(JRadioButton.class::isInstance).map(JRadioButton.class::cast)
+                        .filter(radio -> radio.getText().equals("Active")).findFirst().orElseThrow().doClick();
                 button(h.view.editor, "Save").doClick();
             });
             h.event("finished"); assertEquals("update", h.recording.calls.get(0));
