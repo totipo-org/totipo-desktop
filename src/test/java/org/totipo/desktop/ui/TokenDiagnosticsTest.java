@@ -35,7 +35,7 @@ class TokenDiagnosticsTest {
             var a = alternative(TokenStatus.ACTIVE, "A", "account", TotpAlgorithm.SHA1, 6, 30, one, two);
             var panel = browser(new MutableClock()); var state = new State(token(1, a));
             try {
-                panel.render(state.value); assertFalse(panel.row(id(1)).token.hasConflict()); assertNull(panel.row(id(1)).warning.getParent());
+                panel.render(state.value); assertFalse(panel.row(id(1)).token.hasConflict()); assertFalse(panel.row(id(1)).getAccessibleContext().getAccessibleName().contains("conflicting versions"));
                 String text = new TokenDiagnosticsPanel(panel.row(id(1)).token).text.getText();
                 int alternative = text.indexOf("\nAlternative 1\n"), competition = text.indexOf("\nField competition");
                 assertTrue(text.indexOf(one.revision().hex()) > alternative); assertTrue(text.indexOf(two.revision().hex()) < competition);

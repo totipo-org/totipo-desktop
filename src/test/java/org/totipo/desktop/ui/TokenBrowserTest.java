@@ -59,7 +59,7 @@ class TokenBrowserTest {
                 panel.render(state.value); var normal = panel.row(id(1)); var conflict = panel.row(id(2));
                 Color amber = conflict.getBackground(); panel.select(id(1)); assertNotEquals(amber, normal.getBackground());
                 UsabilityTest.invoke(normal, JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT, KeyStroke.getKeyStroke("DOWN"));
-                assertEquals(id(2), panel.selectedId()); assertNotNull(conflict.warning.getParent());
+                assertEquals(id(2), panel.selectedId()); assertTrue(conflict.getAccessibleContext().getAccessibleName().contains("conflicting versions"));
                 UsabilityTest.invoke(conflict, JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT, KeyStroke.getKeyStroke("UP"));
                 assertEquals(id(1), panel.selectedId()); assertTrue(state.calls.isEmpty());
             } finally { panel.closing(); }
@@ -71,7 +71,7 @@ class TokenBrowserTest {
             try {
                 panel.render(new State(token(1, active("A")), token(2, active("<html>long issuer ".repeat(1000)))).value);
                 panel.list.setSize(600, 400); panel.list.doLayout();
-                var shortRow = panel.rows.get(0); var longRow = panel.rows.get(1);
+                var shortRow = panel.row(id(1)); var longRow = panel.row(id(2));
                 assertEquals(shortRow.getHeight(), longRow.getHeight()); assertTrue(longRow.getWidth() <= panel.list.getWidth());
                 assertEquals(longRow.primary.getText(), longRow.primary.getToolTipText());
                 assertEquals(Boolean.TRUE, longRow.primary.createToolTip().getClientProperty("html.disable"));
@@ -131,9 +131,9 @@ class TokenBrowserTest {
             var panel = new VaultPanel();
             try {
                 var browser = find(panel, TokenBrowserPanel.class); panel.render(new State().value);
-                assertTrue(browser.empty.getText().contains("No tokens yet")); assertNotNull(browser.empty.getParent());
+                assertTrue(browser.empty.getText().contains("No TOTPs yet")); assertNotNull(browser.empty.getParent());
                 assertFalse(browser.editMenu.isEnabled()); assertFalse(browser.diagnosticsMenu.isEnabled());
-                var menus = panel.menuBar(); assertEquals(3, menus.getMenuCount()); assertEquals("Token", menus.getMenu(2).getText());
+                var menus = panel.menuBar(); assertEquals(3, menus.getMenuCount()); assertEquals("TOTP", menus.getMenu(2).getText());
                 assertEquals(2, menus.getMenu(2).getItemCount()); assertSame(browser.editMenu, menus.getMenu(2).getItem(0));
                 assertEquals(new Dimension(640, 520), panel.getMinimumSize()); assertEquals(new Dimension(760, 820), VaultPanel.INITIAL_SIZE);
                 assertNull(find(panel, JSplitPane.class));
@@ -148,7 +148,7 @@ class TokenBrowserTest {
             var state = new State(token(1, a)); var panel = browser(new MutableClock());
             try {
                 panel.render(state.value); var row = panel.row(id(1));
-                assertFalse(row.token.hasConflict()); assertNull(row.warning.getParent());
+                assertFalse(row.token.hasConflict()); assertFalse(row.getAccessibleContext().getAccessibleName().contains("conflicting versions"));
                 row.show.doClick(0); assertEquals(1, state.calls.size()); assertEquals(1, TotpCopyTest.buttons(row).size());
                 String detail = TokenPresentation.detail(row.token);
                 assertTrue(detail.contains("2 current causal heads carry the same token value."));

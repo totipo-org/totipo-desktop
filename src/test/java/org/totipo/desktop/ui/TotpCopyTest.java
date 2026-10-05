@@ -19,7 +19,7 @@ class TotpCopyTest {
     static List<JButton> buttons(Container root) {
         List<JButton> result = new ArrayList<>();
         for (Component child : root.getComponents()) {
-            if (child instanceof JButton b && b.getText().equals("Copy") && b.isVisible()) { result.add(b); }
+            if (child instanceof JButton b && (b.getText().equals("Copy") || b.getText().equals("Copied")) && b.isVisible()) { result.add(b); }
             if (child instanceof Container c) { result.addAll(buttons(c)); }
         }
         return result;
@@ -50,7 +50,7 @@ class TotpCopyTest {
                 assertNull(codeLabel(panel.row(id(1)))); assertNotNull(codeLabel(panel.row(id(2)))); assertEquals(1, buttons(panel).size());
                 JButton copy = buttons(panel).get(0); assertEquals("Copy TOTP code", copy.getAccessibleContext().getAccessibleName());
                 panel.writeAvailability(false); assertTrue(copy.isEnabled()); copy.doClick(0);
-                assertEquals(1, copies.get()); assertEquals(1, state.calls.size()); assertEquals(CopyNotification.COPIED, status(panel).getText());
+                assertEquals(1, copies.get()); assertEquals(1, state.calls.size()); assertEquals("Copied", copy.getText()); assertFalse(panel.copyNotification.isVisible());
                 JLabel code = codeLabel(panel.row(id(2))); panel.closing(); assertEquals("", code.getText()); assertFalse(copy.isEnabled());
                 copy.getActionListeners()[0].actionPerformed(null); assertEquals(1, copies.get());
             } finally { panel.closing(); }
@@ -91,7 +91,6 @@ class TotpCopyTest {
                     assertEquals(2, buttons(panel).size()); buttons(panel).forEach(button -> button.doClick(0));
                     assertEquals(List.of("001234", same ? "001234" : "005678"), copied);
                     assertTrue(panel.row(id(1)).getAccessibleContext().getAccessibleName().contains("conflicting versions"));
-                    assertNotNull(panel.row(id(1)).warning.getParent());
                 } finally { panel.closing(); }
             }
         });
@@ -102,8 +101,7 @@ class TotpCopyTest {
             try {
                 panel.render(state.value); var row = panel.row(id(1)); Color warningBackground = row.getBackground();
                 row.show.doClick(0); assertEquals(1, buttons(row).size()); assertEquals(1, state.calls.size());
-                assertTrue(row.getAccessibleContext().getAccessibleName().contains("conflicting versions"));
-                assertNotNull(row.warning.getParent()); panel.select(null); assertEquals(warningBackground, row.getBackground());
+                assertTrue(row.getAccessibleContext().getAccessibleName().contains("conflicting versions")); panel.select(null); assertEquals(warningBackground, row.getBackground());
                 assertFalse(row.primary.getText().contains("Alternative"));
             } finally { panel.closing(); }
         });

@@ -42,11 +42,12 @@ class UsabilityTest {
             var state = new State(token(3, active("match")), token(1, active("other")), token(2, active("match"), active("else")));
             try {
                 panel.render(state.value);
-                assertEquals("3 tokens", panel.resultCount.getText());
+                assertEquals("3 TOTPs", panel.resultCount.getText());
                 panel.search.setText("MATCH");
-                assertEquals("2 of 3 tokens", panel.resultCount.getText());
-                assertEquals(id(3), panel.rows.get(0).token.id());
+                assertEquals("2 of 3 TOTPs", panel.resultCount.getText());
+                assertEquals(id(2), panel.rows.get(0).token.id());
                 assertEquals(id(2), panel.rows.get(1).token.id());
+                assertEquals(id(3), panel.rows.get(2).token.id());
                 assertTrue(panel.rows.get(1).token.hasConflict());
                 assertTrue(state.calls.isEmpty());
                 panel.select(id(3));
@@ -55,12 +56,12 @@ class UsabilityTest {
                 assertEquals(id(3), panel.selectedId());
                 panel.search.setText("absent");
                 assertNull(panel.selectedId());
-                assertEquals("No tokens match this search.", panel.empty.getText());
+                assertEquals("No TOTPs match this search.", panel.empty.getText());
                 invoke(panel.search, JComponent.WHEN_FOCUSED, KeyStroke.getKeyStroke("ESCAPE"));
                 assertEquals("", panel.search.getText());
                 assertNull(panel.selectedId());
                 panel.render(new State().value);
-                assertTrue(panel.empty.getText().contains("No tokens yet"));
+                assertTrue(panel.empty.getText().contains("No TOTPs yet"));
             } finally { panel.closing(); }
         });
     }

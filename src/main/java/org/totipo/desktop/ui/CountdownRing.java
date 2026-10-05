@@ -31,9 +31,10 @@ final class CountdownRing extends JPanel {
             g.setStroke(new BasicStroke(3f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
             int diameter = Math.min(getWidth(), getHeight()) - 6;
             int x = (getWidth() - diameter) / 2, y = (getHeight() - diameter) / 2;
-            g.setColor(UIManager.getColor("Separator.foreground")); g.drawOval(x, y, diameter, diameter);
-            g.setColor(urgent ? new Color(190, 40, 40) : new Color(35, 110, 200));
+            g.setColor(DesktopStyle.border()); g.drawOval(x, y, diameter, diameter);
+            g.setColor(indicatorColor());
             g.drawArc(x, y, diameter, diameter, 90, -(int) (360.0 * remaining / 1000));
         } finally { g.dispose(); }
     }
+    Color indicatorColor() { return urgent ? DesktopStyle.warning() : DesktopStyle.accent(); }
 }

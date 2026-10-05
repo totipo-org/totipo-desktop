@@ -9,8 +9,9 @@ browsing, manual Base32 token creation, and ordinary update of an explicitly
 selected semantic alternative. Independent vault windows own their sessions and
 close them during window/application shutdown. Refresh requests local observation.
 
-Search filters logical tokens by token ID, issuer or account, including every
-complete conflict alternative, with result counts and distinct empty states.
+Search filters logical TOTPs by issuer/account only, using case-insensitive
+whitespace-separated AND terms across both fields. A matching conflict Alternative
+keeps the full group visible, with result counts and distinct empty states.
 Ctrl/Cmd+F focuses Search, Escape in Search clears it, F5 refreshes, and Ctrl/Cmd+N
 opens Create Token when available. Normal list arrow/Page/Home/End navigation is
 preserved. Hiding a selected token clears its selection; clearing search does not
@@ -20,7 +21,7 @@ and ordinary default buttons. Long details and merge content scroll; focus is no
 requested by state updates. These are concrete usability improvements, not a formal
 accessibility certification.
 
-Visible active TOTP codes have an explicit **Copy code** button, including a separate
+Visible active TOTP codes have an explicit **Copy** button, including a separate
 button for each active conflict alternative. Copying preserves the displayed digits
 exactly. There is no automatic copy, rollover copy, or global Ctrl/Cmd+C override.
 Totipo attempts to clear its exact current clipboard payload at code expiry or

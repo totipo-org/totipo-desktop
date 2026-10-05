@@ -15,7 +15,7 @@ class TokenRowLayoutTest {
         var c = ((GridBagLayout) row.grid.getLayout()).getConstraints(slot);
         assertEquals(column, c.gridx); assertEquals(line, c.gridy);
         assertEquals(GridBagConstraints.BOTH, c.fill);
-        if (column > 0) { assertEquals(20, c.insets.left); assertEquals(0, c.weightx); }
+        if (column > 0) { assertEquals(column == 1 ? 16 : 12, c.insets.left); assertEquals(0, c.weightx); }
         else { assertEquals(1, c.weightx); assertEquals(0, slot.getMinimumSize().width); }
     }
     @Test void ordinaryHiddenRevealedAndPendingShareTwoLinesAndStableActionSlots() throws Exception {
@@ -23,7 +23,8 @@ class TokenRowLayoutTest {
             var row = new TokenRowPanel(token(1, active("GitHub")), () -> { }, () -> { }, () -> { }, i -> { });
             cell(row, row.identityTop, 0, 0); cell(row, row.identityBottom, 0, 1);
             cell(row, row.statusTop, 1, 0); cell(row, row.statusBottom, 1, 1);
-            cell(row, row.actionTop, 2, 0); cell(row, row.actionBottom, 2, 1);
+            assertEquals(2, ((GridBagLayout) row.grid.getLayout()).getConstraints(row.actionTop.getParent()).gridheight);
+            assertEquals(2, ((GridBagLayout) row.grid.getLayout()).getConstraints(row.actionBottom.getParent()).gridheight);
             assertSame(row.identityTop, row.primary.getParent()); assertSame(row.identityBottom, row.account.getParent());
             assertSame(row.actionTop, row.show.getParent()); assertSame(row.actionBottom, row.edit.getParent());
             assertEquals(0, row.statusTop.getComponentCount()); assertEquals(0, row.statusBottom.getComponentCount());
@@ -67,8 +68,9 @@ class TokenRowLayoutTest {
             var row = new TokenRowPanel(token(1, active("Long identity ".repeat(100))), () -> { }, () -> { }, () -> { }, i -> { });
             row.display(List.of(new TotpDisplay.Display("identity", "00123456", 500, 15, false)));
             row.setSize(360, row.getPreferredSize().height); row.doLayout(); row.grid.doLayout();
+            row.actionTop.getParent().doLayout(); row.actionBottom.getParent().doLayout();
             assertTrue(row.statusTop.getX() >= row.identityTop.getX() + row.identityTop.getWidth());
-            assertTrue(row.actionTop.getX() >= row.statusTop.getX() + row.statusTop.getWidth());
+            assertTrue(SwingUtilities.convertPoint(row.actionTop, 0, 0, row.grid).x >= row.statusTop.getX() + row.statusTop.getWidth());
             assertEquals(row.statusTop.getPreferredSize().width, row.statusTop.getWidth());
             assertEquals(row.actionTop.getPreferredSize().width, row.actionTop.getWidth());
             assertEquals(row.primary.getText(), row.primary.getToolTipText()); row.retire();

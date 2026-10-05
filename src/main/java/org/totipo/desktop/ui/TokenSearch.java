@@ -7,9 +7,12 @@ import java.util.Locale;
 final class TokenSearch {
     private TokenSearch() { }
     static boolean matches(TokenState token, String query) {
-        String needle = query.toLowerCase(Locale.ROOT);
-        return needle.isEmpty() || token.alternatives().stream().anyMatch(a ->
-                a.descriptor().issuer().toLowerCase(Locale.ROOT).contains(needle)
-                || a.descriptor().account().toLowerCase(Locale.ROOT).contains(needle));
+        var terms = java.util.Arrays.stream(query.toLowerCase(Locale.ROOT).split("(?U)\\s+"))
+                .filter(term -> !term.isEmpty()).toList();
+        return terms.isEmpty() || token.alternatives().stream().anyMatch(a -> {
+            String issuer = UntrustedText.display(a.descriptor().issuer()).toLowerCase(Locale.ROOT);
+            String account = UntrustedText.display(a.descriptor().account()).toLowerCase(Locale.ROOT);
+            return terms.stream().allMatch(term -> issuer.contains(term) || account.contains(term));
+        });
     }
 }

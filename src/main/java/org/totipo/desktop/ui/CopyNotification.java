@@ -5,10 +5,9 @@ import java.time.Clock;
 import java.time.Instant;
 import javax.swing.*;
 
-/** One non-modal, presentation-only notification; the clipboard owns its separate lifetime. */
+/** Exceptional operation notice; ordinary copy success belongs to the originating row. */
 final class CopyNotification extends JPanel {
     private static final long serialVersionUID = 1L;
-    static final String COPIED = "Code copied. Totipo will try to clear it when it expires.";
     static final int TIMEOUT_MS = 3000;
     final JTextArea message = new JTextArea(2, 32);
     final JButton close = new JButton("×");

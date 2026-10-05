@@ -69,7 +69,7 @@ class TokenKeyboardTest {
                 try {
                     panel.render(state.value); var row = panel.row(id(1)); rowKey(row, key);
                     assertEquals(1, state.calls.size()); assertTrue(copied.isEmpty()); assertEquals(id(1), panel.selectedId());
-                    rowKey(row, key); assertEquals(List.of("001234"), copied); assertEquals(1, state.calls.size()); assertEquals(CopyNotification.COPIED, panel.copyNotification.message.getText());
+                    rowKey(row, key); assertEquals(List.of("001234"), copied); assertEquals(1, state.calls.size()); assertEquals("Copied", TotpCopyTest.buttons(row).get(0).getText()); assertFalse(panel.copyNotification.isVisible());
                     assertNull(row.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).get(KeyStroke.getKeyStroke(key)));
                     assertNotSame(row.getActionMap().get("primary-action"), UsabilityTest.binding(TotpCopyTest.buttons(row).get(0), JComponent.WHEN_FOCUSED, KeyStroke.getKeyStroke("SPACE")));
                     TotpCopyTest.buttons(row).get(0).doClick(0); assertEquals(2, copied.size()); assertEquals(1, state.calls.size());

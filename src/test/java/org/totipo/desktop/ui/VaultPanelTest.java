@@ -64,7 +64,7 @@ class VaultPanelTest {
             assertInstanceOf(FlowLayout.class, row.getLayout());
             assertEquals(2, row.getComponentCount());
             assertEquals("Refresh", ((JButton) row.getComponent(0)).getText());
-            assertEquals("Create Token", ((JButton) row.getComponent(1)).getText());
+            assertEquals("Add", ((JButton) row.getComponent(1)).getText());
             assertNull(javax.swing.SwingUtilities.getAncestorOfClass(VaultPanel.class, panel.changePassword));
             assertEquals(640, panel.getMinimumSize().width); assertEquals(520, panel.getMinimumSize().height);
             panel.closing(); assertFalse(menu.getItem(0).isEnabled()); assertFalse(menu.getItem(1).isEnabled());

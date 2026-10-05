@@ -8,13 +8,15 @@ import static org.totipo.desktop.ui.TokenFixtures.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class TokenSearchTest {
-    @Test void identitySubstringIsCaseInsensitiveAndWhitespaceRemainsLiteral() {
+    @Test void identityUsesWhitespaceAndTermsAcrossBothFields() {
         var token = token(1, alternative(TokenStatus.ACTIVE, "GitHub", "niki@example.net", TotpAlgorithm.SHA256, 8, 45));
         for (String query : List.of("github", "GITHUB", "Hub", "NIKI@", "example.net", "")) {
             assertTrue(TokenSearch.matches(token, query), query);
         }
-        assertFalse(TokenSearch.matches(token, " GitHub "));
-        assertFalse(TokenSearch.matches(token, "   "));
+        assertTrue(TokenSearch.matches(token, " GitHub \t NIK \n"));
+        assertTrue(TokenSearch.matches(token, "   "));
+        assertTrue(TokenSearch.matches(token, "nik git"));
+        assertFalse(TokenSearch.matches(token, "git absent"));
         assertTrue(TokenSearch.matches(token(2), ""));
     }
     @Test void technicalFieldsHeadsAndDiagnosticsAreExcluded() {
@@ -35,14 +37,16 @@ class TokenSearchTest {
             var b = alternative(TokenStatus.TOMBSTONED, "South", "other", TotpAlgorithm.SHA256, 8, 45);
             var token = token(1, a, b); var state = new State(token, token(2,
                     alternative(TokenStatus.ACTIVE, "West", "zzz", TotpAlgorithm.SHA1, 6, 30)));
+            assertTrue(TokenSearch.matches(token, "south other"));
+            assertFalse(TokenSearch.matches(token, "north other")); // Terms cannot combine different versions.
             try {
                 panel.render(state.value);
                 for (String query : List.of("north", "SOUTH", "owner", "other", "o")) {
                     panel.search.setText(query); assertEquals(2, panel.rows.size());
                     assertSame(token, panel.rows.get(0).token); assertTrue(panel.rows.get(0).token.hasConflict());
-                    assertEquals("1 of 2 tokens", panel.resultCount.getText());
+                    assertEquals("1 of 2 TOTPs", panel.resultCount.getText());
                 }
-                panel.search.setText(""); assertEquals("2 tokens", panel.resultCount.getText());
+                panel.search.setText(""); assertEquals("2 TOTPs", panel.resultCount.getText());
                 assertTrue(state.calls.isEmpty());
             } finally { panel.closing(); }
         });
@@ -60,7 +64,7 @@ class TokenSearchTest {
                 String code = panel.totp.presentation(ggg.id()).get(0).code();
                 panel.search.setText("001234"); assertTrue(panel.rows.isEmpty()); assertEquals(1, state.calls.size());
                 panel.search.setText("c"); assertNull(panel.row(ggg.id())); assertNotNull(panel.row(abc.id()));
-                assertEquals("1 of 2 tokens", panel.resultCount.getText()); assertEquals(1, state.calls.size());
+                assertEquals("1 of 2 TOTPs", panel.resultCount.getText()); assertEquals(1, state.calls.size());
                 panel.search.setText(""); assertFalse(panel.row(ggg.id()).show.isVisible());
                 assertEquals(code, panel.totp.presentation(ggg.id()).get(0).code()); assertEquals(1, state.calls.size());
             } finally { panel.closing(); }

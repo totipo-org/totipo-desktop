@@ -39,7 +39,7 @@ public final class VaultPanel extends JPanel {
     private transient Runnable refreshCallback = () -> { };
     private transient Runnable createCallback = () -> { };
     final transient javax.swing.Action refreshAction = SwingUsability.action("Refresh", () -> refreshCallback.run());
-    final transient javax.swing.Action createAction = SwingUsability.action("Create Token", () -> createCallback.run());
+    final transient javax.swing.Action createAction = SwingUsability.action("Add", () -> createCallback.run());
     private final JButton refresh = new JButton(refreshAction);
     private final TokenBrowserPanel browser = new TokenBrowserPanel(Clock.systemUTC());
     private final JButton create = new JButton(createAction);
@@ -50,24 +50,26 @@ public final class VaultPanel extends JPanel {
 
     public VaultPanel() {
         Edt.require();
-        setLayout(new BorderLayout(12, 12));
+        DesktopStyle.action(create, DesktopStyle.ActionRole.PrimaryAction, false);
+        DesktopStyle.action(refresh, DesktopStyle.ActionRole.QuietAction, false);
+        setLayout(new BorderLayout(DesktopStyle.COMPACT, DesktopStyle.COMPACT));
         setMinimumSize(new java.awt.Dimension(MINIMUM_SIZE));
         SwingUsability.bind(this, WHEN_IN_FOCUSED_WINDOW, javax.swing.KeyStroke.getKeyStroke("F5"), "refresh", refreshAction);
         SwingUsability.bind(this, WHEN_IN_FOCUSED_WINDOW, javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_N, SwingUsability.menuMask()), "create", createAction);
         SwingUsability.bind(this, WHEN_IN_FOCUSED_WINDOW, javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_F, java.awt.event.InputEvent.CTRL_DOWN_MASK), "find", SwingUsability.action("Find", browser::focusSearch));
         refresh.setMnemonic('R'); create.setMnemonic('N'); changePassword.setMnemonic('P');
-        refresh.setToolTipText("Refresh (F5)"); create.setToolTipText("Create Token (menu shortcut + N)");
+        refresh.setToolTipText("Refresh (F5)"); create.setToolTipText("Add TOTP (menu shortcut + N)");
         status.getAccessibleContext().setAccessibleDescription("Vault reading status");
         progress.getAccessibleContext().setAccessibleName("Vault reading progress");
         uncertainty.getAccessibleContext().setAccessibleName("Save decision");
-        setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
-        JPanel heading = new JPanel(new BorderLayout(0, 12));
+        setBorder(BorderFactory.createEmptyBorder(DesktopStyle.WINDOW_PADDING, DesktopStyle.WINDOW_PADDING, DesktopStyle.WINDOW_PADDING, DesktopStyle.WINDOW_PADDING));
+        JPanel heading = new JPanel(new BorderLayout(0, DesktopStyle.COMPACT));
         reading.add(status, BorderLayout.WEST);
         reading.add(progress, BorderLayout.CENTER);
-        JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEADING, 10, 0));
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEADING, DesktopStyle.TIGHT, 0));
         actions.add(refresh);
         actions.add(create);
-        JPanel controls = new JPanel(new BorderLayout(0, 12));
+        JPanel controls = new JPanel(new BorderLayout(0, DesktopStyle.COMPACT));
         controls.add(reading, BorderLayout.NORTH);
         controls.add(actions, BorderLayout.CENTER);
         writeMessage.setVisible(false);
@@ -92,7 +94,7 @@ public final class VaultPanel extends JPanel {
         JMenu vault = new JMenu("Vault"); vault.setMnemonic('V');
         changeVault.setMnemonic('V');
         vault.add(changeVault); vault.add(changePassword); bar.add(vault);
-        JMenu token = new JMenu("Token"); token.setMnemonic('T');
+        JMenu token = new JMenu("TOTP"); token.setMnemonic('T');
         token.add(browser.editMenu); token.add(browser.diagnosticsMenu); bar.add(token);
         return bar;
     }

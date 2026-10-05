@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class TokenRowSelectionTest {
     static boolean hasSelectionOutline(Border border) {
-        if (border instanceof LineBorder line) { return line.getThickness() == 2 && line.getLineColor().equals(UIManager.getColor("List.selectionBackground")); }
+        if (border instanceof LineBorder line) { return line.getThickness() == 1 && line.getLineColor().equals(DesktopStyle.accent()); }
         return border instanceof CompoundBorder compound && (hasSelectionOutline(compound.getInsideBorder()) || hasSelectionOutline(compound.getOutsideBorder()));
     }
     @Test void ordinarySelectionUsesRestrainedDerivedFillAndAccessibleOutlineWithoutGeometryChange() throws Exception {
@@ -36,8 +36,8 @@ class TokenRowSelectionTest {
             row.selected(true); ordinary.selected(true);
             assertEquals(ordinary.getBackground(), row.getBackground()); assertNotEquals(conflict, row.getBackground());
             assertTrue(hasSelectionOutline(row.getBorder()));
-            assertEquals(UIManager.getColor("Separator.foreground"), ((MatteBorder)((CompoundBorder)row.getBorder()).getOutsideBorder()).getMatteColor());
-            assertSame(row.identityBottom, row.warning.getParent()); assertTrue(row.getAccessibleContext().getAccessibleName().contains("conflicting versions"));
+            assertEquals(DesktopStyle.border(), ((MatteBorder)((CompoundBorder)row.getBorder()).getOutsideBorder()).getMatteColor());
+            assertTrue(row.getAccessibleContext().getAccessibleName().contains("conflicting versions"));
             assertTrue(row.getAccessibleContext().getAccessibleStateSet().contains(AccessibleState.SELECTED)); assertEquals(height, row.getPreferredSize().height);
             assertEquals(UIManager.getColor("List.foreground"), row.primary.getForeground()); assertNotEquals(conflict, row.primary.getForeground()); row.retire(); ordinary.retire();
         });

@@ -19,7 +19,7 @@ public final class RevealLifecycleProbe {
     public void reveal() { revealed = browser.rows.get(0).token.id(); browser.rows.get(0).show.doClick(0); }
     public void copyAndAssertVisible() {
         assertFalse(browser.rows.get(0).show.isVisible()); TotpCopyTest.buttons(browser).get(0).doClick(0);
-        assertTrue(browser.copyNotification.isVisible());
+        assertEquals("Copied", TotpCopyTest.buttons(browser).get(0).getText()); assertFalse(browser.copyNotification.isVisible());
     }
     public void expireInitialPeriod() {
         clock.now = Instant.ofEpochSecond(30); browser.totp.tick();

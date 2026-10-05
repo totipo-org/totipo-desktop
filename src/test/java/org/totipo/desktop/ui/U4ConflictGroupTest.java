@@ -34,8 +34,8 @@ class U4ConflictGroupTest {
                 assertTrue(buttons(header, "Show Code").isEmpty()); assertTrue(buttons(header, "Edit").isEmpty());
                 assertFalse(header.isFocusable()); assertFalse(header.isOpaque());
                 var warning = TokenBrowserTest.find(header, JLabel.class);
-                assertEquals("⚠ Conflict", warning.getText());
-                assertEquals(UIManager.getColor("List.foreground"), warning.getForeground());
+                assertEquals("Conflict", warning.getText());
+                assertEquals(DesktopStyle.warning(), warning.getForeground());
                 assertEquals("This token has conflicting versions", warning.getAccessibleContext().getAccessibleName());
                 assertEquals(warning.getAccessibleContext().getAccessibleName(), group.getAccessibleContext().getAccessibleName());
                 assertEquals(UIManager.getColor("List.background"), group.getBackground());
@@ -77,7 +77,7 @@ class U4ConflictGroupTest {
                         var group = (JPanel) panel.list.getComponent(0);
                         var warning = TokenBrowserTest.find((JPanel) group.getComponent(0), JLabel.class);
                         assertEquals(surface, group.getBackground());
-                        assertEquals(UIManager.getColor("List.foreground"), warning.getForeground());
+                        assertEquals(DesktopStyle.warning(), warning.getForeground());
                         assertNotEquals(surface, warning.getForeground());
                         var edge = group.getBorder();
                         var child = panel.rows.get(0); var ordinary = panel.rows.get(2);
@@ -102,16 +102,19 @@ class U4ConflictGroupTest {
             var defaultNimbus = defaults.get("nimbusOrange");
             try {
                 UIManager.put("OptionPane.warningDialog.titlePane.background", Color.ORANGE);
-                assertEquals(Color.ORANGE, TokenBrowserPanel.conflictAccent());
+                assertEquals(DesktopStyle.warning(), TokenBrowserPanel.conflictAccent());
+                assertTrue(DesktopStyle.contrast(TokenBrowserPanel.conflictAccent(), DesktopStyle.surface()) >= 4.5);
                 UIManager.put("OptionPane.warningDialog.titlePane.background", Color.YELLOW);
                 assertNotEquals(Color.ORANGE, TokenBrowserPanel.conflictAccent());
                 UIManager.put("OptionPane.warningDialog.titlePane.background", null);
                 defaults.remove("OptionPane.warningDialog.titlePane.background");
                 UIManager.put("nimbusOrange", Color.ORANGE);
-                assertEquals(Color.ORANGE, TokenBrowserPanel.conflictAccent());
+                assertEquals(DesktopStyle.warning(), TokenBrowserPanel.conflictAccent());
+                assertTrue(DesktopStyle.contrast(TokenBrowserPanel.conflictAccent(), DesktopStyle.surface()) >= 4.5);
                 UIManager.put("nimbusOrange", null);
                 defaults.remove("nimbusOrange");
-                assertEquals(Color.ORANGE, TokenBrowserPanel.conflictAccent());
+                assertEquals(DesktopStyle.warning(), TokenBrowserPanel.conflictAccent());
+                assertTrue(DesktopStyle.contrast(TokenBrowserPanel.conflictAccent(), DesktopStyle.surface()) >= 4.5);
             } finally {
                 defaults.put("OptionPane.warningDialog.titlePane.background", defaultWarning); defaults.put("nimbusOrange", defaultNimbus);
                 UIManager.put("OptionPane.warningDialog.titlePane.background", warning); UIManager.put("nimbusOrange", nimbus);
@@ -156,18 +159,18 @@ class U4ConflictGroupTest {
             state.result = call -> new TotpCode(call.alternative() == a ? "001234" : "005678", Instant.ofEpochSecond(clock.now.getEpochSecond() / 30 * 30), Instant.ofEpochSecond(clock.now.getEpochSecond() / 30 * 30 + 30));
             List<String> copied = new ArrayList<>(); panel.copyAction((code, from, until, now) -> { copied.add(code); return TotpClipboard.COPIED; });
             try {
-                panel.render(state.value); assertEquals(3, panel.rows.size()); assertEquals("2 tokens", panel.resultCount.getText());
+                panel.render(state.value); assertEquals(3, panel.rows.size()); assertEquals("2 TOTPs", panel.resultCount.getText());
                 assertEquals(1, buttons(panel.list, "Resolve").size()); assertEquals(3, buttons(panel.list, "Show Code").size()); assertTrue(state.calls.isEmpty());
                 var first = panel.rows.get(0); var second = panel.rows.get(1);
                 assertNotSame(first.getParent(), panel.list); assertEquals(2, buttons(first.getParent().getParent(), "Edit").size());
                 first.show.doClick(0); assertEquals(List.of(a), state.calls.stream().map(Call::alternative).toList()); assertTrue(second.show.isVisible());
                 second.show.doClick(0); assertFalse(first.show.isVisible()); assertFalse(second.show.isVisible());
                 TotpCopyTest.buttons(first).get(0).doClick(0); TotpCopyTest.buttons(second).get(0).doClick(0); assertEquals(List.of("001234", "005678"), copied);
-                panel.search.setText("Beta"); assertEquals(2, panel.rows.size()); assertEquals("1 of 2 tokens", panel.resultCount.getText()); assertEquals("Alpha", panel.rows.get(0).primary.getText());
+                panel.search.setText("Beta"); assertEquals(2, panel.rows.size()); assertEquals("1 of 2 TOTPs", panel.resultCount.getText()); assertEquals("Alpha", panel.rows.get(0).primary.getText());
                 assertFalse(panel.rows.get(0).show.isVisible()); assertFalse(panel.rows.get(1).show.isVisible()); assertEquals(2, state.calls.size());
                 panel.search.setText("nothing"); panel.search.setText("Alpha"); assertEquals(2, state.calls.size());
                 panel.render(new State(token(1, a), token(2, active("Gamma"))).value);
-                assertEquals(1, panel.rows.size()); assertTrue(buttons(panel.list, "Resolve").isEmpty()); assertTrue(panel.rows.get(0).show.isVisible()); assertEquals("1 of 2 tokens", panel.resultCount.getText());
+                assertEquals(1, panel.rows.size()); assertTrue(buttons(panel.list, "Resolve").isEmpty()); assertTrue(panel.rows.get(0).show.isVisible()); assertEquals("1 of 2 TOTPs", panel.resultCount.getText());
             } finally { panel.closing(); }
         });
     }
@@ -175,7 +178,7 @@ class U4ConflictGroupTest {
         edt(() -> {
             var panel = browser(new MutableClock()); var deleted = alternative(TokenStatus.TOMBSTONED, "Gone", "old", TotpAlgorithm.SHA1, 6, 30);
             panel.onEdit((base, value, explanation) -> assertSame(deleted, value));
-            try { panel.render(new State(token(1, active("Here"), deleted)).value); var row = panel.rows.get(1);
+            try { panel.render(new State(token(1, active("Here"), deleted)).value); var row = panel.rows.stream().filter(r -> r.alternative == deleted).findFirst().orElseThrow();
                 assertTrue(row.account.getText().contains("Deleted")); assertFalse(row.show.isEnabled()); row.edit.doClick(0);
             } finally { panel.closing(); }
         });

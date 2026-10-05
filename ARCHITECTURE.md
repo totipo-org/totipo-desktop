@@ -538,11 +538,15 @@ prevent queued session close or stop shutdown of other windows.
 
 The browser retains the latest authoritative VaultState, a temporary search-field
 query and ordinary presentation rows. Search never alters/copies protocol state or
-creates a second domain database. Matching is a literal Locale.ROOT case-insensitive
-substring of the full token-ID hex or issuer/account of any complete alternative.
-No other fields are searched. Empty query matches all logical tokens, including
-incomplete observations. Filtering preserves supplied ordering and one row per
-TokenId, with all conflict/unresolved detail intact and no winning alternative.
+creates a second domain database. Matching uses Locale.ROOT case-insensitive
+whitespace-separated AND substrings
+across the displayed issuer/account of one complete Alternative. No internal
+identifiers or credential/configuration fields are searched. Empty query matches
+all logical tokens, including incomplete observations. Displayed primary/secondary
+identity determines case-insensitive stable ordering, both for Alternatives and
+outer entries (a conflict sorts by its first ordered Alternative). One child is
+rendered per semantic Alternative, with conflict/unresolved detail intact and no
+winning alternative.
 
 New states retain the query and resolve surviving selection by full TokenId.
 A removed or filtered-out selection is cleared; clearing the filter never restores

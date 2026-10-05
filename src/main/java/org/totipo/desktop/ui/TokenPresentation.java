@@ -8,6 +8,24 @@ import java.util.stream.Collectors;
 final class TokenPresentation {
     private TokenPresentation() { }
 
+    static String primary(TokenDescriptor d) {
+        return !d.issuer().isBlank() ? UntrustedText.display(d.issuer())
+                : !d.account().isBlank() ? UntrustedText.display(d.account()) : "Unnamed TOTP";
+    }
+    static String secondary(TokenDescriptor d) {
+        return (d.issuer().isBlank() ? "" : UntrustedText.display(d.account()))
+                + (d.status() == TokenStatus.TOMBSTONED ? " · Deleted" : "");
+    }
+    static final java.util.Comparator<TokenAlternative> IDENTITY_ORDER = java.util.Comparator
+            .comparing((TokenAlternative a) -> primary(a.descriptor()), String.CASE_INSENSITIVE_ORDER)
+            .thenComparing(a -> secondary(a.descriptor()), String.CASE_INSENSITIVE_ORDER);
+    static List<TokenAlternative> ordered(TokenState token) {
+        return token.alternatives().stream().sorted(IDENTITY_ORDER).toList();
+    }
+    static final java.util.Comparator<TokenState> TOKEN_ORDER = java.util.Comparator
+            .comparing((TokenState t) -> ordered(t).isEmpty() ? "Incomplete version" : primary(ordered(t).get(0).descriptor()), String.CASE_INSENSITIVE_ORDER)
+            .thenComparing(t -> ordered(t).isEmpty() ? "" : secondary(ordered(t).get(0).descriptor()), String.CASE_INSENSITIVE_ORDER);
+
     private static String visibleValues(CompetingField<String> field) {
         return field.values().stream().map(value -> UntrustedText.display(value.value()))
                 .filter(value -> !value.isBlank()).collect(Collectors.joining(" / "));

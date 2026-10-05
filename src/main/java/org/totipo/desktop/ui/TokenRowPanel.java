@@ -19,10 +19,9 @@ final class TokenRowPanel extends JPanel {
     final JButton edit = new JButton("Edit");
     final JLabel primary;
     final JLabel account;
-    final JLabel warning = literal("⚠");
     final JPanel grid = transparent(new GridBagLayout());
     final JPanel identityTop = transparent(new BorderLayout());
-    final JPanel identityBottom = transparent(new BorderLayout(8, 0));
+    final JPanel identityBottom = transparent(new BorderLayout(DesktopStyle.TIGHT, 0));
     final JPanel statusTop = transparent(new BorderLayout());
     final JPanel statusBottom = transparent(new BorderLayout());
     final JPanel actionTop = transparent(new BorderLayout());
@@ -36,6 +35,10 @@ final class TokenRowPanel extends JPanel {
     private boolean selection;
     private int outcomeCount;
     private boolean updating;
+    private final transient java.time.Clock clock;
+    private transient java.time.Instant copiedUntil;
+    private final Timer feedbackTimer = new Timer(2500, e -> feedbackTick());
+    private boolean keyboardFocus;
 
     private static JPanel transparent(LayoutManager layout) {
         JPanel panel = new JPanel(layout); panel.setOpaque(false); return panel;
@@ -44,44 +47,49 @@ final class TokenRowPanel extends JPanel {
         this(token, token.alternatives().size() == 1 ? token.alternatives().get(0) : null, select, reveal, editAction, copy);
     }
     TokenRowPanel(TokenState token, TokenAlternative alternative, Runnable select, Runnable reveal, Runnable editAction, IntConsumer copy) {
+        this(token, alternative, select, reveal, editAction, copy, java.time.Clock.systemUTC());
+    }
+    TokenRowPanel(TokenState token, TokenAlternative alternative, Runnable select, Runnable reveal, Runnable editAction, IntConsumer copy, java.time.Clock clock) {
         this.token = token; this.copy = copy; this.select = select;
+        this.clock = clock; feedbackTimer.setRepeats(false);
         this.alternative = alternative;
-        setLayout(new BorderLayout(0, 6)); setFocusable(true);
+        setLayout(new BorderLayout(0, DesktopStyle.MICRO)); setFocusable(true);
+        putClientProperty("totipo.rowPresentation", "divider");
         primary = literal(TokenPresentation.primary(token)); account = literal(TokenPresentation.account(token));
         if (alternative != null) {
             var descriptor = alternative.descriptor();
-            primary.setText(descriptor.issuer().isBlank() ? "Unnamed token" : UntrustedText.display(descriptor.issuer()));
-            account.setText(UntrustedText.display(descriptor.account()) + (descriptor.status() == TokenStatus.TOMBSTONED ? " · Deleted" : ""));
+            primary.setText(TokenPresentation.primary(descriptor));
+            account.setText(TokenPresentation.secondary(descriptor));
         }
-        primary.setFont(primary.getFont().deriveFont(Font.BOLD));
+        primary.setFont(DesktopStyle.font(DesktopStyle.Typography.Body).deriveFont(Font.BOLD));
+        account.setFont(DesktopStyle.font(DesktopStyle.Typography.Body));
         primary.setToolTipText(primary.getText()); account.setToolTipText(account.getText());
         primary.setMinimumSize(new Dimension(0, primary.getPreferredSize().height));
         account.setMinimumSize(new Dimension(0, account.getPreferredSize().height));
         identityTop.add(primary); identityBottom.add(account);
-        if (token.hasConflict()) {
-            warning.setToolTipText("This token has conflicting versions");
-            warning.getAccessibleContext().setAccessibleName("This token has conflicting versions");
-            identityBottom.add(warning, BorderLayout.EAST);
-        }
-        show.setMargin(new Insets(3, 8, 3, 8)); edit.setMargin(new Insets(3, 8, 3, 8));
+        DesktopStyle.action(show, DesktopStyle.ActionRole.SecondaryAction, true);
+        DesktopStyle.action(edit, DesktopStyle.ActionRole.QuietAction, true);
+        show.getAccessibleContext().setAccessibleDescription("Show code for " + primary.getText() + " " + account.getText());
+        edit.getAccessibleContext().setAccessibleDescription("Edit " + primary.getText() + " " + account.getText());
         actionTop.add(show, BorderLayout.EAST); actionBottom.add(edit, BorderLayout.EAST);
         JLabel sample = codeLabel();
         int middleWidth = Math.max(sample.getFontMetrics(sample.getFont()).stringWidth("8888 8888"),
                 sample.getFontMetrics(sample.getFont()).stringWidth("Updating…"));
         long period = token.alternatives().stream().mapToLong(a -> a.descriptor().period().getSeconds()).max().orElse(0);
         middleWidth = Math.max(middleWidth, account.getFontMetrics(account.getFont()).stringWidth(period + " sec")
-                + new CountdownRing().getPreferredSize().width + 15);
-        int lineHeight = Math.max(show.getPreferredSize().height,
+                + new CountdownRing().getPreferredSize().width + DesktopStyle.NORMAL);
+        int lineHeight = Math.max(primary.getPreferredSize().height,
                 Math.max(sample.getPreferredSize().height, new CountdownRing().getPreferredSize().height));
-        int actionWidth = Math.max(show.getPreferredSize().width, edit.getPreferredSize().width);
+        JButton copySample = new JButton("Copied"); DesktopStyle.action(copySample, DesktopStyle.ActionRole.SecondaryAction, true);
+        int actionWidth = Math.max(copySample.getPreferredSize().width, Math.max(show.getPreferredSize().width, edit.getPreferredSize().width));
         addCell(identityTop, 0, 0, 1, 0, lineHeight);
         addCell(identityBottom, 0, 1, 1, 0, lineHeight);
         addCell(statusTop, 1, 0, 0, middleWidth, lineHeight);
         addCell(statusBottom, 1, 1, 0, middleWidth, lineHeight);
-        addCell(actionTop, 2, 0, 0, actionWidth, lineHeight);
-        addCell(actionBottom, 2, 1, 0, actionWidth, lineHeight);
+        addActionCell(actionTop, 2, actionWidth);
+        addActionCell(actionBottom, 3, edit.getPreferredSize().width);
         add(grid, BorderLayout.NORTH);
-        expanded.setLayout(new BoxLayout(expanded, BoxLayout.Y_AXIS)); add(expanded, BorderLayout.CENTER);
+        expanded.setLayout(new BoxLayout(expanded, BoxLayout.Y_AXIS)); expanded.setVisible(false); add(expanded, BorderLayout.CENTER);
         show.addActionListener(e -> { if (!retired) { select.run(); reveal.run(); } });
         edit.addActionListener(e -> { if (!retired) { select.run(); editAction.run(); } });
         show.setEnabled(codeEligible()); show.setVisible(codeEligible());
@@ -90,7 +98,7 @@ final class TokenRowPanel extends JPanel {
         };
         addMouseListener(selectionListener); grid.addMouseListener(selectionListener);
         for (Component cell : grid.getComponents()) { cell.addMouseListener(selectionListener); }
-        primary.addMouseListener(selectionListener); account.addMouseListener(selectionListener); warning.addMouseListener(selectionListener);
+        primary.addMouseListener(selectionListener); account.addMouseListener(selectionListener);
         selectOnFocus(this); selectOnFocus(show); selectOnFocus(edit);
         SwingUsability.bind(this, WHEN_FOCUSED, KeyStroke.getKeyStroke("ENTER"), "primary-action",
                 SwingUsability.action("Show or copy code", this::primaryAction));
@@ -104,12 +112,26 @@ final class TokenRowPanel extends JPanel {
         cell.setMinimumSize(new Dimension(width, height));
         GridBagConstraints c = new GridBagConstraints();
         c.gridx = column; c.gridy = line; c.weightx = weight; c.fill = GridBagConstraints.BOTH;
-        c.insets = new Insets(line == 0 ? 0 : 3, column == 0 ? 0 : 20, 0, 0);
+        c.insets = new Insets(line == 0 ? 0 : DesktopStyle.MICRO,
+                column == 0 ? 0 : column == 1 ? DesktopStyle.NORMAL : DesktopStyle.COMPACT, 0, 0);
         grid.add(cell, c);
+    }
+    private void addActionCell(JPanel cell, int column, int width) {
+        // Inline commands share the two-line identity height instead of forcing two button heights.
+        JPanel holder = transparent(new GridBagLayout());
+        GridBagConstraints centered = new GridBagConstraints(); centered.fill = GridBagConstraints.HORIZONTAL; centered.weightx = 1;
+        int height = Math.max(DesktopStyle.INLINE, cell.getPreferredSize().height);
+        cell.setPreferredSize(new Dimension(width, height));
+        cell.setMinimumSize(new Dimension(width, height));
+        holder.add(cell, centered);
+        GridBagConstraints c = new GridBagConstraints(); c.gridx = column; c.gridy = 0; c.gridheight = 2;
+        c.fill = GridBagConstraints.BOTH; c.insets = new Insets(0, column == 2 ? DesktopStyle.COMPACT : DesktopStyle.TIGHT, 0, 0);
+        grid.add(holder, c);
     }
     private void selectOnFocus(JComponent component) {
         component.addFocusListener(new FocusAdapter() {
-            @Override public void focusGained(FocusEvent e) { if (!retired) { select.run(); } }
+            @Override public void focusGained(FocusEvent e) { if (!retired) { select.run(); focused(true); } }
+            @Override public void focusLost(FocusEvent e) { focused(false); }
         });
     }
     static JLabel literal(String text) {
@@ -123,20 +145,13 @@ final class TokenRowPanel extends JPanel {
     }
     private static JLabel codeLabel() {
         JLabel code = literal(""); code.setHorizontalAlignment(SwingConstants.TRAILING);
-        code.setFont(code.getFont().deriveFont(Font.BOLD, code.getFont().getSize2D() * 1.2f)); return code;
+        code.setFont(DesktopStyle.font(DesktopStyle.Typography.Code)); return code;
     }
     void selected(boolean selected) {
         boolean previous = selection;
         selection = selected;
-        Color background = UIManager.getColor("List.background");
-        if (selected) { background = mix(background, UIManager.getColor("List.selectionBackground"), 12); }
-        setBackground(background);
-        labelColors(this, UIManager.getColor("List.foreground"));
-        Color edge = UIManager.getColor("Separator.foreground");
-        setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, edge),
-                BorderFactory.createCompoundBorder(selected
-                        ? BorderFactory.createLineBorder(UIManager.getColor("List.selectionBackground"), 2)
-                        : BorderFactory.createEmptyBorder(2, 2, 2, 2), BorderFactory.createEmptyBorder(8, 8, 8, 8))));
+        setBackground(selected ? DesktopStyle.surfaceSelected() : DesktopStyle.surface());
+        appearance();
         if (previous != selected) {
             getAccessibleContext().firePropertyChange(javax.accessibility.AccessibleContext.ACCESSIBLE_STATE_PROPERTY,
                     previous ? javax.accessibility.AccessibleState.SELECTED : null,
@@ -144,10 +159,37 @@ final class TokenRowPanel extends JPanel {
         }
         repaint();
     }
-    private static Color mix(Color base, Color accent, int weight) {
-        return new Color((base.getRed() * (weight - 1) + accent.getRed()) / weight,
-                (base.getGreen() * (weight - 1) + accent.getGreen()) / weight,
-                (base.getBlue() * (weight - 1) + accent.getBlue()) / weight);
+    void focused(boolean focused) { keyboardFocus = focused; appearance(); repaint(); }
+    private void appearance() {
+        labelColors(this, DesktopStyle.readable(DesktopStyle.text(), getBackground(), 4.5));
+        account.setForeground(DesktopStyle.readable(DesktopStyle.textSecondary(), getBackground(), 4.5));
+        setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0, 0, DesktopStyle.BORDER, 0, DesktopStyle.border()),
+                BorderFactory.createCompoundBorder(keyboardFocus
+                        ? BorderFactory.createLineBorder(DesktopStyle.focus(), DesktopStyle.FOCUS)
+                        : selection ? BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(DesktopStyle.accent(), DesktopStyle.BORDER),
+                                BorderFactory.createEmptyBorder(DesktopStyle.BORDER, DesktopStyle.BORDER, DesktopStyle.BORDER, DesktopStyle.BORDER))
+                        : BorderFactory.createEmptyBorder(DesktopStyle.FOCUS, DesktopStyle.FOCUS, DesktopStyle.FOCUS, DesktopStyle.FOCUS),
+                        BorderFactory.createEmptyBorder(DesktopStyle.TIGHT - DesktopStyle.FOCUS, DesktopStyle.COMPACT - DesktopStyle.FOCUS,
+                                DesktopStyle.TIGHT - DesktopStyle.FOCUS, DesktopStyle.COMPACT - DesktopStyle.FOCUS))));
+    }
+    void copied() {
+        if (retired) { return; }
+        copiedUntil = clock.instant().plusMillis(2500); feedbackTimer.setInitialDelay(2500); feedbackTimer.restart(); feedback();
+    }
+    void feedbackTick() {
+        if (copiedUntil == null) { return; }
+        long left = java.time.Duration.between(clock.instant(), copiedUntil).toMillis();
+        if (left <= 0) { copiedUntil = null; feedbackTimer.stop(); feedback(); }
+        else { feedbackTimer.setInitialDelay((int) Math.min(2500, Math.max(1, left))); feedbackTimer.restart(); }
+    }
+    private void feedback() {
+        for (Outcome outcome : outcomes) {
+            String text = copiedUntil == null ? "Copy" : "Copied";
+            outcome.button.setText(text);
+            outcome.button.getAccessibleContext().setAccessibleName(text + " TOTP code");
+            outcome.button.getAccessibleContext().setAccessibleDescription(copiedUntil == null ? null : "Code copied to clipboard");
+        }
+        repaint();
     }
     @Override public javax.accessibility.AccessibleContext getAccessibleContext() {
         if (accessibleContext == null) { accessibleContext = new AccessibleJPanel() {
@@ -180,11 +222,11 @@ final class TokenRowPanel extends JPanel {
         final JLabel code = codeLabel();
         final JLabel seconds = literal("");
         final CountdownRing ring = new CountdownRing();
-        final JPanel countdown = transparent(new FlowLayout(FlowLayout.TRAILING, 5, 0));
+        final JPanel countdown = transparent(new FlowLayout(FlowLayout.TRAILING, DesktopStyle.MICRO, 0));
         final JButton button = new JButton("Copy");
         Outcome(int index, String label) {
             countdown.add(seconds); countdown.add(ring);
-            button.setMargin(new Insets(3, 8, 3, 8));
+            button.setText("Copied"); DesktopStyle.action(button, DesktopStyle.ActionRole.SecondaryAction, true); button.setText("Copy");
             button.getAccessibleContext().setAccessibleName("Copy TOTP code" + (outcomeCount > 1 ? " for " + label : ""));
             Object generation = presentation;
             button.addActionListener(e -> { if (!retired && !updating && presentation == generation && button.isEnabled()) { select.run(); copy.accept(index); } });
@@ -200,6 +242,7 @@ final class TokenRowPanel extends JPanel {
         if (labels.size() == outcomeCount && pending == updating) { return; }
         clearPresentation(); outcomeCount = labels.size(); updating = pending;
         if (outcomeCount > 1) { expanded.add(literal("Conflicting versions")); }
+        expanded.setVisible(outcomeCount > 1);
         for (int i = 0; i < outcomeCount; i++) {
             Outcome outcome = new Outcome(i, labels.get(i)); outcomes.add(outcome);
             if (outcomeCount == 1) {
@@ -237,14 +280,18 @@ final class TokenRowPanel extends JPanel {
             var d = displays.get(i); Outcome outcome = outcomes.get(i);
             outcome.button.setEnabled(false);
             outcome.ring.update(d); outcome.seconds.setText(d.seconds() + " sec");
+            if (copiedUntil != null && !outcome.code.getText().equals(TokenPresentation.formattedCode(d.code()))) {
+                copiedUntil = null; feedbackTimer.stop();
+            }
             outcome.code.setText(TokenPresentation.formattedCode(d.code()));
             outcome.code.getAccessibleContext().setAccessibleName("TOTP code " + outcome.code.getText());
             outcome.button.setEnabled(true); outcome.button.getAccessibleContext().setAccessibleDescription(null);
         }
+        feedback();
         updateAccessible(displays); refresh();
     }
     private void refresh() {
-        labelColors(this, UIManager.getColor("List.foreground"));
+        appearance();
         revalidate(); repaint();
     }
     private boolean codeEligible() {
@@ -262,6 +309,6 @@ final class TokenRowPanel extends JPanel {
         presentation = new Object(); outcomes.forEach(Outcome::erase); outcomes.clear();
         statusTop.removeAll(); statusBottom.removeAll(); actionTop.removeAll(); expanded.removeAll();
     }
-    void retire() { display(List.of()); retired = true; show.setEnabled(false); edit.setEnabled(false); }
+    void retire() { feedbackTimer.stop(); copiedUntil = null; display(List.of()); retired = true; show.setEnabled(false); edit.setEnabled(false); }
     @Override public Dimension getMaximumSize() { return new Dimension(Integer.MAX_VALUE, getPreferredSize().height); }
 }
