@@ -105,6 +105,7 @@ public final class VaultPanel extends JPanel {
         Edt.require(); changeVault.addActionListener(event -> action.run());
     }
 
+    public void mutationAcknowledged(org.totipo.SaveResult.Saved saved) { browser.mutationAcknowledged(saved); }
     public void focusSearch() { browser.focusSearch(); }
     public void copyAction(TotpClipboard.Copy action) { browser.copyAction(action); }
     public void totpAction(VaultView.TotpAction action) { browser.totpAction(action); }
@@ -119,6 +120,9 @@ public final class VaultPanel extends JPanel {
     public void writeAvailability(boolean available) {
         Edt.require(); writeAvailable = available;
         changePassword.setEnabled(available);
+        createAction.putValue(javax.swing.Action.SHORT_DESCRIPTION, available ? "Add TOTP (menu shortcut + N)"
+                : "Changes are unavailable while another change is in progress or the vault session is closing.");
+        create.getAccessibleContext().setAccessibleDescription((String) createAction.getValue(javax.swing.Action.SHORT_DESCRIPTION));
         createAction.setEnabled(available && observed); browser.writeAvailability(available);
     }
     public void writeMessage(String text) {
@@ -166,7 +170,7 @@ public final class VaultPanel extends JPanel {
         JTextArea text = new JTextArea("Totipo could not confirm whether this token change was saved. "
                 + "It may already be present in the vault.\nRetry sends the exact same change again. It does not read newer token data or adjust the change."
                 + "\nStop retrying gives up the option to retry this change; it does not undo a save or prove it failed."
-                + (isCreate ? "\nStarting Create Token again later creates a separate token; it is not a retry and could create two tokens." : ""));
+                + (isCreate ? "\nStarting Add TOTP again later creates a separate TOTP; it is not a retry and could create two tokens." : ""));
         text.setEditable(false); text.setLineWrap(true); text.setWrapStyleWord(true);
         text.setRows(isCreate ? 5 : 4);
         uncertainty.add(text, BorderLayout.CENTER);

@@ -77,11 +77,26 @@ explicit Open Vault. Password-change UNCERTAIN has no retry capability, automati
 retry, rollback, or preferred recovery password. Earlier unresolved token-publication
 warnings remain independent.
 
-Updates can change status (Active / Deleted, corresponding to ACTIVE / TOMBSTONED)
-and optionally replace the secret; existing secrets are never exported. An edit
-is based on the token value observed when the editor opened. Later concurrent
-changes are not automatically folded into that draft. Conflicted tokens require
-explicit alternative selection for **Edit Alternative…**, which changes only that alternative.
+**Add** / `Ctrl+N` opens Add TOTP: explicitly paste an `otpauth://totp` setup URI
+or choose Manual entry, then review the identity and non-secret setup before
+publication. Supported setups use SHA1/SHA256/SHA512, 6–8 digits, and whole periods
+from 1 to 4294967295 seconds. Manual Base32 accepts ordinary spaces. Totipo does
+not inspect the clipboard for enrollment material. Matching active issuer/account
+values require an explicit Update Existing / Add Another / Cancel decision;
+multiple matches require a target choice. Update Existing reviews a proposed
+setup replacement and preserves the logical TOTP identity.
+
+**Edit TOTP** changes issuer/account and shows a non-secret setup summary.
+**Change setup…** acquires and reviews a new complete authenticator setup;
+existing secrets are never redisplayed. **Delete TOTP…** opens a separate danger
+confirmation and removes the TOTP from the active list; previous versions remain
+in vault history. An edit is based on the observed version when it opened; later
+concurrent changes are not silently folded into the draft. Editing a conflict
+version changes that version and does not resolve its peers. Management does not
+derive codes. Lock immediately retires these flows and discards temporary input.
+After an acknowledged change, emitted state supplies the updated list. Codes stay
+concealed, and a nonmatching search is retained with an explicit Clear Search option.
+
 **Resolve Conflict…** separately offers all captured alternatives or a deliberate
 subset, then explicit field-by-field resolution and secret equality-group selection.
 No automatic winner or automatic merge is chosen. New relevant information stops

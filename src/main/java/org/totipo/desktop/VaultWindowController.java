@@ -94,6 +94,7 @@ final class VaultWindowController {
         Edt.require();
         if (!closing) {
             latest = state;
+            writes.current(latest);
             view.render(latest);
         }
     }

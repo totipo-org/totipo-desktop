@@ -34,6 +34,8 @@ public interface VaultView {
     }
     default void tokenActions(Runnable create, EditAction edit) { }
     default void writeAvailability(boolean available) { }
+    default void manageToken(TokenManagementPanel editor) { }
+    default void mutationAcknowledged(org.totipo.SaveResult.Saved saved) { }
     default void editToken(TokenEditorPanel editor, boolean create) { }
     default void retireEditor() { }
     default void publicationUncertain(boolean create, boolean busy, Runnable retry, Runnable stop) { }

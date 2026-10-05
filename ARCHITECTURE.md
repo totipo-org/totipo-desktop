@@ -32,7 +32,7 @@ TotipoDesktop: invokeLater
                  -> PasswordChangePanel, with three transient password fields
                  -> one task-owned PasswordChangeSubmission after validation
             -> one TokenWriteController (create/update OR merge OR capability decision)
-                 -> desktop TokenEditorPanel / owned modeless TokenEditDialog
+                 -> desktop TokenManagementPanel / owned modeless task dialog
                  -> captured base/alternative for an open editor
                  -> MergeEditorPanel with captured MergeInputs and submitted MergeDraft
                  -> at most one executor-owned PartialResolution OR PublicationRetry
@@ -307,22 +307,48 @@ No success result directly changes a row, selection, descriptor or code.
 
 ## Desktop drafts and secret ingress (M2a)
 
-`TokenEditorPanel` is headlessly testable; `TokenEditDialog` is only an owned
-modeless shell. Neither holds a core builder. Create defaults are ACTIVE, empty
-issuer/account, SHA1, six digits, thirty seconds, and a required secret. Update
-prefills the selected descriptor, permits ACTIVE/TOMBSTONED, and requires an
-explicit Replace secret checkbox to accept replacement ingress. TOMBSTONED is
-not permanent deletion. No metadata is supplied or copied from parents.
+`TokenManagementPanel` is the session-owned S3 task surface, mounted in a modeless
+child of the persistent shell. Its stages separate URI/manual acquisition, parsed
+review, explicit duplicate decision, setup replacement review, identity Edit, and
+Delete confirmation. It never owns a Java builder. `SetupDraft` owns new secret
+bytes and a secret-free `TokenDescriptor` review; transfer produces the common
+`TokenDraft`. Identity Edit uses the captured descriptor setup and no secret
+ingress. Change Setup uses every acquired setup field together and the target's
+saved identity. Delete uses the target's descriptor with TOMBSTONED status and no
+secret ingress. No desktop protocol persistence is implemented.
 
-Non-secret input is validated against public TokenDescriptor bounds. No extra
-issuer/account policy or hidden wire-format validation is duplicated. A Save
-reads `JPasswordField.getPassword()` into a temporary char array and decodes that
-array directly. `Base32` accepts RFC 4648 upper/lowercase, padded or unpadded text,
-and ignores ASCII space/tab/CR/LF/hyphen. It rejects invalid alphabet, Unicode
-lookalikes, 0/1 substitutions, misplaced/incorrect padding, impossible lengths,
-nonzero trailing bits, and decoded lengths outside 1–128 bytes. Error messages
-never contain input. Temporary character arrays are wiped in finally; fields
-clear after decoding, cancellation, retirement, and disabling replacement.
+`SetupUri` is a small TOTP-only application ingress parser because the consumed
+published Java 0.1.1 JAR has no enrollment parser. It rejects HOTP, malformed URIs,
+ambiguous/repeated or unsupported parameters, issuer disagreement, invalid Base32,
+unsupported algorithms/digits, and out-of-domain periods. URI secrets use strict
+Base32. `SetupValidation` applies Java's identity UTF-8 limits and setup bounds;
+empty identities remain supported. The existing `Base32` decoder permits
+space/tab/CR/LF/hyphen in manual entry. URI/JVM string copies cannot be wiped, but
+input char arrays, acquired bytes, submitted bytes and secret-bearing Swing fields
+have explicit retirement paths; no ingress value is included in diagnostics.
+
+`IdentityMatches` reads only current active descriptors and exact issuer/account
+values. It does not read secret comparison groups, causal heads, timestamps, or
+codes. Multiple candidates have no preselected target. If the emitted state changes
+before a duplicate decision is committed, the choice must be reviewed again.
+Update Existing converges on the same setup replacement mutation as Change Setup.
+
+Submit actions remain available with incomplete input. Activation rejects invalid
+input before submission, exposes a local field message and accessible description,
+and requests focus/scroll to the first problem. Acquisition leads to a separate
+review action. Secondary task cancellation returns to Edit; shell retirement
+always discards the entire flow. A queued validated draft is atomically transferred
+to the session executor, or promptly wiped on retirement before execution.
+
+Saved publication carries its token ID and acknowledged revisions back to the
+view. The view waits for those revisions in emitted state before bringing the
+result into view or showing the modest hidden-by-search notice. It does not insert
+an optimistic row or reveal a code. Pure deleted logical TOTPs are omitted from
+the active collection; existing conflict child presentation remains unchanged.
+The legacy `TokenEditorPanel`/`TokenEditDialog` is retained for the older isolated
+editor boundary tests and shared sizing/scroll-body helpers, but S3 actions route
+exclusively through `TokenManagementPanel`. Conflict resolution itself is deferred
+to S4 and retains its existing MergeEditorPanel/publication behavior.
 
 A submitted `TokenDraft` exclusively owns its decoded byte array and immutable
 non-secret descriptor. Ownership transfers to one executor task. `TokenWrites`

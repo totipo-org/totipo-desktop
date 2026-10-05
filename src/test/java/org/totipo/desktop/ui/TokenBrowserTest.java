@@ -191,7 +191,7 @@ class TokenBrowserTest {
                     assertTrue(detail.contains(field + ":\nNo complete observed value"));
                 }
                 panel.render(new State(token(2, alternative(TokenStatus.TOMBSTONED, "old", "account", TotpAlgorithm.SHA1, 6, 30))).value);
-                assertFalse(panel.row(id(2)).show.isEnabled()); assertTrue(state.calls.isEmpty());
+                assertNull(panel.row(id(2))); assertTrue(state.calls.isEmpty());
             } finally { panel.closing(); }
         });
     }

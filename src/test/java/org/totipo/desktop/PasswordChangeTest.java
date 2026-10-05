@@ -49,7 +49,7 @@ class PasswordChangeTest {
         PasswordChangePanel panel;
         int forms;
         int tokenForms;
-        TokenEditorPanel tokenEditor;
+        TokenManagementPanel tokenEditor;
         Runnable retry;
         Runnable stop;
         final BlockingQueue<String> tokenEvents = new LinkedBlockingQueue<>();
@@ -61,7 +61,7 @@ class PasswordChangeTest {
         @Override public void passwordAction(Runnable action) { password = action; }
         @Override public void tokenActions(Runnable action, EditAction editAction) { create = action; edit = editAction; }
         @Override public void mergeAction(MergeAction action) { merge = action; }
-        @Override public void editToken(TokenEditorPanel editor, boolean createToken) { tokenForms++; tokenEditor = editor; }
+        @Override public void manageToken(TokenManagementPanel editor) { tokenForms++; tokenEditor = editor; }
         @Override public void retireEditor() { tokenEditor = null; }
         @Override public void publicationUncertain(boolean createToken, boolean busy, Runnable retryAction, Runnable stopAction) {
             retry = retryAction; stop = stopAction; if (!busy) { tokenEvents.add("uncertain"); }
@@ -280,7 +280,7 @@ class PasswordChangeTest {
             edt(() -> { h.view.sticky = false; h.session.lifecycle.subscriber.onNext(recording.state); });
             edt(() -> {
                 h.view.create.run(); h.view.password.run(); assertNull(h.view.panel);
-                password(h.view.tokenEditor).setText("MY"); button(h.view.tokenEditor, "Create").doClick();
+                acquireAndAdd(h.view.tokenEditor);
             });
             assertEquals("uncertain", h.view.tokenEvents.poll(10, TimeUnit.SECONDS));
             edt(() -> { h.view.password.run(); assertNull(h.view.panel); h.view.stop.run(); });

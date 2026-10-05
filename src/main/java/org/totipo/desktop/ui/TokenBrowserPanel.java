@@ -40,6 +40,9 @@ public final class TokenBrowserPanel extends JPanel {
     private transient VaultView.EditAction editAction;
     private transient VaultView.MergeAction mergeAction;
     private boolean writeAvailable = true;
+    private transient SaveResult.Saved changed;
+    private final JPanel changedNotice = new JPanel(new FlowLayout(FlowLayout.LEADING, 8, 0));
+    private final JLabel changedText = new JLabel("The saved TOTP is hidden by your search.");
     private boolean closed;
     private final transient List<JDialog> dialogs = new ArrayList<>();
     transient Consumer<TokenDiagnosticsPanel> diagnosticsAction = panel -> openDialog("Token Diagnostics", panel);
@@ -78,6 +81,12 @@ public final class TokenBrowserPanel extends JPanel {
                 SwingUsability.action("Focus token results", this::focusResults));
         SwingUsability.bind(search, WHEN_FOCUSED, KeyStroke.getKeyStroke("ENTER"), "enter-results",
                 search.getActionMap().get("enter-results"));
+        changedNotice.setOpaque(false); changedNotice.setVisible(false);
+        changedNotice.add(changedText);
+        JButton clearChangedSearch = new JButton("Clear Search");
+        DesktopStyle.action(clearChangedSearch, DesktopStyle.ActionRole.QuietAction, true);
+        clearChangedSearch.addActionListener(event -> search.setText("")); changedNotice.add(clearChangedSearch);
+        add(changedNotice, BorderLayout.SOUTH);
         list.setLayout(new BoxLayout(list, BoxLayout.Y_AXIS)); list.setBackground(DesktopStyle.surface());
         list.getAccessibleContext().setAccessibleName("TOTPs");
         JScrollPane scroll = new JScrollPane(list, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
@@ -122,7 +131,7 @@ public final class TokenBrowserPanel extends JPanel {
         TokenAlternative previous = selectedRow == null ? null : selectedRow.alternative;
         rows.forEach(TokenRowPanel::retire); rows.clear(); resolveButtons.clear(); list.removeAll();
         int matched = 0;
-        for (TokenState token : latest.tokens().stream().sorted(TokenPresentation.TOKEN_ORDER).toList()) {
+        for (TokenState token : latest.tokens().stream().filter(TokenBrowserPanel::activeToken).sorted(TokenPresentation.TOKEN_ORDER).toList()) {
             if (!TokenSearch.matches(token, search.getText())) { continue; }
             matched++;
             JPanel group = null;
@@ -213,7 +222,7 @@ public final class TokenBrowserPanel extends JPanel {
         }
         selectedRow = rows.stream().filter(r -> r.token.id().equals(selected) && r.alternative == previous).findFirst().orElse(row(selected));
         if (row(selected) == null) { selected = null; }
-        int total = latest.tokens().size();
+        int total = (int) latest.tokens().stream().filter(TokenBrowserPanel::activeToken).count();
         if (matched == 0) {
             empty.setText(total == 0 ? "No TOTPs yet" : "No TOTPs match \"" + UntrustedText.display(search.getText()) + "\"");
             empty.setToolTipText(empty.getText());
@@ -224,6 +233,31 @@ public final class TokenBrowserPanel extends JPanel {
         searchBar.setVisible(total != 0);
         resultCount.setText(search.getText().isEmpty() ? total + " TOTPs" : matched + " of " + total);
         updateActions(); list.revalidate(); list.repaint();
+        showChanged();
+    }
+    public void mutationAcknowledged(SaveResult.Saved saved) { Edt.require(); changed = saved; showChanged(); }
+    private void showChanged() {
+        if (changed == null || latest == null || closed) { return; }
+        TokenState token = latest.token(changed.tokenId()).orElse(null);
+        if (token == null) { return; } // Next emitted post-publication state may still be pending.
+        if (!changed.revisions().isEmpty() && !token.heads().stream().map(TokenHead::revision).toList().containsAll(changed.revisions())) { return; }
+        if (!activeToken(token)) { changed = null; changedNotice.setVisible(false); return; }
+        boolean hidden = !TokenSearch.matches(token, search.getText()); changedNotice.setVisible(hidden);
+        if (!hidden) {
+            TokenRowPanel target = row(changed.tokenId());
+            if (target != null) {
+                selectRow(target);
+                SwingUtilities.invokeLater(() -> {
+                    if (!closed && rows.contains(target)) { list.scrollRectToVisible(SwingUtilities.convertRectangle(target.getParent(), target.getBounds(), list)); }
+                });
+            }
+            changed = null;
+        }
+        revalidate(); repaint();
+    }
+    private static boolean activeToken(TokenState token) {
+        return token.hasConflict() || token.alternatives().isEmpty()
+                || token.alternatives().stream().anyMatch(a -> a.descriptor().status() == TokenStatus.ACTIVE);
     }
     private void display(TokenId id, List<TotpDisplay.Display> displays) {
         TokenRowPanel row = row(id);
@@ -281,7 +315,12 @@ public final class TokenBrowserPanel extends JPanel {
     }
     public void copyAction(TotpClipboard.Copy action) { Edt.require(); copyAction = action; }
     public void collectionAction(Action action) { Edt.require(); add.setAction(action); emptyAdd.setAction(action); }
-    public void writeAvailability(boolean available) { Edt.require(); writeAvailable = available; updateActions(); }
+    public void writeAvailability(boolean available) {
+        Edt.require(); writeAvailable = available;
+        editMenu.setToolTipText(available ? "Edit the selected TOTP" : "Changes are unavailable while another change is in progress or the vault session is closing.");
+        editMenu.getAccessibleContext().setAccessibleDescription(editMenu.getToolTipText());
+        updateActions();
+    }
     private void updateActions() {
         TokenState token = selectedToken();
         editMenu.setEnabled(writeAvailable && token != null && !token.alternatives().isEmpty());
@@ -289,6 +328,7 @@ public final class TokenBrowserPanel extends JPanel {
         for (TokenRowPanel row : rows) {
             row.selected(row == selectedRow);
             row.edit.setEnabled(!closed && writeAvailable && !row.token.alternatives().isEmpty());
+            row.edit.setToolTipText(writeAvailable ? "Edit TOTP" : "Changes are unavailable while another change is in progress or the vault session is closing.");
         }
         resolveButtons.forEach(button -> button.setEnabled(!closed && writeAvailable));
     }

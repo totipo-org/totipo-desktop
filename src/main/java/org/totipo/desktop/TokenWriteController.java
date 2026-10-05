@@ -12,7 +12,10 @@ final class TokenWriteController {
     private final VaultView view;
     private final MutationGate gate;
     private final Runnable closeSession;
-    private TokenEditorPanel editor;
+    private TokenManagementPanel editor;
+    private VaultState current;
+    private SaveResult.Saved savedResult;
+    private final java.util.concurrent.atomic.AtomicReference<TokenDraft> queuedDraft = new java.util.concurrent.atomic.AtomicReference<>();
     private MergeEditorPanel mergeEditor;
     private boolean merge;
     private boolean original;
@@ -22,7 +25,7 @@ final class TokenWriteController {
     private VaultState reviewBase; // EDT descriptive state, never browser authority.
     private boolean active;
     private boolean pending;
-    private boolean closing;
+    private volatile boolean closing;
     private boolean abandoned;
     private boolean create;
     private PublicationRetry retry; // Session executor only, including cleanup.
@@ -37,10 +40,13 @@ final class TokenWriteController {
         active = true;
         merge = false; original = false;
         create = alternative == null;
-        editor = new TokenEditorPanel(create ? null : alternative.descriptor(), explanation,
-                draft -> submit(base, alternative, draft), this::cancel);
-        view.editToken(editor, create);
+        if (current == null) { current = base; }
+        editor = new TokenManagementPanel(base, alternative, explanation, () -> current,
+                this::submit, this::cancel);
+        view.manageToken(editor);
     }
+
+    void current(VaultState state) { Edt.require(); current = state; }
 
     void openMerge(VaultState base, TokenState token) {
         Edt.require();
@@ -141,14 +147,20 @@ final class TokenWriteController {
     private void submit(VaultState base, TokenAlternative alternative, TokenDraft draft) {
         Edt.require();
         if (closing || pending || !active) { draft.close(); return; }
+        create = alternative == null;
         pending = true;
+        queuedDraft.set(draft);
         executor.execute(() -> {
+            TokenDraft owned = queuedDraft.getAndSet(null);
+            if (owned == null) { return; }
+            if (closing) { owned.close(); return; }
             try {
-                SaveResult result = TokenWrites.save(base, alternative, draft);
+                SaveResult result = TokenWrites.save(base, alternative, owned);
                 if (result instanceof SaveResult.AdditionalConflict conflict) {
                     closePartialQuietly(conflict.resolution());
                     deliver(Outcome.INTERNAL_FAILURE, null, "Internal token operation failure.");
-                } else if (result instanceof SaveResult.Saved) {
+                } else if (result instanceof SaveResult.Saved saved) {
+                    savedResult = saved;
                     deliver(Outcome.SAVED, null, null);
                 } else if (result instanceof SaveResult.PublicationUncertain uncertain) {
                     retry = uncertain.retry();
@@ -171,6 +183,7 @@ final class TokenWriteController {
             pending = false;
             if (outcome == Outcome.SAVED) {
                 finish();
+                if (!merge && savedResult != null) { view.mutationAcknowledged(savedResult); savedResult = null; }
                 view.writeMessage(merge ? (original ? "Original merge resolution publication acknowledged." : "Merge publication acknowledged.")
                         : create ? "Token publication acknowledged." : "Token update publication acknowledged.");
             } else if (outcome == Outcome.UNCERTAIN) {
@@ -227,7 +240,8 @@ final class TokenWriteController {
                 }
                 if (result instanceof SaveResult.PublicationUncertain) {
                     deliver(Outcome.UNCERTAIN, null, null);
-                } else if (result instanceof SaveResult.Saved) {
+                } else if (result instanceof SaveResult.Saved saved) {
+                    savedResult = saved;
                     deliver(Outcome.SAVED, null, null);
                 } else {
                     throw new IllegalStateException("Unsupported retry result");
@@ -280,7 +294,10 @@ final class TokenWriteController {
         gate.release(this);
     }
     void closing() {
-        Edt.require(); closing = true; retireEditor(); active = false; pending = false; decision = false; reviewBase = null;
+        Edt.require(); closing = true;
+        TokenDraft abandonedDraft = queuedDraft.getAndSet(null);
+        if (abandonedDraft != null) { abandonedDraft.close(); }
+        retireEditor(); active = false; pending = false; decision = false; reviewBase = null; current = null;
         view.clearUncertainty(); view.writeAvailability(false);
         executor.execute(this::cleanupQuietly);
     }

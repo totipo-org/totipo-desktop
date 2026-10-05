@@ -23,7 +23,7 @@ class TokenWriteControllerTest {
         void passwordBlocked() { passwordAction.run(); assertEquals(0, passwordForms); }
         Runnable create;
         EditAction edit;
-        TokenEditorPanel editor;
+        TokenManagementPanel editor;
         Runnable retry;
         Runnable stop;
         boolean available;
@@ -31,9 +31,9 @@ class TokenWriteControllerTest {
         String message;
         final BlockingQueue<String> events = new LinkedBlockingQueue<>();
         @Override public void tokenActions(Runnable create, EditAction edit) { this.create = create; this.edit = edit; }
-        @Override public void editToken(TokenEditorPanel editor, boolean create) {
+        @Override public void manageToken(TokenManagementPanel editor) {
             Edt.require(); this.editor = editor; events.add("editor");
-            button(editor, create ? "Create" : "Save").addPropertyChangeListener("enabled", event -> {
+            button(editor, editor.title().equals("Add TOTP") ? "Review" : "Save").addPropertyChangeListener("enabled", event -> {
                 if (Boolean.TRUE.equals(event.getNewValue())) { events.add("editable"); }
             });
         }
@@ -86,7 +86,7 @@ class TokenWriteControllerTest {
         }
         void open() throws Exception { edt(view.create); event("editor"); }
         void save() throws Exception {
-            edt(() -> { password(view.editor).setText("MY"); button(view.editor, "Create").doClick(); view.passwordBlocked(); });
+            edt(() -> { acquireAndAdd(view.editor); view.passwordBlocked(); });
         }
         void event(String expected) throws Exception {
             assertEquals(expected, view.events.poll(10, TimeUnit.SECONDS));
@@ -110,14 +110,21 @@ class TokenWriteControllerTest {
         return components(root).stream().filter(c -> c instanceof JButton b && b.getText().equals(label))
                 .map(JButton.class::cast).findFirst().orElseThrow();
     }
+    static void acquireAndAdd(TokenManagementPanel panel) {
+        // Explicit acquisition followed by a separate affirmative publication action.
+        var manual = components(panel).stream().filter(AbstractButton.class::isInstance).map(AbstractButton.class::cast)
+                .filter(button -> button.getText().equals("Manual entry")).findFirst().orElseThrow();
+        if (!manual.isSelected()) { manual.doClick(0); }
+        password(panel).setText("MY"); button(panel, "Review").doClick(0); button(panel, "Add").doClick(0);
+    }
     static JPasswordField password(Container root) {
         return components(root).stream().filter(JPasswordField.class::isInstance).map(JPasswordField.class::cast).findFirst().orElseThrow();
     }
     @Test void savedUsesSessionExecutorAndRepeatedClicksCannotQueue() throws Exception {
         try (Harness h = new Harness()) {
             h.recording.results.add(saved()); h.recording.release = new CountDownLatch(1);
-            h.open(); TokenEditorPanel panel = onEdt(() -> h.view.editor); h.save(); await(h.recording.entered);
-            edt(() -> { button(panel, "Create").doClick(); h.view.create.run(); assertFalse(h.view.available); });
+            h.open(); TokenManagementPanel panel = onEdt(() -> h.view.editor); h.save(); await(h.recording.entered);
+            edt(() -> { button(panel, "Add").doClick(); h.view.create.run(); assertFalse(h.view.available); });
             h.recording.release.countDown(); h.event("finished");
             edt(() -> { assertNull(h.view.editor); assertTrue(h.view.available); assertFalse(h.view.sticky); });
             assertEquals(1, h.recording.calls.stream().filter("createToken"::equals).count());
@@ -252,24 +259,23 @@ class TokenWriteControllerTest {
             h.event("editor");
             edt(() -> h.session.subscriber.onNext(state(new ObservationProgress.Finished(0, false))));
             edt(() -> {
-                components(h.view.editor).stream().filter(JRadioButton.class::isInstance).map(JRadioButton.class::cast)
-                        .filter(radio -> radio.getText().equals("Active")).findFirst().orElseThrow().doClick();
+                assertTrue(components(h.view.editor).stream().noneMatch(JRadioButton.class::isInstance));
                 button(h.view.editor, "Save").doClick();
             });
             h.event("finished"); assertEquals("update", h.recording.calls.get(0));
-            assertEquals(TokenStatus.ACTIVE, h.recording.values.get("status")); assertFalse(h.recording.calls.contains("secret"));
+            assertEquals(TokenStatus.TOMBSTONED, h.recording.values.get("status")); assertFalse(h.recording.calls.contains("secret"));
         }
     }
     @Test void unsavedCloseClearsFieldsWithoutBuilder() throws Exception {
         try (Harness h = new Harness()) {
-            h.open(); TokenEditorPanel panel = onEdt(() -> h.view.editor);
+            h.open(); TokenManagementPanel panel = onEdt(() -> h.view.editor);
             edt(() -> { password(panel).setText("MY"); h.controller.close(); assertEquals(0, password(panel).getPassword().length); });
             await(h.retired); assertTrue(h.recording.calls.isEmpty());
         }
     }
     @Test void cancelRestoresActionsAndDoesNotCreateBuilder() throws Exception {
         try (Harness h = new Harness()) {
-            h.open(); TokenEditorPanel panel = onEdt(() -> h.view.editor);
+            h.open(); TokenManagementPanel panel = onEdt(() -> h.view.editor);
             edt(() -> { password(panel).setText("MY"); button(panel, "Cancel").doClick(); });
             h.event("finished");
             edt(() -> { assertNull(h.view.editor); assertTrue(h.view.available); assertEquals(0, password(panel).getPassword().length); });

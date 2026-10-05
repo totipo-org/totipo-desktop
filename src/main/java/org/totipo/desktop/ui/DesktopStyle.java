@@ -56,6 +56,8 @@ final class DesktopStyle {
         return base.deriveFont(weight, Math.max(12f, base.getSize2D() * scale));
     }
     static void action(JButton button, ActionRole role, boolean compact) {
+        // A task may relabel its action between acquisition/review/confirmation.
+        button.setPreferredSize(null); button.setMinimumSize(null);
         button.putClientProperty("totipo.actionRole", role);
         // The standard Swing delegate respects semantic fills (some L&Fs paint a fixed gradient).
         button.setUI(new javax.swing.plaf.basic.BasicButtonUI() {
@@ -83,6 +85,11 @@ final class DesktopStyle {
         int height = Math.max(compact ? INLINE : CONTROL, size.height);
         button.setPreferredSize(new Dimension(size.width, height));
         button.setMinimumSize(new Dimension(size.width, Math.max(MINIMUM_CONTROL, height)));
+    }
+    static void confirmDanger(JButton button) {
+        action(button, ActionRole.DestructiveAction, false);
+        button.setBackground(danger());
+        button.setForeground(readable(Color.WHITE, danger(), 4.5));
     }
     static void input(JTextField field) {
         field.setUI(new javax.swing.plaf.basic.BasicTextFieldUI() {

@@ -19,13 +19,13 @@ class OwnedFlowLockTest {
         Runnable password;
         EditAction edit;
         MergeAction resolve;
-        TokenEditorPanel token;
+        TokenManagementPanel token;
         MergeEditorPanel merge;
         PasswordChangePanel passwords;
         @Override public void tokenActions(Runnable add, EditAction edit) { this.add = add; this.edit = edit; }
         @Override public void mergeAction(MergeAction action) { resolve = action; }
         @Override public void passwordAction(Runnable action) { password = action; }
-        @Override public void editToken(TokenEditorPanel panel, boolean create) { token = panel; }
+        @Override public void manageToken(TokenManagementPanel panel) { token = panel; }
         @Override public void editMerge(MergeEditorPanel panel) { merge = panel; }
         @Override public void editPassword(PasswordChangePanel panel) { passwords = panel; }
         @Override public void retireEditor() { token = null; merge = null; }
@@ -45,11 +45,17 @@ class OwnedFlowLockTest {
             edt(() -> {
                 switch (kind) {
                     case "add" -> view.add.run();
-                    case "edit" -> view.edit.open(fixture.state, fixture.token.alternatives().getFirst(), "Edit");
+                    case "edit", "setup", "delete" -> view.edit.open(fixture.state, fixture.token.alternatives().getFirst(), "Edit");
                     case "resolve" -> view.resolve.open(fixture.state, fixture.token);
                     case "password" -> view.password.run();
                     default -> throw new AssertionError();
                 }
+                if (kind.equals("setup")) {
+                    button(view.token, "Change setup…").doClick(0);
+                    password(view.token).setText("otpauth://totp/Service:account?secret=MY");
+                    button(view.token, "Review").doClick(0);
+                }
+                if (kind.equals("delete")) { button(view.token, "Delete TOTP…").doClick(0); }
                 JPanel form = view.token != null ? view.token : view.merge != null ? view.merge : view.passwords;
                 assertNotNull(form);
                 var secrets = components(form).stream().filter(JPasswordField.class::isInstance).map(JPasswordField.class::cast).toList();
@@ -68,6 +74,10 @@ class OwnedFlowLockTest {
     @Test void lockRetiresAddWithoutDraftConfirmation() throws Exception { retire("add", false); }
     @Test void ctrlLRetiresAdd() throws Exception { retire("add", true); }
     @Test void lockRetiresEditWithoutDraftConfirmation() throws Exception { retire("edit", false); }
+    @Test void lockRetiresSetupReviewWithoutPublication() throws Exception { retire("setup", false); }
+    @Test void ctrlLRetiresSetupReviewWithoutPublication() throws Exception { retire("setup", true); }
+    @Test void lockRetiresDeleteConfirmationWithoutPublication() throws Exception { retire("delete", false); }
+    @Test void ctrlLRetiresDeleteConfirmationWithoutPublication() throws Exception { retire("delete", true); }
     @Test void ctrlLRetiresEdit() throws Exception { retire("edit", true); }
     @Test void lockRetiresResolverWithoutDraftConfirmation() throws Exception { retire("resolve", false); }
     @Test void ctrlLRetiresResolver() throws Exception { retire("resolve", true); }
@@ -85,7 +95,7 @@ class OwnedFlowLockTest {
         try {
             edt(() -> app.begin(Path.of("vault"), new char[] {'p'}, false)); await(shell.ready);
             edt(() -> session.subscriber.onNext(recording.state)); edt(() -> { });
-            edt(() -> { view.add.run(); password(view.token).setText("MY"); button(view.token, "Create").doClick(0); });
+            edt(() -> { view.add.run(); acquireAndAdd(view.token); });
             await(recording.entered);
             edt(() -> { shell.lock.run(); assertEquals(ShellState.LOCKED, app.state()); assertNull(view.token); });
             recording.release.countDown(); await(view.disposed);

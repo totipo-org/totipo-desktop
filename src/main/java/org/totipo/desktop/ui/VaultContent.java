@@ -67,6 +67,23 @@ public final class VaultContent implements VaultView {
     }
     @Override public void tokenActions(Runnable create, EditAction edit) { panel.tokenActions(create, edit); }
     @Override public void writeAvailability(boolean available) { panel.writeAvailability(available); }
+    @Override public void manageToken(TokenManagementPanel content) {
+        editor = new javax.swing.JDialog(owner, content.title(), false);
+        editor.setDefaultCloseOperation(javax.swing.JDialog.DO_NOTHING_ON_CLOSE);
+        editor.setContentPane(content);
+        javax.swing.JDialog owned = editor;
+        content.installDialog(editor.getRootPane(), title -> {
+            owned.setTitle(title);
+            TaskDialogSizing.fit(owned, content);
+        });
+        editor.addWindowListener(new WindowAdapter() {
+            @Override public void windowOpened(WindowEvent event) { content.focusInitialField(); }
+            @Override public void windowClosing(WindowEvent event) { content.cancel(); }
+        });
+        editor.setMinimumSize(new java.awt.Dimension(Math.min(560, editor.getWidth()), Math.min(260, editor.getHeight())));
+        editor.setLocationRelativeTo(owner); editor.setVisible(true);
+    }
+    @Override public void mutationAcknowledged(org.totipo.SaveResult.Saved saved) { panel.mutationAcknowledged(saved); }
     @Override public void editToken(TokenEditorPanel content, boolean create) {
         editor = new TokenEditDialog(owner, content, create); editor.setVisible(true);
     }

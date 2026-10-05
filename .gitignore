@@ -4,3 +4,6 @@ build/
 *.class
 
 /result
+
+# Local visual-review artifacts
+review/screenshots/
