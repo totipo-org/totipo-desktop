@@ -295,7 +295,7 @@ class PasswordChangeTest {
     @ParameterizedTest @EnumSource(PasswordChangeResult.class)
     void applicationShutdownWaitsWithoutReopeningOrResultUi(PasswordChangeResult result) throws Exception {
         PasswordSession session = new PasswordSession(); session.result = result;
-        PasswordView view = new PasswordView(); Launcher launcher = new Launcher();
+        PasswordView view = new PasswordView(); Shell launcher = new Shell();
         java.util.concurrent.atomic.AtomicInteger opens = new java.util.concurrent.atomic.AtomicInteger();
         VaultAccess access = new VaultAccess() {
             public OpenResult open(java.nio.file.Path path, char[] password) { opens.incrementAndGet(); return new OpenResult.Opened(session); }
@@ -368,13 +368,12 @@ class PasswordChangeTest {
     }
 
     @ParameterizedTest @EnumSource(value = PasswordChangeResult.class, names = {"STALE", "UNCERTAIN"})
-    void retirementMessageReachesLauncherAndReopenIsExplicitNewSession(PasswordChangeResult result) throws Exception {
+    void retirementMessageReachesBlockingShellAndReopenIsExplicitNewSession(PasswordChangeResult result) throws Exception {
         PasswordSession first = new PasswordSession(); first.result = result;
         PasswordSession second = new PasswordSession();
-        Launcher launcher = new Launcher();
+        Shell launcher = new Shell();
         java.util.List<PasswordView> views = new java.util.ArrayList<>();
         var opens = new java.util.concurrent.atomic.AtomicInteger();
-        CountDownLatch message = new CountDownLatch(1);
         CountDownLatch reopened = new CountDownLatch(1);
         VaultAccess access = new VaultAccess() {
             public OpenResult open(java.nio.file.Path path, char[] password) {
@@ -387,18 +386,15 @@ class PasswordChangeTest {
         }));
         try {
             edt(() -> {
-                launcher.duringMessage = () -> {
-                    assertEquals(1, first.lifecycle.closes.get()); assertEquals(0, views.getFirst().disposed.getCount());
-                    message.countDown();
-                };
                 app.begin(java.nio.file.Path.of("same-directory"), new char[0], false);
             });
             await(launcher.ready);
             edt(() -> { views.getFirst().password.run(); enterAndSubmit(views.getFirst().panel); });
-            first.release.countDown(); await(message);
+            first.release.countDown(); await(views.getFirst().disposed);
             edt(() -> {
                 assertEquals(1, opens.get()); assertEquals(1, views.size());
-                assertTrue(launcher.messages.getFirst().contains("reopen") || launcher.messages.getFirst().contains("Reopen"));
+                assertEquals(ShellState.BLOCKING_VAULT_STATE, app.state());
+                assertTrue(launcher.notice.contains("reopen") || launcher.notice.contains("Reopen"));
                 app.begin(java.nio.file.Path.of("same-directory"), new char[]{'f', 'r', 'e', 's', 'h'}, false);
             });
             await(reopened);

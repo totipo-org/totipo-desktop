@@ -32,8 +32,8 @@ final class JdkVaultPreferences implements VaultPreferences {
     }
     @Override public void setLastVault(Path path) {
         if (store == null) { return; }
-        try { store.put(KEY, path.toAbsolutePath().normalize().toString()); }
-        catch (SecurityException | IllegalArgumentException unavailable) { /* Optional desktop convenience. */ }
+        try { store.put(KEY, path.toAbsolutePath().normalize().toString()); store.flush(); }
+        catch (SecurityException | IllegalArgumentException | java.util.prefs.BackingStoreException unavailable) { /* Optional desktop convenience. */ }
     }
     @Override public void clearLastVault() {
         if (store == null) { return; }

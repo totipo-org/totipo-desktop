@@ -29,7 +29,7 @@ class U4ConflictGroupTest {
                 var header = (JPanel) group.getComponent(0);
                 var first = panel.rows.get(0); var second = panel.rows.get(1); var ordinary = panel.rows.get(2);
                 assertSame(group, first.getParent().getParent()); assertSame(group, second.getParent().getParent());
-                assertEquals(3, group.getComponentCount()); // header plus one child per Alternative, despite two Heads
+                assertEquals(4, group.getComponentCount()); // header, divider, one child per Alternative despite two Heads
                 assertEquals(1, buttons(header, "Resolve").size());
                 assertTrue(buttons(header, "Show Code").isEmpty()); assertTrue(buttons(header, "Edit").isEmpty());
                 assertFalse(header.isFocusable()); assertFalse(header.isOpaque());
@@ -166,11 +166,11 @@ class U4ConflictGroupTest {
                 first.show.doClick(0); assertEquals(List.of(a), state.calls.stream().map(Call::alternative).toList()); assertTrue(second.show.isVisible());
                 second.show.doClick(0); assertFalse(first.show.isVisible()); assertFalse(second.show.isVisible());
                 TotpCopyTest.buttons(first).get(0).doClick(0); TotpCopyTest.buttons(second).get(0).doClick(0); assertEquals(List.of("001234", "005678"), copied);
-                panel.search.setText("Beta"); assertEquals(2, panel.rows.size()); assertEquals("1 of 2 TOTPs", panel.resultCount.getText()); assertEquals("Alpha", panel.rows.get(0).primary.getText());
+                panel.search.setText("Beta"); assertEquals(2, panel.rows.size()); assertEquals("1 of 2", panel.resultCount.getText()); assertEquals("Alpha", panel.rows.get(0).primary.getText());
                 assertFalse(panel.rows.get(0).show.isVisible()); assertFalse(panel.rows.get(1).show.isVisible()); assertEquals(2, state.calls.size());
                 panel.search.setText("nothing"); panel.search.setText("Alpha"); assertEquals(2, state.calls.size());
                 panel.render(new State(token(1, a), token(2, active("Gamma"))).value);
-                assertEquals(1, panel.rows.size()); assertTrue(buttons(panel.list, "Resolve").isEmpty()); assertTrue(panel.rows.get(0).show.isVisible()); assertEquals("1 of 2 TOTPs", panel.resultCount.getText());
+                assertEquals(1, panel.rows.size()); assertTrue(buttons(panel.list, "Resolve").isEmpty()); assertTrue(panel.rows.get(0).show.isVisible()); assertEquals("1 of 2", panel.resultCount.getText());
             } finally { panel.closing(); }
         });
     }

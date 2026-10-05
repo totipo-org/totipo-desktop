@@ -11,6 +11,7 @@ import static org.totipo.desktop.TestSupport.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ClipboardLifecycleTest {
+    @org.junit.jupiter.api.io.TempDir Path directory;
     private static final class CopyWindow extends Window {
         TotpClipboard.Copy copy;
         final CountDownLatch shown = new CountDownLatch(1);
@@ -33,14 +34,17 @@ class ClipboardLifecycleTest {
             }
             public CreateVaultResult create(Path path, char[] password) { throw new AssertionError(); }
         };
-        Launcher launcher = new Launcher();
+        Shell launcher = new Shell();
+        Path target = java.nio.file.Files.createDirectory(directory.resolve("b"));
+        java.nio.file.Files.writeString(target.resolve("vault"), "TOTIPO-VLT");
         DesktopApplication app = onEdt(() -> new DesktopApplication(access, launcher,
                 path -> windows.getAndIncrement() == 0 ? wa : wb, probe.manager()));
         try {
             edt(() -> app.begin(Path.of("a"), new char[0], false)); await(wa.shown);
             edt(() -> {
                 assertEquals(TotpClipboard.COPIED, wa.copyNow());
-                launcher.directory = Path.of("b");
+                launcher.ready = new CountDownLatch(1);
+                launcher.directory = target;
                 launcher.duringDirectory = () -> {
                     probe.assertEmpty();
                     assertEquals(1, a.closes.get()); assertEquals(1, wa.disposals);
@@ -49,6 +53,12 @@ class ClipboardLifecycleTest {
                 wa.changeVault.run();
                 probe.assertEmpty();
                 assertEquals(TotpClipboard.UNAVAILABLE, wa.copyNow());
+            });
+            await(launcher.ready);
+            edt(() -> {
+                assertEquals(ShellState.LOCKED, app.state());
+                assertEquals(target, app.selectedVault());
+                launcher.submit.accept(new char[0]);
             });
             await(wb.shown);
             edt(() -> {

@@ -36,7 +36,7 @@ class RevealNotificationLifecycleTest {
     private void retirement(boolean pending) throws Exception { retirement(pending, false); }
     private void retirement(boolean pending, boolean completedStage) throws Exception {
         for (String transition : List.of("vaultClose", "changeVault", "shutdown")) {
-            var session = new Session(); var launcher = new Launcher(); launcher.directory = null;
+            var session = new Session(); var launcher = new Shell(); launcher.directory = null;
             var window = onEdt(BrowserWindow::new); var generated = new AtomicInteger();
             var graceEntered = new CountDownLatch(1); var releaseGrace = new CountDownLatch(1);
             var alternative = MergeFixtures.alternative(0);

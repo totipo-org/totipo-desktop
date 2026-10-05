@@ -2,7 +2,7 @@ package org.totipo.desktop;
 
 import org.totipo.*;
 import org.totipo.desktop.ui.Edt;
-import org.totipo.desktop.ui.LauncherView;
+import org.totipo.desktop.ui.ShellView;
 import org.totipo.desktop.ui.PasswordPromptResult;
 import org.totipo.desktop.ui.PasswordPromptContext;
 import org.totipo.desktop.ui.VaultView;
@@ -103,7 +103,20 @@ public final class TestSupport {
         @Override public PasswordChangeResult changePassword(char[] old, char[] next) { throw new AssertionError(); }
     }
 
-    static class Launcher implements LauncherView {
+    static class Shell implements ShellView {
+        ShellState state;
+        Path selected;
+        String notice;
+        java.util.function.Consumer<char[]> submit;
+        Runnable lock;
+        Runnable retry;
+        @Override public void openAction(java.util.function.Consumer<char[]> action) { submit = action; }
+        @Override public void lockAction(Runnable action) { lock = action; }
+        @Override public void retryAction(Runnable action) { retry = action; }
+        @Override public void renderShell(ShellState value, Path path, String message, boolean busy) {
+            Edt.require(); state = value; selected = path; notice = message;
+        }
+        @Override public void retireDialogs() { }
         CountDownLatch ready = new CountDownLatch(1);
         final CountDownLatch disposed = new CountDownLatch(1);
         final List<String> titles = new ArrayList<>();
@@ -155,7 +168,6 @@ public final class TestSupport {
             Edt.require(); titles.add(title); messages.add(text); duringMessage.run();
         }
         @Override public void showWindow() { Edt.require(); shown++; }
-        @Override public void hideWindow() { Edt.require(); hidden++; }
         @Override public void dispose() { Edt.require(); disposals++; disposed.countDown(); }
     }
 

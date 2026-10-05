@@ -88,6 +88,12 @@ final class DesktopStyle {
         field.setUI(new javax.swing.plaf.basic.BasicTextFieldUI() {
             @Override public void update(Graphics g, JComponent c) { paintControlSurface(g, c); paint(g, c); }
         });
+        // The native caret repaints its own rectangle on focus changes. Our shared
+        // border needs a full-field repaint, without changing insets or dimensions.
+        field.addFocusListener(new java.awt.event.FocusAdapter() {
+            @Override public void focusGained(java.awt.event.FocusEvent event) { field.repaint(); }
+            @Override public void focusLost(java.awt.event.FocusEvent event) { field.repaint(); }
+        });
         field.setOpaque(false);
         field.setFont(font(Typography.Body)); field.setBackground(surfaceInput());
         field.setForeground(readable(text(), surfaceInput(), 4.5));
@@ -95,6 +101,26 @@ final class DesktopStyle {
         field.setBorder(new ControlBorder(null, new Insets(CONTROL_RADIUS, TIGHT, CONTROL_RADIUS, TIGHT)));
         Dimension size = field.getPreferredSize();
         field.setPreferredSize(new Dimension(size.width, Math.max(CONTROL, size.height)));
+    }
+    static void menus(JMenuBar bar) {
+        for (int i = 0; i < bar.getMenuCount(); i++) {
+            JMenu menu = bar.getMenu(i);
+            if (menu != null) { menuSpacing(menu, true); }
+        }
+    }
+    private static void menuSpacing(JMenu menu, boolean topLevel) {
+        menu.setBorder(BorderFactory.createEmptyBorder(topLevel ? MICRO : BUTTON_PADDING_Y,
+                topLevel ? TIGHT + BORDER * 2 : NORMAL, topLevel ? MICRO : BUTTON_PADDING_Y,
+                topLevel ? TIGHT + BORDER * 2 : NORMAL));
+        for (Component child : menu.getMenuComponents()) {
+            if (child instanceof JMenu nested) { menuSpacing(nested, false); }
+            else if (child instanceof JMenuItem item) {
+                item.setBorder(BorderFactory.createEmptyBorder(BUTTON_PADDING_Y, NORMAL, BUTTON_PADDING_Y, NORMAL));
+            } else if (child instanceof JSeparator separator) {
+                Dimension size = separator.getPreferredSize();
+                separator.setPreferredSize(new Dimension(size.width, TIGHT + BORDER * 2));
+            }
+        }
     }
     static RoundRectangle2D controlShape(double x, double y, double width, double height, double inset) {
         double radius = Math.max(0, CONTROL_RADIUS - inset);
@@ -141,6 +167,7 @@ final class DesktopStyle {
             Graphics2D g2 = (Graphics2D) g.create();
             try {
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
                 g2.setStroke(new BasicStroke(BORDER));
                 int thickness = focused ? FOCUS : BORDER;
                 for (int i = 0; i < thickness; i++) {

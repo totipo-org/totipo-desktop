@@ -119,6 +119,7 @@ final class VaultWindowController {
             return;
         }
         closing = true;
+        if (failed && retirementReason == null) { retirementReason = "This vault session is unavailable. Try opening it again."; }
         subscriber.cancel();
         latest = null;
         try {

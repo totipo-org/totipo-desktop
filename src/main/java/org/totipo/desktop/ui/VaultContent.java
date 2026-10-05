@@ -5,48 +5,32 @@ import org.totipo.desktop.clipboard.TotpClipboard;
 import org.totipo.VaultState;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
-import java.nio.file.Path;
-import javax.swing.JFrame;
 import javax.swing.JOptionPane;
 
-/** Visual shell for one controller-owned session. */
-public final class VaultFrame extends JFrame implements VaultView {
-    private static final long serialVersionUID = 1L;
+/** Session-owned content and child flows inside the persistent application frame. */
+public final class VaultContent implements VaultView {
+    private final ShellFrame owner;
     private final VaultPanel panel = new VaultPanel();
     private javax.swing.JDialog editor;
     private PasswordChangeDialog passwordDialog;
-    private transient Runnable quit;
 
-    public VaultFrame(Path directory) {
-        super("Totipo — " + directory);
+    public VaultContent(ShellFrame owner) {
         Edt.require();
-        setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
-        setContentPane(panel);
-        setJMenuBar(panel.menuBar());
-        setMinimumSize(panel.getMinimumSize());
-        setPreferredSize(new java.awt.Dimension(VaultPanel.INITIAL_SIZE));
-        pack();
-        SwingUsability.fit(this, VaultPanel.INITIAL_SIZE.width, VaultPanel.INITIAL_SIZE.height);
-        setLocationByPlatform(true);
+        this.owner = owner;
     }
 
     @Override public void actions(Runnable refresh, Runnable close) {
         Edt.require();
         panel.onRefresh(refresh);
-        addWindowListener(new WindowAdapter() {
-            @Override public void windowClosing(WindowEvent event) {
-                if (quit != null) { quit.run(); } else { close.run(); }
-            }
-        });
     }
     @Override public void quitAction(Runnable action) {
-        Edt.require(); quit = action; panel.exitAction(action);
+        Edt.require(); panel.exitAction(action);
     }
     @Override public void changeVaultAction(Runnable action) { panel.changeVaultAction(action); }
     @Override public void copyAction(TotpClipboard.Copy action) { panel.copyAction(action); }
     @Override public void passwordAction(Runnable action) { panel.passwordAction(action); }
     @Override public void editPassword(PasswordChangePanel content) {
-        passwordDialog = new PasswordChangeDialog(this, content); passwordDialog.setVisible(true);
+        passwordDialog = new PasswordChangeDialog(owner, content); passwordDialog.setVisible(true);
     }
     @Override public void retirePassword() {
         if (passwordDialog != null) {
@@ -55,7 +39,7 @@ public final class VaultFrame extends JFrame implements VaultView {
     }
     @Override public void mergeAction(MergeAction action) { panel.mergeAction(action); }
     @Override public void editMerge(MergeEditorPanel content) {
-        editor = new javax.swing.JDialog(this, "Resolve Conflict", false);
+        editor = new javax.swing.JDialog(owner, "Resolve Conflict", false);
         editor.setDefaultCloseOperation(javax.swing.JDialog.DO_NOTHING_ON_CLOSE);
         editor.setContentPane(content);
         content.installDialog(editor.getRootPane());
@@ -65,7 +49,7 @@ public final class VaultFrame extends JFrame implements VaultView {
         SwingUsability.fit(editor, TokenEditorPanel.PREFERRED_SIZE.width, TokenEditorPanel.PREFERRED_SIZE.height);
         editor.setMinimumSize(new java.awt.Dimension(Math.min(TokenEditorPanel.MINIMUM_SIZE.width, editor.getWidth()),
                 Math.min(TokenEditorPanel.MINIMUM_SIZE.height, editor.getHeight())));
-        editor.setLocationRelativeTo(this); editor.setVisible(true);
+        editor.setLocationRelativeTo(owner); editor.setVisible(true);
     }
     @Override public void additionalConflict(Runnable review, Runnable publish, Runnable cancel) {
         panel.additionalConflict(review, publish, cancel);
@@ -75,7 +59,7 @@ public final class VaultFrame extends JFrame implements VaultView {
                 + "It does not include the newly observed information and does not run the merge new-information check again.\n"
                 + "The resulting token may still have competing alternatives.";
         Object[] choices = {"Cancel", "Publish original resolution anyway"};
-        if (JOptionPane.showOptionDialog(this, text, "Publish original resolution anyway", JOptionPane.DEFAULT_OPTION,
+        if (JOptionPane.showOptionDialog(owner, text, "Publish original resolution anyway", JOptionPane.DEFAULT_OPTION,
                 JOptionPane.WARNING_MESSAGE, null, choices, choices[0]) == 1) { confirmed.run(); }
     }
     @Override public void mergePublicationUncertain(boolean original, boolean busy, Runnable retry, Runnable stop) {
@@ -84,7 +68,7 @@ public final class VaultFrame extends JFrame implements VaultView {
     @Override public void tokenActions(Runnable create, EditAction edit) { panel.tokenActions(create, edit); }
     @Override public void writeAvailability(boolean available) { panel.writeAvailability(available); }
     @Override public void editToken(TokenEditorPanel content, boolean create) {
-        editor = new TokenEditDialog(this, content, create); editor.setVisible(true);
+        editor = new TokenEditDialog(owner, content, create); editor.setVisible(true);
     }
     @Override public void retireEditor() { if (editor != null) { editor.dispose(); editor = null; } }
     @Override public void publicationUncertain(boolean create, boolean busy, Runnable retry, Runnable stop) {
@@ -96,13 +80,12 @@ public final class VaultFrame extends JFrame implements VaultView {
     @Override public void writeWarning(String detail, String message) { panel.writeWarning(message); }
     @Override public void totpAction(TotpAction action) { panel.totpAction(action); }
     @Override public void render(VaultState state) { panel.render(state); }
-    @Override public void closing() { panel.closing(); }
+    @Override public void closing() { panel.closing(); owner.retireDialogs(); }
     @Override public void failure() {
         Edt.require();
-        JOptionPane.showMessageDialog(this, "This vault session is unusable and will close.",
-                "Session failure", JOptionPane.ERROR_MESSAGE);
+        owner.contentFailure();
     }
-    @Override public void showWindow() { Edt.require(); setVisible(true); javax.swing.SwingUtilities.invokeLater(() -> { if (isShowing()) { panel.focusSearch(); } }); }
-    @Override public void hideWindow() { Edt.require(); setVisible(false); }
-    @Override public void dispose() { Edt.require(); panel.closing(); super.dispose(); }
+    @Override public void showWindow() { Edt.require(); owner.mount(panel); }
+    @Override public void hideWindow() { Edt.require(); owner.unmount(panel); }
+    @Override public void dispose() { Edt.require(); panel.closing(); owner.unmount(panel); }
 }

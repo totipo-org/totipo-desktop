@@ -44,7 +44,7 @@ class UsabilityTest {
                 panel.render(state.value);
                 assertEquals("3 TOTPs", panel.resultCount.getText());
                 panel.search.setText("MATCH");
-                assertEquals("2 of 3 TOTPs", panel.resultCount.getText());
+                assertEquals("2 of 3", panel.resultCount.getText());
                 assertEquals(id(2), panel.rows.get(0).token.id());
                 assertEquals(id(2), panel.rows.get(1).token.id());
                 assertEquals(id(3), panel.rows.get(2).token.id());
@@ -56,7 +56,7 @@ class UsabilityTest {
                 assertEquals(id(3), panel.selectedId());
                 panel.search.setText("absent");
                 assertNull(panel.selectedId());
-                assertEquals("No TOTPs match this search.", panel.empty.getText());
+                assertEquals("No TOTPs match \"absent\"", panel.empty.getText());
                 invoke(panel.search, JComponent.WHEN_FOCUSED, KeyStroke.getKeyStroke("ESCAPE"));
                 assertEquals("", panel.search.getText());
                 assertNull(panel.selectedId());

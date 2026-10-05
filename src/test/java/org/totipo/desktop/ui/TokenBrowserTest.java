@@ -133,8 +133,8 @@ class TokenBrowserTest {
                 var browser = find(panel, TokenBrowserPanel.class); panel.render(new State().value);
                 assertTrue(browser.empty.getText().contains("No TOTPs yet")); assertNotNull(browser.empty.getParent());
                 assertFalse(browser.editMenu.isEnabled()); assertFalse(browser.diagnosticsMenu.isEnabled());
-                var menus = panel.menuBar(); assertEquals(3, menus.getMenuCount()); assertEquals("TOTP", menus.getMenu(2).getText());
-                assertEquals(2, menus.getMenu(2).getItemCount()); assertSame(browser.editMenu, menus.getMenu(2).getItem(0));
+                var menus = panel.menuBar(); assertEquals(3, menus.getMenuCount()); assertEquals("Token", menus.getMenu(2).getText());
+                assertEquals(3, menus.getMenu(2).getItemCount()); assertSame(browser.editMenu, menus.getMenu(2).getItem(1));
                 assertEquals(new Dimension(640, 520), panel.getMinimumSize()); assertEquals(new Dimension(760, 820), VaultPanel.INITIAL_SIZE);
                 assertNull(find(panel, JSplitPane.class));
             } finally { panel.closing(); }

@@ -52,6 +52,71 @@ class DesktopStyleTest {
         FocusButton(String label) { super(label); }
         @Override public boolean hasFocus() { return focused; }
     }
+    private static final class FocusField extends JTextField {
+        private static final long serialVersionUID = 1L;
+        boolean focused;
+        int fullRepaints;
+        FocusField() { super("Search text", 24); }
+        @Override public boolean hasFocus() { return focused; }
+        @Override public void repaint() { fullRepaints++; super.repaint(); }
+    }
+    @Test void searchFocusPaintsTwoPixelsOnEveryEdgeWithoutChangingSize() throws Exception {
+        edt(() -> {
+            var field = new FocusField(); DesktopStyle.input(field);
+            var size = field.getPreferredSize(); var insets = field.getInsets();
+            var idle = paint(field); field.focused = true; field.fullRepaints = 0;
+            for (var listener : field.getFocusListeners()) {
+                listener.focusGained(new java.awt.event.FocusEvent(field, java.awt.event.FocusEvent.FOCUS_GAINED));
+            }
+            assertTrue(field.fullRepaints > 0, "Focus must repaint the entire field, including its border");
+            Color expected = DesktopStyle.readable(DesktopStyle.focus(), field.getBackground(), 3);
+            for (int scale : new int[] {1, 2}) {
+                field.setSize(size);
+                var image = new java.awt.image.BufferedImage(size.width * scale, size.height * scale,
+                        java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                var graphics = image.createGraphics(); graphics.scale(scale, scale);
+                try { field.paint(graphics); } finally { graphics.dispose(); }
+                for (int offset = 0; offset < DesktopStyle.FOCUS * scale; offset++) {
+                    assertEquals(expected.getRGB(), image.getRGB(image.getWidth() / 2, offset), "Top edge");
+                    assertEquals(expected.getRGB(), image.getRGB(image.getWidth() / 2, image.getHeight() - 1 - offset), "Bottom edge");
+                    assertEquals(expected.getRGB(), image.getRGB(offset, image.getHeight() / 2), "Left edge");
+                    assertEquals(expected.getRGB(), image.getRGB(image.getWidth() - 1 - offset, image.getHeight() / 2), "Right edge");
+                }
+            }
+            assertNotEquals(idle.getRGB(size.width / 2, 1), expected.getRGB());
+            field.focused = false; field.fullRepaints = 0;
+            for (var listener : field.getFocusListeners()) {
+                listener.focusLost(new java.awt.event.FocusEvent(field, java.awt.event.FocusEvent.FOCUS_LOST));
+            }
+            assertTrue(field.fullRepaints > 0, "Blur must also repaint the entire border");
+            assertEquals(size, field.getPreferredSize()); assertEquals(size, field.getSize()); assertEquals(insets, field.getInsets());
+        });
+    }
+    @Test void sharedMenuSpacingRetainsNativeDelegatesMnemonicsAcceleratorsAndAlignment() throws Exception {
+        edt(() -> {
+            var vault = new VaultPanel();
+            try {
+                var bar = vault.menuBar();
+                for (int i = 0; i < bar.getMenuCount(); i++) {
+                    var menu = bar.getMenu(i); var delegate = menu.getUI(); var mnemonic = menu.getMnemonic();
+                    assertEquals(new Insets(4, 10, 4, 10), menu.getInsets());
+                    assertNotEquals(0, mnemonic);
+                    var item = menu.getItem(0); var itemDelegate = item.getUI();
+                    var accelerator = item.getAccelerator();
+                    DesktopStyle.menus(bar);
+                    assertSame(delegate, menu.getUI()); assertEquals(mnemonic, menu.getMnemonic());
+                    assertSame(itemDelegate, item.getUI()); assertEquals(accelerator, item.getAccelerator());
+                    for (int j = 0; j < menu.getItemCount(); j++) {
+                        assertEquals(new Insets(6, 16, 6, 16), menu.getItem(j).getInsets());
+                        assertNotNull(menu.getItem(j).getAccessibleContext());
+                    }
+                }
+                assertEquals(KeyStroke.getKeyStroke("F5"), bar.getMenu(1).getItem(2).getAccelerator());
+                var menu = bar.getMenu(0); menu.addSeparator(); DesktopStyle.menus(bar);
+                assertEquals(10, menu.getMenuComponent(1).getPreferredSize().height);
+            } finally { vault.closing(); }
+        });
+    }
     private static java.awt.image.BufferedImage paint(JComponent control) {
         var size = control.getPreferredSize(); control.setSize(size);
         var image = new java.awt.image.BufferedImage(size.width, size.height, java.awt.image.BufferedImage.TYPE_INT_ARGB);
@@ -126,7 +191,7 @@ class DesktopStyleTest {
                     assertEquals(DesktopStyle.ActionRole.QuietAction, row.edit.getClientProperty("totipo.actionRole"));
                     assertFalse(row.edit.isContentAreaFilled());
                 }
-                for (var button : allButtons(browser)) {
+                for (var button : allButtons(browser.list)) {
                     assertNotEquals(DesktopStyle.ActionRole.PrimaryAction, button.getClientProperty("totipo.actionRole"));
                 }
             } finally { panel.closing(); }
@@ -225,7 +290,7 @@ class DesktopStyleTest {
                         panel.rows.stream().map(r -> r.alternative).toList());
                 assertEquals(3, panel.list.getComponentCount()); assertEquals(4, panel.rows.size()); assertNull(panel.selectedId());
                 assertTrue(state.calls.isEmpty()); panel.search.setText("alpha a");
-                assertEquals(2, panel.rows.size()); assertEquals("1 of 3 TOTPs", panel.resultCount.getText()); assertTrue(state.calls.isEmpty());
+                assertEquals(2, panel.rows.size()); assertEquals("1 of 3", panel.resultCount.getText()); assertTrue(state.calls.isEmpty());
             } finally { panel.closing(); }
         });
     }

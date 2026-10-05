@@ -7,18 +7,18 @@ import java.nio.file.Path;
 import javax.swing.JDialog;
 import javax.swing.JFileChooser;
 
-/** Standard Swing folder selection, shared by open and create. */
+/** Existing Create Vault chooser; existing-vault selection uses DirectoryPicker. */
 final class VaultDirectoryChooser extends JFileChooser {
     private static final long serialVersionUID = 1L;
 
-    VaultDirectoryChooser(Path location, boolean create) {
+    VaultDirectoryChooser(Path location) {
         Edt.require();
         setFileSelectionMode(DIRECTORIES_ONLY);
         setMultiSelectionEnabled(false);
         setAcceptAllFileFilterUsed(false);
-        setDialogTitle(create ? "Select New Vault Folder" : "Select Vault Folder");
+        setDialogTitle("Select New Vault Folder");
         setApproveButtonText("Select Folder");
-        setApproveButtonToolTipText(create ? "Create a vault in the selected folder" : "Open the vault in the selected folder");
+        setApproveButtonToolTipText("Create a vault in the selected folder");
         getAccessibleContext().setAccessibleName(getDialogTitle());
         setPreferredSize(new Dimension(800, 550));
         if (location != null) {
@@ -27,7 +27,6 @@ final class VaultDirectoryChooser extends JFileChooser {
             while (current != null && !current.isDirectory()) { current = current.getParentFile(); }
             if (current != null) { setCurrentDirectory(current); }
             else if (candidate.isDirectory()) { setCurrentDirectory(candidate); }
-            if (!create && candidate.isDirectory()) { setSelectedFile(candidate); }
         }
     }
 

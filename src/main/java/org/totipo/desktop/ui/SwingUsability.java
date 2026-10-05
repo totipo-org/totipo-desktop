@@ -24,6 +24,13 @@ final class SwingUsability {
         JLabel label = new JLabel(text); label.setLabelFor(input);
         input.getAccessibleContext().setAccessibleName(text); return label;
     }
+    /** Task/dialog actions only: quiet/secondary actions precede the trailing primary. */
+    static JPanel taskActions(JButton primary, JButton... secondary) {
+        JPanel row = new JPanel(new FlowLayout(FlowLayout.TRAILING, 8, 0));
+        for (JButton button : secondary) { row.add(button); }
+        row.add(primary);
+        return row;
+    }
     static void dialog(JRootPane root, JButton normal, Runnable cancel) {
         root.setDefaultButton(normal);
         bind(root, JComponent.WHEN_IN_FOCUSED_WINDOW, KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0),

@@ -44,7 +44,7 @@ class TokenSearchTest {
                 for (String query : List.of("north", "SOUTH", "owner", "other", "o")) {
                     panel.search.setText(query); assertEquals(2, panel.rows.size());
                     assertSame(token, panel.rows.get(0).token); assertTrue(panel.rows.get(0).token.hasConflict());
-                    assertEquals("1 of 2 TOTPs", panel.resultCount.getText());
+                    assertEquals("1 of 2", panel.resultCount.getText());
                 }
                 panel.search.setText(""); assertEquals("2 TOTPs", panel.resultCount.getText());
                 assertTrue(state.calls.isEmpty());
@@ -64,7 +64,7 @@ class TokenSearchTest {
                 String code = panel.totp.presentation(ggg.id()).get(0).code();
                 panel.search.setText("001234"); assertTrue(panel.rows.isEmpty()); assertEquals(1, state.calls.size());
                 panel.search.setText("c"); assertNull(panel.row(ggg.id())); assertNotNull(panel.row(abc.id()));
-                assertEquals("1 of 2 TOTPs", panel.resultCount.getText()); assertEquals(1, state.calls.size());
+                assertEquals("1 of 2", panel.resultCount.getText()); assertEquals(1, state.calls.size());
                 panel.search.setText(""); assertFalse(panel.row(ggg.id()).show.isVisible());
                 assertEquals(code, panel.totp.presentation(ggg.id()).get(0).code()); assertEquals(1, state.calls.size());
             } finally { panel.closing(); }

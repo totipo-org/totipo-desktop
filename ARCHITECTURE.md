@@ -19,11 +19,11 @@ See [the released dependency](TOTIPO_JAVA_DEPENDENCY.md).
 ```text
 TotipoDesktop: invokeLater
   -> DesktopApplication (EDT ownership)
-       -> LauncherFrame / LauncherPanel
+       -> one persistent ShellFrame / ShellPanel
        -> one serialized application lifecycle executor
-       -> zero or more VaultWindowController
+       -> zero or one VaultWindowController (including while closing)
             -> one VaultSession
-            -> one VaultFrame / VaultPanel
+            -> one embedded VaultContent / VaultPanel
             -> one StateSubscriber / states() subscription
             -> one serialized session executor
             -> at most the latest immutable VaultState reference
@@ -39,18 +39,17 @@ TotipoDesktop: invokeLater
                  -> sticky non-secret abandoned-publication boolean
 ```
 
-There is no global current vault. Independent windows have independent controllers,
-subscriptions and executors, even if the user selects the same directory twice.
-`DesktopApplication` owns the launcher and tracks controllers until session close
-finishes. Frames render and emit actions; they do not own protocol behavior.
-`LauncherView` and `VaultView` are small presentation interfaces for testing these
+`DesktopApplication` owns the current selected path independently of authentication,
+one persistent shell, and at most one controller until session close finishes.
+The shell renders and emits actions; it does not own protocol behavior.
+`ShellView` and `VaultView` are small presentation interfaces for testing these
 owners without constructing top-level windows. They are not a general UI framework.
 
 ## Threading and entry points
 
 All ownership transitions, user actions and Swing changes occur on the EDT. The
 small `Edt` guard checks those boundaries. `TotipoDesktop` only schedules creation
-of `DesktopApplication` and shows its launcher.
+of `DesktopApplication` and shows its persistent shell.
 
 One ordinary JDK single-thread executor, named `totipo-application`, runs blocking
 open/create and closes returned sessions that cannot be transferred to a controller.
@@ -76,12 +75,25 @@ Executors are explicitly shut down; no shutdown interrupts an in-flight operatio
 The application uses neither SwingWorker nor virtual threads nor reactive libraries.
 Production code remains compatible with Java 17.
 
-## Launcher and passwords
+## Shell, selection, and passwords
 
-Open and Create choose an existing directory with Swing's directory chooser.
+Select/Change Vault use an owned modal `DirectoryPicker` with read-only directory
+navigation. Create retains its separate Swing directory chooser. The picker has
+an informational current path, Up, a directory-only JList occupying the expanding
+center, Cancel, and Select This Folder. Enter/double-click navigates; Select
+chooses the displayed directory rather than the highlighted child. No file
+management, filename/filter or preview controls are constructed. A dedicated
+daemon worker performs directory listing off the EDT, closing each stream and
+rejecting stale navigation results by generation. Disposal invalidates publication
+and shuts down that worker. Application validation/remembering remains outside
+the picker, and Select stays activatable for non-vault folders.
 Desktop code does not create directories, recursively inspect them, or canonicalize
-paths. The NIO result is authoritative. Only one launcher operation is accepted at
-a time; both buttons stay disabled across prompts, work, result presentation and
+paths. A bounded read of the public `TOTIPO-VLT` bootstrap signature recognizes
+a target without authenticating it or accepting its version/length as valid. A
+recognizable selected path is normalized and remembered immediately. Missing or
+clearly non-vault targets do not replace it. The NIO open result remains authoritative.
+Only one application operation is accepted at a time; actions stay disabled across
+chooser/create prompts, work, result presentation and
 unclaimed-session cleanup. Modal dialogs can run nested EDT loops, so shutdown is
 checked after prompting as well as when the background result reaches the EDT.
 
@@ -95,7 +107,7 @@ cleared when dismissed. Cancellation/rejection wipes any retrieved primary array
 It rejects unpaired surrogates and more than 1024 UTF-8 bytes. Empty input and all
 other valid Unicode within the limit are accepted. Creating with an empty password
 requires a separate explicit warning/confirmation, with Cancel as the default.
-The application reserves the launcher during this dialog and rechecks shutdown.
+The application reserves the shell during this dialog and rechecks shutdown.
 Opening an existing empty-password vault requires no creation confirmation.
 Once accepted for background work, the operation owns the primary array and wipes
 it in `finally`, whether NIO returns a session, another outcome, or throws. This is
@@ -168,26 +180,83 @@ Refresh invokes `VaultSession.requestRefresh()` directly on the EDT because the
 API guarantees a non-blocking request. It is disabled during close. There is no
 polling, filesystem watcher, automatic refresh loop or remote sync behavior.
 
-## Close and shutdown
+## Lock, close, and shutdown
 
-Both frames use `DO_NOTHING_ON_CLOSE`; owners control disposal. A window close
-request idempotently marks its controller closing, cancels the subscriber, drops
+The sole frame uses `DO_NOTHING_ON_CLOSE`; window close and File → Exit terminate
+the application. Lock/Change Vault idempotently mark the controller closing, cancel the subscriber, drop
 the latest reference, disables Refresh and displays “Closing…”. Its session executor
 calls `session.close()`. After that call finishes, the executor is shut down and an
-EDT callback disposes the frame and removes the controller from the application.
+EDT callback disposes the retired content and removes the controller from the application.
 A runtime close failure is reported generically and still retires the executor and
 window, without retry or a claim that unexpected core cleanup failure was repaired.
 No frame disposal substitutes for session close.
 
-Launcher close marks the application shutting down, disables Open/Create and asks
-every live controller to close. No new vault window can be created thereafter.
+Exit marks the application shutting down and asks the current controller to close.
+No new session content can be accepted thereafter.
 An already-running open/create is allowed to finish without interruption. A session
 returned after shutdown is explicitly closed on the application executor; passwords
-are still wiped normally. The launcher remains owned until no launcher operation
+are still wiped normally. The persistent frame remains owned until no application operation
 (including prompts, result presentation or unclaimed cleanup) is pending and all
-controllers have reported closed. Then the application executor shuts down and the
-launcher is disposed. The EDT never waits for background work. There is no
+controller has reported closed. Then the application executor shuts down and the
+shell is disposed. The EDT never waits for background work. There is no
 `System.exit()` shortcut.
+
+Shell states are `NO_VAULT`, `LOCKED`, `UNLOCKED`, and `BLOCKING_VAULT_STATE`.
+LOCKED uses a horizontally centered task block capped at 560 logical pixels,
+with 24-pixel outer margins and a modest upward bias in the available height.
+Its basename heading and path are informational labels; the path has no caret,
+focus or input border, and retains its full accessible description and tooltip
+when Swing visually ellipsizes it. Password remains a JPasswordField.
+NO_VAULT uses the shared `EmptyState`: centered “No vault selected” heading and
+compact centered Select Vault / Create New Vault stack, capped at 280 pixels.
+`SwingUsability.taskActions` supplies the reusable normal task/dialog
+action-row convention: trailing alignment, secondary actions first, primary last,
+and eight logical pixels between actions. Toolbars and TokenRow actions retain
+their independent layouts.
+The unlocked collection has one Search/count/Add row. Search expands; count is
+secondary and Add has its natural command width at the trailing edge. Refresh
+is menu/F5 only. With zero semantic TOTPs, the header is hidden and the result
+area uses EmptyState with No TOTPs yet, explanatory text and primary Add. With
+zero search matches, the header remains and EmptyState offers quiet Clear Search.
+Filtered count is M of N; unfiltered count is N TOTPs. Clear Search follows the
+ordinary filter path and then requests Search focus; it does not derive or extend
+reveal authorization. Empty content uses a separate card filling the result area,
+so centering follows viewport space rather than list preferred height. The copy
+notification still overlays that same result area. Conflict header padding is
+balanced above/below its vertically centered title and Resolve control; its
+semantic edge, children and resolver callbacks are preserved.
+Read-only remains an attribute of usable session state. Wrong password remains
+LOCKED with inline feedback; required invalid/unsupported or unavailable state
+blocks ordinary token content. Try Again returns to the password form. No raw
+password is retained for retry. The existing API cannot distinguish every
+authentication failure from damaged authenticated data; feedback makes no proof
+of password correctness or corruption.
+
+Lock invalidates application generation, retires controller-owned drafts/reveals/
+clipboard and all owned dialogs, stops the inactivity timer, and replaces content
+immediately. Session close follows queued session work. Open remains unavailable
+until close completes, including unclaimed late-result cleanup. Change Vault waits
+for that completion before its chooser; Cancel stays LOCKED, with no session
+resurrection. Late open results close unclaimed sessions; existing controller
+closing checks reject late observation, derivation, write, and password results.
+
+`InactivityLock` uses an injected wall clock and a fixed 15-minute deadline.
+`DesktopEvents` routes direct key presses, pointer activation/drag, and scroll from
+the shell or owned windows, with a keyboard dispatcher that intercepts Ctrl+L even
+inside modal/modeless flows. Background ticks, observation, publication, rendering,
+focus loss and minimization do not reset it. Deadline expiry is checked before
+user interaction and on activation/deiconification. Application exit unregisters
+event hooks and stops its Swing timer; content retirement stops row timers.
+
+Pure-JDK Desktop user-session/sleep hooks are installed only when supported.
+They lock on deactivation/activation and sleep/wake. `ResumeGuard` conservatively
+locks on >=30 seconds between event-processing checks or >5 seconds of wall versus
+monotonic clock discrepancy. It resets on unlock. This detects many missed resumes
+but also locks after long EDT stalls/clock corrections. Unsupported platforms
+cannot reliably report OS lock or every short suspend. Event delivery is asynchronous
+and cannot guarantee compositor previews before resume notification. No JNI,
+native integration, or new dependency was introduced; real desktop qualification
+remains required.
 
 ## Preserved principles and later work
 
@@ -459,7 +528,7 @@ real NIO smoke does not attempt to manufacture AdditionalConflict with filesyste
 
 ## Explicit password-wrapper change (M3a)
 
-The live vault window offers **Change Password…**; the launcher does not. Rewrap
+The unlocked vault content offers **Change Vault Password…**. Rewrap
 retains the root and does not rewrite TOKEN objects. There is no fingerprint UI,
 fingerprint authorization, token rewrite, secret rotation, password caching, or
 password recovery subsystem. Only public `VaultSession.changePassword` is invoked.
@@ -517,10 +586,9 @@ cannot reclassify it. Cleanup errors are handled separately and redacted.
 STALE/UNCERTAIN retirement immediately marks the window closing on EDT, disables
 actions, clears the form, cancels state presentation and stops TOTP through the
 existing close path. Session close is queued on the session executor. After close
-and frame disposal, `DesktopApplication` presents the reopen-required explanation
-through the owning launcher, unless shutdown has begun. The message outlives the
-vault frame; no interactive stale session remains while it is read. There is no
-automatic Open. An explicit subsequent launcher Open creates an ordinary new
+and content retirement, `DesktopApplication` presents the reopen-required explanation
+in BLOCKING_VAULT_STATE, unless shutdown has begun. No interactive stale session
+remains while it is read. There is no automatic Open. Try Again and an explicit Open create an ordinary new
 session with no old state, heads, alternatives, partial/retry handles or password
 arrays carried into it.
 

@@ -1,7 +1,6 @@
 package org.totipo.desktop.ui;
 
 import org.totipo.ObservationProgress;
-import java.awt.FlowLayout;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JProgressBar;
@@ -54,20 +53,18 @@ class VaultPanelTest {
             var menu = bar.getMenu(1);
             assertEquals("Vault", menu.getText()); assertNotEquals(0, menu.getMnemonic());
             assertEquals("Change Vault…", menu.getItem(0).getText());
-            assertEquals("Change Password…", menu.getItem(1).getText());
+            assertEquals("Change Vault Password…", menu.getItem(3).getText());
             int[] called = {0, 0};
             panel.changeVaultAction(() -> called[0]++); panel.passwordAction(() -> called[1]++);
-            menu.getItem(0).doClick(); menu.getItem(1).doClick();
+            menu.getItem(0).doClick(); menu.getItem(3).doClick();
             assertArrayEquals(new int[] {1, 1}, called);
-            JButton refresh = find(panel, JButton.class);
-            var row = refresh.getParent();
-            assertInstanceOf(FlowLayout.class, row.getLayout());
-            assertEquals(2, row.getComponentCount());
-            assertEquals("Refresh", ((JButton) row.getComponent(0)).getText());
-            assertEquals("Add", ((JButton) row.getComponent(1)).getText());
+            assertEquals("Refresh", menu.getItem(2).getText());
+            assertEquals(javax.swing.KeyStroke.getKeyStroke("F5"), menu.getItem(2).getAccelerator());
+            int[] refreshes = {0}; panel.onRefresh(() -> refreshes[0]++); menu.getItem(2).doClick(0);
+            assertEquals(1, refreshes[0]);
             assertNull(javax.swing.SwingUtilities.getAncestorOfClass(VaultPanel.class, panel.changePassword));
             assertEquals(640, panel.getMinimumSize().width); assertEquals(520, panel.getMinimumSize().height);
-            panel.closing(); assertFalse(menu.getItem(0).isEnabled()); assertFalse(menu.getItem(1).isEnabled());
+            panel.closing(); assertFalse(menu.getItem(0).isEnabled()); assertFalse(menu.getItem(3).isEnabled());
         });
     }
 

@@ -1,328 +1,230 @@
 package org.totipo.desktop;
 
+import java.awt.event.InputEvent;
+import java.awt.event.KeyEvent;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseWheelEvent;
 import java.nio.file.Path;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.Duration;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.Flow;
+import javax.swing.JPanel;
 import org.junit.jupiter.api.Test;
 import org.totipo.*;
 import org.totipo.desktop.clipboard.TotpClipboard;
-import org.totipo.desktop.ui.PasswordPromptContext;
-import org.totipo.desktop.ui.PasswordPromptResult;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.totipo.desktop.TestSupport.*;
-import static org.totipo.desktop.DesktopApplication.Surface.*;
 
-/** Observe presentation lifetimes, not pixels; blocked public close/open calls prove ordering. */
+/** Session/UI lifetime tests use blocked workers and injected time/events, never sleeps. */
 class SingleSurfaceLifecycleTest {
-    private static final Path OLD = Path.of("old-vault");
-    private static final Path NEXT = Path.of("next-vault");
-
-    private static final class Fixture implements AutoCloseable {
-        DesktopApplication app;
-        DesktopApplication.Surface active = NONE;
-        final List<DesktopApplication.Surface> visible = new ArrayList<>();
-        final AtomicInteger live = new AtomicInteger();
-        final AtomicInteger maximumLive = new AtomicInteger();
-        final AtomicInteger attempts = new AtomicInteger();
-        final List<Path> attemptedPaths = new java.util.concurrent.CopyOnWriteArrayList<>();
-        final List<LiveSession> sessions = new java.util.concurrent.CopyOnWriteArrayList<>();
-        final List<TrackingWindow> windows = new ArrayList<>();
-        final TrackingLauncher launcher = new TrackingLauncher();
-        final RememberedVaultTest.Store store = new RememberedVaultTest.Store(null);
-        CountDownLatch releaseClose = new CountDownLatch(0);
+    static final Path TARGET = Path.of("vault").toAbsolutePath();
+    static final class Time extends Clock {
+        Instant now = Instant.parse("2026-10-05T00:00:00Z");
+        public ZoneId getZone() { return ZoneOffset.UTC; }
+        public Clock withZone(ZoneId zone) { return this; }
+        public Instant instant() { return now; }
+        void advance(long minutes) { now = now.plus(Duration.ofMinutes(minutes)); }
+    }
+    static final class Fixture implements AutoCloseable {
+        final Shell shell = new Shell();
+        final Time clock = new Time();
+        final RememberedVaultTest.Store store = new RememberedVaultTest.Store(TARGET);
+        final List<Session> sessions = new java.util.concurrent.CopyOnWriteArrayList<>();
+        final List<Window> contents = new ArrayList<>();
+        final AtomicInteger opens = new AtomicInteger();
         CountDownLatch releaseOpen = new CountDownLatch(0);
-        final CountDownLatch alternateEntered = new CountDownLatch(1);
-        boolean failOpen;
-        boolean failClose;
-
+        CountDownLatch releaseClose = new CountDownLatch(0);
+        CountDownLatch entered = new CountDownLatch(1);
+        final DesktopApplication app;
         Fixture() throws Exception {
-            VaultAccess access = new VaultAccess() {
-                public OpenResult open(Path path, char[] password) { attemptedPaths.add(path); return attempt(); }
-                public CreateVaultResult create(Path path, char[] password) {
-                    return new CreateVaultResult.Created(((OpenResult.Opened) attempt()).session());
+            app = onEdt(() -> new DesktopApplication(new VaultAccess() {
+                public OpenResult open(Path path, char[] password) {
+                    for (Session session : sessions) { assertEquals(1, session.closes.get(), "An old session is still owned"); }
+                    opens.incrementAndGet(); entered.countDown(); await(releaseOpen);
+                    Session session = new Session(releaseClose); sessions.add(session); return new OpenResult.Opened(session);
                 }
-                private OpenResult attempt() {
-                    assertEquals(0, live.get(), "Previous unlocked session still live at open/create");
-                    if (attempts.incrementAndGet() == 2) { alternateEntered.countDown(); }
-                    await(releaseOpen);
-                    if (failOpen) { return new OpenResult.AuthenticationFailed(); }
-                    LiveSession session = new LiveSession(releaseClose, failClose);
-                    sessions.add(session);
-                    return new OpenResult.Opened(session);
-                }
-            };
-            app = onEdt(() -> new DesktopApplication(access, launcher, path -> {
-                TrackingWindow window = new TrackingWindow(); windows.add(window); return window;
-            }, new TotpClipboard(), store));
+                public CreateVaultResult create(Path path, char[] password) { throw new AssertionError(); }
+            }, shell, path -> { Window view = new Window(); contents.add(view); return view; }, new TotpClipboard(), store, clock));
         }
-
-        void enter(DesktopApplication.Surface next) {
-            assertEquals(NONE, active, "Two presentation surfaces overlap");
-            assertEquals(next, app.surface()); active = next; visible.add(next);
+        void open() throws Exception {
+            edt(() -> { shell.ready = new CountDownLatch(1); app.begin(TARGET, new char[] {'p'}, false); }); await(shell.ready);
         }
-        void leave(DesktopApplication.Surface previous) {
-            if (active == previous) { active = NONE; }
-            else { assertEquals(NONE, active); } // Shutdown may already have retired a modal surface.
-        }
-        void openFirst() throws Exception {
-            edt(() -> app.begin(OLD, new char[] {'p'}, false)); await(launcher.ready);
-            edt(() -> { assertEquals(VAULT_WINDOW, active); assertEquals(1, live.get()); });
-        }
-        @Override public void close() {
-            releaseClose.countDown(); releaseOpen.countDown();
-            try {
-                edt(app::shutdown); await(launcher.disposed);
-                edt(() -> { assertEquals(NONE, active); assertEquals(NONE, app.surface()); });
-            } catch (Exception failure) { throw new AssertionError(failure); }
-        }
-
-        final class TrackingLauncher extends Launcher {
-            int retirements;
-            @Override public void showWindow() { enter(LAUNCHER); assertEquals(0, live.get()); super.showWindow(); }
-            @Override public void hideWindow() { leave(LAUNCHER); super.hideWindow(); }
-            @Override public Path chooseDirectory(Path initial, boolean create) {
-                enter(CHOOSER); assertEquals(0, live.get());
-                try { return super.chooseDirectory(initial, create); } finally { leave(CHOOSER); }
-            }
-            @Override public PasswordPromptResult password(Path directory, boolean create, PasswordPromptContext context) {
-                enter(PASSWORD_PROMPT); assertEquals(0, live.get());
-                try { return super.password(directory, create, context); } finally { leave(PASSWORD_PROMPT); }
-            }
-            @Override public void message(String title, String text) {
-                enter(MESSAGE);
-                try { super.message(title, text); } finally { leave(MESSAGE); }
-            }
-            @Override public boolean confirmEmptyPassword() {
-                enter(MESSAGE);
-                try { return super.confirmEmptyPassword(); } finally { leave(MESSAGE); }
-            }
-            @Override public void retireDialogs() {
-                retirements++;
-                if (active == CHOOSER || active == PASSWORD_PROMPT || active == MESSAGE) { active = NONE; }
-            }
-        }
-        final class TrackingWindow extends Window {
-            int hides;
-            @Override public void showWindow() { super.showWindow(); enter(VAULT_WINDOW); }
-            @Override public void hideWindow() { leave(VAULT_WINDOW); hides++; }
-            @Override public void dispose() { leave(VAULT_WINDOW); super.dispose(); }
-        }
-        final class LiveSession implements VaultSession {
-            final Session delegate;
-            LiveSession(CountDownLatch release, boolean fails) {
-                delegate = new Session(release); delegate.failClose = fails;
-                maximumLive.accumulateAndGet(live.incrementAndGet(), Math::max);
-            }
-            public Flow.Publisher<VaultState> states() { return delegate.states(); }
-            public void requestRefresh() { delegate.requestRefresh(); }
-            public void close() { delegate.close(); live.decrementAndGet(); }
-            public VaultFingerprint fingerprint() { throw new AssertionError(); }
-            public VaultState state() { throw new AssertionError(); }
-            public PasswordChangeResult changePassword(char[] old, char[] next) { throw new AssertionError(); }
+        void locked() { await(contents.getLast().disposed); }
+        public void close() {
+            releaseOpen.countDown(); releaseClose.countDown();
+            try { edt(app::shutdown); await(shell.disposed); } catch (Exception failure) { throw new AssertionError(failure); }
         }
     }
-
-    @Test void launcherChooserPasswordAndVaultHaveExclusiveVisibilityForOpenAndCreate() throws Exception {
-        for (boolean create : new boolean[] {false, true}) {
+    @Test void successfulOpenUsesSameShellAndOneSession() throws Exception {
+        try (Fixture f = new Fixture()) {
+            // Startup without an actual filesystem target is tested separately. Opening
+            // the fake session boundary must never ask for another application window.
+            edt(() -> f.shell.showWindow()); f.open();
+            edt(() -> { assertEquals(ShellState.UNLOCKED, f.app.state()); assertEquals(1, f.shell.shown); assertEquals(1, f.contents.size()); });
+            assertEquals(0, f.sessions.getFirst().closes.get());
+        }
+    }
+    @Test void explicitLockImmediatelyRetiresContentAndEventuallyClosesSession() throws Exception {
+        try (Fixture f = new Fixture()) {
+            f.releaseClose = new CountDownLatch(1); f.open();
+            edt(() -> { f.shell.lock.run(); assertEquals(ShellState.LOCKED, f.app.state()); assertEquals(TARGET, f.app.selectedVault());
+                assertTrue(f.contents.getFirst().closing); assertFalse(f.app.timerRunning()); });
+            await(f.sessions.getFirst().closeEntered); assertEquals(1, f.sessions.getFirst().closes.get());
+            char[] rejected = {'x'}; edt(() -> f.app.open(rejected)); assertArrayEquals(new char[1], rejected);
+            assertEquals(1, f.opens.get()); f.releaseClose.countDown(); f.locked();
+        }
+    }
+    @Test void changeVaultRetiresBeforeChooserAndCancelNeverResurrectsSession() throws Exception {
+        try (Fixture f = new Fixture()) {
+            f.releaseClose = new CountDownLatch(1); f.open();
+            edt(() -> {
+                f.shell.ready = new CountDownLatch(1); f.shell.directory = null;
+                f.shell.duringDirectory = () -> { assertEquals(ShellState.LOCKED, f.app.state()); assertEquals(1, f.sessions.getFirst().closes.get());
+                    assertTrue(f.contents.getFirst().closing); };
+                f.contents.getFirst().changeVault.run();
+                assertEquals(ShellState.LOCKED, f.app.state()); assertEquals(0, f.shell.directories);
+            });
+            await(f.sessions.getFirst().closeEntered); assertEquals(0, f.shell.directories);
+            f.releaseClose.countDown(); await(f.shell.ready);
+            edt(() -> { assertEquals(ShellState.LOCKED, f.app.state()); assertEquals(TARGET, f.app.selectedVault());
+                assertEquals(1, f.shell.directories); assertEquals(1, f.contents.size()); });
+            assertEquals(1, f.opens.get());
+        }
+    }
+    @Test void lockCancelsPendingChangeVaultIntent() throws Exception {
+        try (Fixture f = new Fixture()) {
+            f.releaseClose = new CountDownLatch(1); f.open();
+            edt(() -> { f.contents.getFirst().changeVault.run(); f.app.lock(); });
+            f.releaseClose.countDown(); f.locked(); edt(() -> assertEquals(0, f.shell.directories));
+        }
+    }
+    @Test void ctrlLDispatchInvokesLock() throws Exception {
+        try (Fixture f = new Fixture()) {
+            f.open(); edt(() -> f.app.userEvent(new KeyEvent(new JPanel(), KeyEvent.KEY_PRESSED, 0, InputEvent.CTRL_DOWN_MASK, KeyEvent.VK_L, 'l')));
+            edt(() -> assertEquals(ShellState.LOCKED, f.app.state())); f.locked(); assertEquals(1, f.sessions.getFirst().closes.get());
+        }
+    }
+    @Test void plainLDoesNotLock() throws Exception {
+        try (Fixture f = new Fixture()) {
+            f.open(); edt(() -> { f.app.userEvent(new KeyEvent(new JPanel(), KeyEvent.KEY_PRESSED, 0, 0, KeyEvent.VK_L, 'l'));
+                assertEquals(ShellState.UNLOCKED, f.app.state()); });
+        }
+    }
+    @Test void inactivityLocksAtExactlyFifteenMinutes() throws Exception {
+        try (Fixture f = new Fixture()) {
+            f.open(); edt(() -> { f.clock.advance(14); f.app.checkInactivity(); assertEquals(ShellState.UNLOCKED, f.app.state());
+                f.clock.advance(1); f.app.checkInactivity(); assertEquals(ShellState.LOCKED, f.app.state()); }); f.locked();
+        }
+    }
+    @Test void directKeyboardInputResetsDeadline() throws Exception {
+        try (Fixture f = new Fixture()) {
+            f.open(); edt(() -> { f.clock.advance(14); f.app.userEvent(new KeyEvent(new JPanel(), KeyEvent.KEY_PRESSED, 0, 0, KeyEvent.VK_A, 'a'));
+                f.clock.advance(14); f.app.checkInactivity(); assertEquals(ShellState.UNLOCKED, f.app.state());
+                f.clock.advance(1); f.app.checkInactivity(); assertEquals(ShellState.LOCKED, f.app.state()); }); f.locked();
+        }
+    }
+    @Test void pointerActivationAndScrollResetDeadline() throws Exception {
+        for (boolean wheel : new boolean[] {false, true}) {
             try (Fixture f = new Fixture()) {
-                edt(() -> { f.app.show(); if (create) { f.launcher.create.run(); } else { f.launcher.open.run(); } });
-                await(f.launcher.ready);
-                edt(() -> {
-                    assertEquals(List.of(LAUNCHER, CHOOSER, PASSWORD_PROMPT, VAULT_WINDOW), f.visible);
-                    assertEquals(VAULT_WINDOW, f.active); assertEquals(1, f.maximumLive.get());
-                    assertArrayEquals(new char[1], f.launcher.password);
-                });
+                f.open(); edt(() -> {
+                    f.clock.advance(14);
+                    var source = new JPanel();
+                    f.app.userEvent(wheel ? new MouseWheelEvent(source, MouseEvent.MOUSE_WHEEL, 0, 0, 1, 1, 0, false, MouseWheelEvent.WHEEL_UNIT_SCROLL, 1, 1)
+                            : new MouseEvent(source, MouseEvent.MOUSE_PRESSED, 0, 0, 1, 1, 1, false));
+                    f.clock.advance(14); f.app.checkInactivity(); assertEquals(ShellState.UNLOCKED, f.app.state());
+                    f.clock.advance(1); f.app.checkInactivity(); assertEquals(ShellState.LOCKED, f.app.state());
+                }); f.locked();
             }
         }
     }
-
-    @Test void changeVaultHidesImmediatelyAndWaitsForCloseBeforeChooserPasswordAndNewSession() throws Exception {
+    @Test void countdownChecksBackgroundRefreshAndObservationDoNotResetDeadline() throws Exception {
         try (Fixture f = new Fixture()) {
-            f.releaseClose = new CountDownLatch(1); f.openFirst();
-            Fixture.LiveSession old = f.sessions.getFirst();
-            edt(() -> {
-                f.launcher.ready = new CountDownLatch(1); f.launcher.directory = NEXT;
-                f.launcher.password = new char[] {'n'};
-                f.launcher.duringDirectory = () -> {
-                    assertEquals(0, f.live.get()); assertEquals(1, f.windows.getFirst().disposals);
-                    assertEquals(1, old.delegate.closes.get());
-                };
-                f.windows.getFirst().changeVault.run(); f.windows.getFirst().changeVault.run();
-                assertEquals(NONE, f.active); assertEquals(NONE, f.app.surface());
-                assertEquals(1, f.windows.getFirst().hides); assertEquals(0, f.launcher.directories);
-                char[] rejected = {'r'}; f.app.begin(NEXT, rejected, false);
-                assertArrayEquals(new char[1], rejected);
-                f.launcher.open.run(); f.app.show(); assertEquals(1, f.attempts.get());
+            f.open(); edt(() -> {
+                f.clock.advance(14); f.contents.getFirst().refresh.run(); f.app.checkInactivity();
+                f.sessions.getFirst().subscriber.onNext(TestSupport.state(new ObservationProgress.Enumerating(0)));
             });
-            await(old.delegate.closeEntered);
-            assertEquals(1, f.live.get()); assertEquals(1, f.attempts.get());
-            f.releaseClose.countDown(); await(f.launcher.ready);
-            edt(() -> {
-                assertEquals(List.of(VAULT_WINDOW, CHOOSER, PASSWORD_PROMPT, VAULT_WINDOW), f.visible);
-                assertEquals(1, f.live.get()); assertEquals(1, f.maximumLive.get()); assertEquals(2, f.attempts.get());
-                assertEquals(NEXT.toAbsolutePath(), f.store.path);
-                f.windows.getFirst().changeVault.run(); assertEquals(1, f.launcher.directories);
-            });
+            edt(() -> { f.clock.advance(1); f.app.checkInactivity(); assertEquals(ShellState.LOCKED, f.app.state()); }); f.locked();
         }
     }
-
-    @Test void chooserAndCreatePromptCancellationReturnToLauncherWithNoSession() throws Exception {
-        for (boolean chooser : new boolean[] {true, false}) {
-            try (Fixture f = new Fixture()) {
-                if (chooser) { f.launcher.directory = null; }
-                else { f.launcher.passwordAction = PasswordPromptResult.Action.CANCEL; }
-                edt(() -> { f.app.show(); f.launcher.create.run(); }); await(f.launcher.ready);
-                edt(() -> {
-                    assertEquals(chooser ? List.of(LAUNCHER, CHOOSER, LAUNCHER)
-                            : List.of(LAUNCHER, CHOOSER, PASSWORD_PROMPT, LAUNCHER), f.visible);
-                    assertEquals(LAUNCHER, f.active); assertEquals(0, f.live.get()); assertEquals(0, f.attempts.get());
-                });
-            }
-        }
-    }
-
-    @Test void alternatePasswordChangeCanChooseAgainWithoutOpeningAbandonedDirectory() throws Exception {
+    @Test void pointerMotionAndFocusEventsAreNotUserActivity() throws Exception {
         try (Fixture f = new Fixture()) {
-            f.openFirst(); Path last = Path.of("final-vault");
-            edt(() -> {
-                f.launcher.ready = new CountDownLatch(1); f.launcher.directory = NEXT;
-                f.launcher.duringPassword = () -> {
-                    if (f.launcher.passwordContexts.size() == 1) {
-                        f.launcher.passwordAction = PasswordPromptResult.Action.CHANGE_VAULT;
-                        f.launcher.directory = last;
-                    } else {
-                        f.launcher.passwordAction = null; f.launcher.password = new char[] {'n'};
-                    }
-                };
-                f.windows.getFirst().changeVault.run();
-            });
-            await(f.launcher.ready);
-            edt(() -> {
-                assertEquals(List.of(VAULT_WINDOW, CHOOSER, PASSWORD_PROMPT, CHOOSER, PASSWORD_PROMPT, VAULT_WINDOW), f.visible);
-                assertEquals(List.of(OLD, last), f.attemptedPaths); assertEquals(1, f.maximumLive.get());
-                assertEquals(last.toAbsolutePath(), f.store.path); assertEquals(2, f.store.writes);
-            });
+            f.open(); edt(() -> {
+                f.clock.advance(14); f.app.userEvent(new MouseEvent(new JPanel(), MouseEvent.MOUSE_MOVED, 0, 0, 1, 1, 0, false));
+                f.app.userEvent(new java.awt.event.FocusEvent(new JPanel(), java.awt.event.FocusEvent.FOCUS_LOST));
+                assertEquals(ShellState.UNLOCKED, f.app.state()); f.clock.advance(1); f.app.checkInactivity(); assertEquals(ShellState.LOCKED, f.app.state());
+            }); f.locked();
         }
     }
-
-    @Test void cancellingChangeVaultReturnsOnlyLauncherAndPreservesPathWithoutReopening() throws Exception {
+    @Test void expiredSessionCannotBeRevivedByFirstInputAfterLongPause() throws Exception {
         try (Fixture f = new Fixture()) {
-            f.openFirst();
-            edt(() -> { f.launcher.ready = new CountDownLatch(1); f.launcher.directory = null;
-                f.windows.getFirst().changeVault.run(); });
-            await(f.launcher.ready);
-            edt(() -> {
-                assertEquals(List.of(VAULT_WINDOW, CHOOSER, LAUNCHER), f.visible);
-                assertEquals(LAUNCHER, f.active); assertEquals(0, f.live.get()); assertEquals(1, f.attempts.get());
-                assertEquals(OLD.toAbsolutePath(), f.store.path); assertEquals(1, f.store.writes);
-            });
+            f.open(); edt(() -> { f.clock.advance(20); f.app.userActivity(); assertEquals(ShellState.LOCKED, f.app.state()); }); f.locked();
         }
     }
-
-    @Test void alternateFailureRepromptsWithoutRestoringOldVaultThenAllowsChangeAndCancel() throws Exception {
+    @Test void focusLossAndMinimizeAloneDoNotLockOrResetDeadline() throws Exception {
         try (Fixture f = new Fixture()) {
-            f.openFirst();
-            edt(() -> {
-                f.launcher.ready = new CountDownLatch(1); f.launcher.directory = NEXT;
-                f.failOpen = true; f.launcher.password = new char[] {'x'};
-                f.launcher.duringMessage = () -> {
-                    assertArrayEquals(new char[1], f.launcher.password);
-                    f.launcher.passwordAction = PasswordPromptResult.Action.CHANGE_VAULT;
-                    f.launcher.directory = null;
-                };
-                f.windows.getFirst().changeVault.run();
-            });
-            await(f.launcher.ready);
-            edt(() -> {
-                assertEquals(List.of(VAULT_WINDOW, CHOOSER, PASSWORD_PROMPT, MESSAGE,
-                        PASSWORD_PROMPT, CHOOSER, LAUNCHER), f.visible);
-                assertEquals(0, f.live.get()); assertEquals(2, f.attempts.get());
-                assertEquals(OLD.toAbsolutePath(), f.store.path); assertEquals(1, f.store.writes);
-            });
+            f.open(); edt(() -> {
+                f.clock.advance(14);
+                f.app.windowEvent(java.awt.event.WindowEvent.WINDOW_DEACTIVATED);
+                f.app.windowEvent(java.awt.event.WindowEvent.WINDOW_LOST_FOCUS);
+                f.app.windowEvent(java.awt.event.WindowEvent.WINDOW_ICONIFIED);
+                assertEquals(ShellState.UNLOCKED, f.app.state());
+                f.clock.advance(1); f.app.checkInactivity(); assertEquals(ShellState.LOCKED, f.app.state());
+            }); f.locked();
         }
     }
-
-    @Test void failedPasswordCanRetrySuccessfullyWithFreshArray() throws Exception {
+    @Test void returningToWindowChecksExpiredDeadlineBeforeUse() throws Exception {
         try (Fixture f = new Fixture()) {
-            char[] failed = {'x'}, success = {'p'}; f.failOpen = true; f.launcher.password = failed;
-            f.launcher.duringMessage = () -> {
-                assertArrayEquals(new char[1], failed); f.failOpen = false; f.launcher.password = success;
-            };
-            edt(() -> { f.app.show(); f.launcher.open.run(); }); await(f.launcher.ready);
-            edt(() -> {
-                assertEquals(List.of(LAUNCHER, CHOOSER, PASSWORD_PROMPT, MESSAGE, PASSWORD_PROMPT, VAULT_WINDOW), f.visible);
-                assertArrayEquals(new char[1], success); assertEquals(1, f.maximumLive.get());
-            });
+            f.open(); edt(() -> { f.clock.advance(16); f.app.windowEvent(java.awt.event.WindowEvent.WINDOW_ACTIVATED);
+                assertEquals(ShellState.LOCKED, f.app.state()); }); f.locked();
         }
     }
-
-    @Test void shutdownRetiresPendingChooserOrPromptAndDiscardsLateSubmission() throws Exception {
-        for (boolean chooser : new boolean[] {true, false}) {
-            try (Fixture f = new Fixture()) {
-                if (chooser) { f.launcher.duringDirectory = f.app::shutdown; }
-                else { f.launcher.duringPassword = f.app::shutdown; }
-                edt(() -> { f.app.show(); f.launcher.open.run(); }); await(f.launcher.disposed);
-                edt(() -> {
-                    assertEquals(NONE, f.active); assertEquals(1, f.launcher.retirements);
-                    assertEquals(0, f.attempts.get()); assertEquals(0, f.live.get());
-                    if (!chooser) { assertArrayEquals(new char[1], f.launcher.password); }
-                    f.app.show(); f.launcher.open.run(); assertEquals(NONE, f.active);
-                });
-            }
-        }
-    }
-
-    @Test void shutdownWhileChangeVaultClosePendingNeverStartsSelection() throws Exception {
+    @Test void lateOpenAfterLockClosesUnclaimedSessionWithoutMountingContent() throws Exception {
         try (Fixture f = new Fixture()) {
-            f.releaseClose = new CountDownLatch(1); f.openFirst();
-            edt(() -> { f.windows.getFirst().changeVault.run(); f.app.shutdown(); f.app.shutdown(); });
-            await(f.sessions.getFirst().delegate.closeEntered);
-            edt(() -> { assertEquals(NONE, f.active); assertFalse(f.app.executorShutdown()); });
-            f.releaseClose.countDown(); await(f.launcher.disposed);
-            edt(() -> {
-                assertEquals(0, f.launcher.directories); assertEquals(0, f.live.get());
-                assertEquals(1, f.windows.getFirst().disposals); assertEquals(1, f.launcher.disposals);
-                assertTrue(f.app.executorShutdown());
-            });
+            f.releaseOpen = new CountDownLatch(1);
+            edt(() -> f.app.begin(TARGET, new char[] {'p'}, false)); await(f.entered); edt(f.app::lock);
+            f.releaseOpen.countDown(); await(f.shell.ready);
+            edt(() -> { assertNotEquals(ShellState.UNLOCKED, f.app.state()); assertTrue(f.contents.isEmpty()); });
+            assertEquals(1, f.sessions.getFirst().closes.get());
         }
     }
-
-    @Test void lateAlternateOpenAfterShutdownClosesUnclaimedSessionWithoutShowingWindow() throws Exception {
+    @Test void lateObservationAfterLockNeverRepopulatesContent() throws Exception {
         try (Fixture f = new Fixture()) {
-            f.openFirst(); f.releaseOpen = new CountDownLatch(1);
-            edt(() -> { f.launcher.directory = NEXT; f.launcher.password = new char[] {'n'};
-                f.windows.getFirst().changeVault.run(); });
-            await(f.sessions.getFirst().delegate.closeEntered);
-            // Password prompt has retired and the alternate call is now waiting on its worker.
-            await(f.alternateEntered);
-            edt(f.app::shutdown); f.releaseOpen.countDown(); await(f.launcher.disposed);
-            edt(() -> {
-                assertEquals(List.of(VAULT_WINDOW, CHOOSER, PASSWORD_PROMPT), f.visible);
-                assertEquals(1, f.windows.size()); assertEquals(0, f.live.get()); assertEquals(1, f.maximumLive.get());
-                assertArrayEquals(new char[1], f.launcher.password);
-            });
+            f.open(); edt(f.app::lock);
+            f.sessions.getFirst().subscriber.onNext(TestSupport.state(new ObservationProgress.Enumerating(0)));
+            edt(() -> { assertEquals(ShellState.LOCKED, f.app.state()); assertTrue(f.contents.getFirst().rendered.isEmpty()); }); f.locked();
         }
     }
-
-    @Test void closeFailureCannotStartAlternateSelectionOrOpenAnotherSession() throws Exception {
+    @Test void repeatedUnlockLockMaintainsSingleSessionAndShell() throws Exception {
         try (Fixture f = new Fixture()) {
-            f.failClose = true; f.openFirst();
-            edt(() -> f.windows.getFirst().changeVault.run()); await(f.launcher.disposed);
-            edt(() -> { assertEquals(0, f.launcher.directories); assertEquals(1, f.attempts.get());
-                assertTrue(f.app.executorShutdown()); assertEquals(NONE, f.active); });
+            edt(f.shell::showWindow);
+            for (int i = 0; i < 8; i++) { f.open(); edt(f.app::lock); f.locked(); }
+            assertEquals(8, f.opens.get()); assertEquals(1, f.shell.shown);
+            for (Session session : f.sessions) { assertEquals(1, session.closes.get()); }
         }
     }
-
-    @Test void longLivedLifecycleAndSelectionFieldsContainNoRawPasswordArrays() {
-        for (Class<?> type : List.of(DesktopApplication.class, VaultWindowController.class,
-                PasswordChangeController.class, JdkVaultPreferences.class)) {
+    @Test void shutdownWhileChangeClosePendingDoesNotPresentChooser() throws Exception {
+        try (Fixture f = new Fixture()) {
+            f.releaseClose = new CountDownLatch(1); f.open();
+            edt(() -> { f.contents.getFirst().changeVault.run(); f.app.shutdown(); });
+            f.releaseClose.countDown(); await(f.shell.disposed); assertEquals(0, f.shell.directories);
+        }
+    }
+    @Test void failedCloseTerminatesWithoutAllowingReplacementSession() throws Exception {
+        try (Fixture f = new Fixture()) {
+            f.open(); f.sessions.getFirst().failClose = true;
+            edt(() -> f.contents.getFirst().changeVault.run()); await(f.shell.disposed);
+            assertEquals(0, f.shell.directories); assertEquals(1, f.opens.get()); assertTrue(f.app.executorShutdown());
+        }
+    }
+    @Test void longLivedLifecycleFieldsContainNoRawPasswordArrays() {
+        for (Class<?> type : List.of(DesktopApplication.class, VaultWindowController.class, PasswordChangeController.class, JdkVaultPreferences.class)) {
             for (var field : type.getDeclaredFields()) { assertNotEquals(char[].class, field.getType(), field.toString()); }
-        }
-        for (Class<?> nested : DesktopApplication.class.getDeclaredClasses()) {
-            for (var field : nested.getDeclaredFields()) { assertNotEquals(char[].class, field.getType(), field.toString()); }
         }
     }
 }

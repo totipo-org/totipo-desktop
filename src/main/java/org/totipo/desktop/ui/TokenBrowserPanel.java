@@ -25,6 +25,14 @@ public final class TokenBrowserPanel extends JPanel {
     final JTextField search = new JTextField(24);
     final JLabel resultCount = new JLabel("Waiting for observation");
     final JLabel empty = TokenRowPanel.literal("No TOTPs yet. Use Add to add your first TOTP.");
+    final JLabel emptyHint = TokenRowPanel.literal("");
+    final EmptyState emptyState = new EmptyState(empty, emptyHint, 480);
+    final JButton add = new JButton("Add");
+    final JButton emptyAdd = new JButton("Add");
+    final JButton clearSearch = new JButton("Clear Search");
+    final JPanel searchBar = new JPanel(new BorderLayout(DesktopStyle.TIGHT, DesktopStyle.MICRO));
+    final JPanel headerActions = new JPanel();
+    final JPanel results = new JPanel(new CardLayout());
     final JMenuItem editMenu = new JMenuItem("Edit…");
     final JMenuItem diagnosticsMenu = new JMenuItem("View Diagnostics…");
     final CopyNotification copyNotification;
@@ -42,12 +50,21 @@ public final class TokenBrowserPanel extends JPanel {
         copyNotification = new CopyNotification(clock);
         totp = new TotpDisplay(clock, this::display,
                 id -> copyNotification.showMessage("Code unavailable. Try Show Code again."));
-        JPanel searchBar = new JPanel(new BorderLayout(DesktopStyle.TIGHT, DesktopStyle.MICRO));
         searchBar.add(SwingUsability.label("Search", search), BorderLayout.WEST);
         DesktopStyle.input(search);
+        search.setMinimumSize(new Dimension(0, search.getPreferredSize().height));
+        DesktopStyle.action(add, DesktopStyle.ActionRole.PrimaryAction, false);
+        add.setMaximumSize(add.getPreferredSize());
+        DesktopStyle.action(emptyAdd, DesktopStyle.ActionRole.PrimaryAction, false);
+        DesktopStyle.action(clearSearch, DesktopStyle.ActionRole.QuietAction, false);
+        add.setEnabled(false); emptyAdd.setEnabled(false);
+        clearSearch.addActionListener(event -> { if (!closed) { search.setText(""); focusSearch(); } });
         resultCount.setFont(DesktopStyle.font(DesktopStyle.Typography.Secondary));
         resultCount.setForeground(DesktopStyle.textSecondary());
-        searchBar.add(search, BorderLayout.CENTER); searchBar.add(resultCount, BorderLayout.EAST);
+        headerActions.setLayout(new BoxLayout(headerActions, BoxLayout.X_AXIS));
+        resultCount.setAlignmentY(CENTER_ALIGNMENT); add.setAlignmentY(CENTER_ALIGNMENT);
+        headerActions.add(resultCount); headerActions.add(Box.createHorizontalStrut(DesktopStyle.COMPACT)); headerActions.add(add);
+        searchBar.add(search, BorderLayout.CENTER); searchBar.add(headerActions, BorderLayout.EAST);
         search.getAccessibleContext().setAccessibleDescription("Filter by issuer or account. Escape clears search.");
         add(searchBar, BorderLayout.NORTH);
         search.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
@@ -65,20 +82,20 @@ public final class TokenBrowserPanel extends JPanel {
         list.getAccessibleContext().setAccessibleName("TOTPs");
         JScrollPane scroll = new JScrollPane(list, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         scroll.getVerticalScrollBar().setUnitIncrement(24);
+        results.add(scroll, "list"); results.add(emptyState, "empty");
         JLayeredPane overlay = new JLayeredPane() {
             private static final long serialVersionUID = 1L;
             @Override public Dimension getPreferredSize() { return scroll.getPreferredSize(); }
             @Override public Dimension getMinimumSize() { return scroll.getMinimumSize(); }
             @Override public void doLayout() {
-                scroll.setBounds(0, 0, getWidth(), getHeight());
+                results.setBounds(0, 0, getWidth(), getHeight());
                 Dimension size = copyNotification.getPreferredSize();
                 int width = Math.max(0, Math.min(size.width, getWidth() - 24));
                 copyNotification.setBounds((getWidth() - width) / 2, Math.max(0, getHeight() - size.height - 12), width, size.height);
             }
         };
-        overlay.add(scroll, JLayeredPane.DEFAULT_LAYER);
+        overlay.add(results, JLayeredPane.DEFAULT_LAYER);
         overlay.add(copyNotification, JLayeredPane.POPUP_LAYER); add(overlay, BorderLayout.CENTER);
-        list.add(empty);
         editMenu.addActionListener(e -> editSelected());
         diagnosticsMenu.addActionListener(e -> {
             TokenState token = selectedToken();
@@ -118,7 +135,8 @@ public final class TokenBrowserPanel extends JPanel {
                         BorderFactory.createEmptyBorder(DesktopStyle.TIGHT, DesktopStyle.TIGHT, DesktopStyle.TIGHT, DesktopStyle.TIGHT)));
                 group.setBackground(DesktopStyle.surface());
                 group.getAccessibleContext().setAccessibleName("This token has conflicting versions");
-                JPanel header = new JPanel(new BorderLayout()); header.setOpaque(false); header.setFocusable(false);
+                JPanel header = new JPanel(new BorderLayout(DesktopStyle.TIGHT, 0)); header.setOpaque(false); header.setFocusable(false);
+                header.setBorder(BorderFactory.createEmptyBorder(DesktopStyle.TIGHT, 0, DesktopStyle.TIGHT, 0));
                 JLabel warning = TokenRowPanel.literal("Conflict"); warning.setToolTipText("This token has conflicting versions");
                 warning.setForeground(DesktopStyle.warning());
                 warning.setFont(DesktopStyle.font(DesktopStyle.Typography.SectionTitle));
@@ -132,7 +150,16 @@ public final class TokenBrowserPanel extends JPanel {
                         } else { mergeAction.open(latest, token); }
                     }
                 });
-                header.add(warning); header.add(resolve, BorderLayout.EAST); group.add(header); list.add(group);
+                header.add(warning); header.add(resolve, BorderLayout.EAST); group.add(header);
+                JPanel divider = new JPanel();
+                divider.setOpaque(false);
+                divider.setBorder(BorderFactory.createCompoundBorder(
+                        BorderFactory.createEmptyBorder(0, DesktopStyle.NORMAL, 0, 0),
+                        BorderFactory.createMatteBorder(0, 0, DesktopStyle.BORDER, 0, DesktopStyle.border())));
+                divider.setMinimumSize(new Dimension(0, DesktopStyle.BORDER));
+                divider.setPreferredSize(new Dimension(0, DesktopStyle.BORDER));
+                divider.setMaximumSize(new Dimension(Integer.MAX_VALUE, DesktopStyle.BORDER));
+                group.add(divider); list.add(group);
             }
             List<TokenAlternative> alternatives = TokenPresentation.ordered(token);
             if (alternatives.isEmpty()) {
@@ -186,11 +213,16 @@ public final class TokenBrowserPanel extends JPanel {
         }
         selectedRow = rows.stream().filter(r -> r.token.id().equals(selected) && r.alternative == previous).findFirst().orElse(row(selected));
         if (row(selected) == null) { selected = null; }
-        if (matched == 0) {
-            empty.setText(latest.tokens().isEmpty() ? "No TOTPs yet. Use Add to add your first TOTP." : "No TOTPs match this search."); list.add(empty);
-        }
         int total = latest.tokens().size();
-        resultCount.setText(search.getText().isEmpty() ? total + " TOTPs" : matched + " of " + total + " TOTPs");
+        if (matched == 0) {
+            empty.setText(total == 0 ? "No TOTPs yet" : "No TOTPs match \"" + UntrustedText.display(search.getText()) + "\"");
+            empty.setToolTipText(empty.getText());
+            emptyHint.setText(total == 0 ? "Add a TOTP to get started." : ""); emptyHint.setVisible(total == 0);
+            emptyState.compose(total == 0 ? emptyAdd : clearSearch);
+        }
+        ((CardLayout) results.getLayout()).show(results, matched == 0 ? "empty" : "list");
+        searchBar.setVisible(total != 0);
+        resultCount.setText(search.getText().isEmpty() ? total + " TOTPs" : matched + " of " + total);
         updateActions(); list.revalidate(); list.repaint();
     }
     private void display(TokenId id, List<TotpDisplay.Display> displays) {
@@ -248,6 +280,7 @@ public final class TokenBrowserPanel extends JPanel {
         totp.generator(action);
     }
     public void copyAction(TotpClipboard.Copy action) { Edt.require(); copyAction = action; }
+    public void collectionAction(Action action) { Edt.require(); add.setAction(action); emptyAdd.setAction(action); }
     public void writeAvailability(boolean available) { Edt.require(); writeAvailable = available; updateActions(); }
     private void updateActions() {
         TokenState token = selectedToken();
@@ -298,6 +331,9 @@ public final class TokenBrowserPanel extends JPanel {
         childDisplays.values().forEach(TotpDisplay::clear); childDisplays.clear(); selectedRow = null;
         closeDialogs(); latest = null; selected = null; list.removeAll(); list.setEnabled(false);
         search.setText(""); search.setEnabled(false); updateActions();
-        empty.setText("Closing…"); list.add(empty); list.revalidate(); list.repaint();
+        empty.setText("Closing…"); emptyHint.setVisible(false); emptyState.compose();
+        ((CardLayout) results.getLayout()).show(results, "empty");
+        add.setEnabled(false); emptyAdd.setEnabled(false); searchBar.setVisible(false);
+        list.revalidate(); list.repaint();
     }
 }

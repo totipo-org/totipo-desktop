@@ -3,11 +3,41 @@
 A Java/Swing desktop application for Totipo. Current status: **M4a release
 hardening, unreleased and NOT QUALIFIED**. The feature set includes explicit
 TOTP clipboard copying, alongside merge/conflict resolution, token create,
-ordinary update, and publication uncertainty. The application supports local
+ordinary update, and publication uncertainty. S2 adds a persistent application
+shell and desktop locking on the committed S1 visual foundation. The application supports local
 vault create/open, observation and diagnostics, read-only logical-token/TOTP
 browsing, manual Base32 token creation, and ordinary update of an explicitly
-selected semantic alternative. Independent vault windows own their sessions and
-close them during window/application shutdown. Refresh requests local observation.
+selected semantic alternative. One application window contains no-vault, locked,
+unlocked, or blocking vault content, with at most one session. Refresh requests local observation.
+
+Selecting a recognizable vault remembers that location immediately, before any
+password succeeds. Startup opens directly to its locked form. A missing or
+non-vault remembered location shows a selection warning. A non-vault selection
+does not replace a previously remembered vault. The full path appears in the
+locked form; the title uses the vault basename.
+
+Vault → Lock and Ctrl+L (also the platform menu shortcut on macOS) retire owned
+forms without draft confirmation, clear reveal/clipboard ownership, and close the
+session. Change Vault locks first; cancelling its chooser leaves the previous
+vault locked. File → Exit and window close exit the application. Desktop inactivity
+locks after 15 minutes; only direct keyboard/pointer/scroll interaction resets
+the deadline. Focus loss/minimization alone does not lock or conceal.
+
+Pure-JDK user-session and sleep listeners lock where supported. A portable fallback
+locks after a 30-second event-processing pause or a wall/monotonic clock discrepancy
+over five seconds; long UI stalls and clock corrections can conservatively lock too.
+Without platform listeners, short suspend/OS-lock detection is not guaranteed.
+Deadline checks run before input and on activation. Native event delivery and
+resume privacy still require desktop qualification. No native dependency was added.
+See [the S2 report](review/S2_PERSISTENT_SHELL_LOCKING_REPORT.md).
+
+S2.2 uses a centered welcome stack, an informational locked-vault path, and a
+restricted existing-vault directory picker with folder navigation and no rename,
+delete, filename, filter, or new-folder controls. Create keeps its separate chooser.
+The normal collection header is Search / count / Add; Refresh stays in the Vault
+menu and on F5. Empty vaults show a centered Add action; zero search results show
+Clear Search while retaining the normal header. Filtered counts use “M of N.”
+See [the S2.2 report](review/S2_2_SHELL_COLLECTION_REPORT.md).
 
 Search filters logical TOTPs by issuer/account only, using case-insensitive
 whitespace-separated AND terms across both fields. A matching conflict Alternative
