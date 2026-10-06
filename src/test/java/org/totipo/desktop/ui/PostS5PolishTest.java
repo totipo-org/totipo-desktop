@@ -103,7 +103,7 @@ class PostS5PolishTest {
         assertFalse(SwingUtilities.isDescendingFrom(panel.primary, scroll));
         Rectangle footer = SwingUtilities.convertRectangle(panel.primary.getParent(), panel.primary.getBounds(), panel);
         assertTrue(new Rectangle(panel.getSize()).contains(footer));
-        assertEquals("Review", panel.primary.getText());
+        assertEquals(mode(panel, "Manual entry").isSelected() ? "Add" : "Review", panel.primary.getText());
         centeredFooter(panel.primary);
     }
     @Test void uriValidationReflowsBeforeFocusAndClearingAndModeSwitchesRestoreNaturalHeight() throws Exception {

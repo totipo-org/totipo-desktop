@@ -76,7 +76,7 @@ public class S3SwingSmoke {
             });
         }
         // A small local capture set; functional smoke still exercises every existing step.
-        if (!List.of("edit", "conflict-edit", "add-acquisition", "manual-add", "delete-confirmation", "change-review").contains(name)) { return; }
+        if (!List.of("edit", "conflict-edit", "add-acquisition", "manual-add", "delete-confirmation", "change-review", "manual-duplicate", "validation").contains(name)) { return; }
         Files.createDirectories(Path.of("review/screenshots/s3"));
         Window selected=window; Rectangle r=edt(() -> new Rectangle(selected.getLocationOnScreen(),selected.getSize()));
         ImageIO.write(robot.createScreenCapture(r),"png",Path.of("review/screenshots/s3/"+capturePrefix+"-"+name+".png").toFile());
@@ -98,6 +98,12 @@ public class S3SwingSmoke {
         waitFor(() -> Arrays.stream(frame.getOwnedWindows()).anyMatch(w -> w instanceof JDialog && w.isVisible()));
     }
     static void editGithub() throws Exception { editIdentity("GitHub"); }
+    static void manualValues(String issuer, String account) throws Exception {
+        click(edt(() -> all(uncheckedDialog()).stream().filter(AbstractButton.class::isInstance).map(AbstractButton.class::cast)
+                .filter(b -> b.getText().equals("Manual entry")).findFirst().orElseThrow()));
+        if (!"Add".equals(edt(() -> uncheckedDialog().getRootPane().getDefaultButton().getText()))) throw new AssertionError("Manual default is not Add");
+        text("Issuer / service", issuer); text("Account", account); text("New Base32 secret", "MY");
+    }
     public static void main(String[] args) throws Exception {
         Thread.setDefaultUncaughtExceptionHandler((thread, error) -> { error.printStackTrace(); System.exit(1); });
         theme=args.length==0?"light":args[0];vault=Files.createTempDirectory("totipo-s3-review-");
@@ -138,14 +144,25 @@ public class S3SwingSmoke {
         shortcut(KeyEvent.VK_N);snapshot("add-acquisition");
         Component method=edt(() -> all(uncheckedDialog()).stream().filter(AbstractButton.class::isInstance).map(AbstractButton.class::cast).filter(b -> b.getText().equals("Manual entry")).findFirst().orElseThrow());click(method);
         snapshot("manual-add");
-        click("Review");snapshot("validation");
+        click("Add");snapshot("validation");
         Component focused=edt(() -> KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner());
         if(!(focused instanceof JPasswordField))throw new AssertionError("Invalid secret did not receive focus");
         text("Issuer / service","Example Service");text("Account","review@example.com");text("New Base32 secret","MY");
-        // Enter uses the same validation/review action as a click.
+        // Enter validates and directly adds Manual Entry.
         edt(() -> all(uncheckedDialog()).stream().filter(JPasswordField.class::isInstance).findFirst().orElseThrow().requestFocusInWindow());key(KeyEvent.VK_ENTER);
-        snapshot("manual-review");click("Add");closed();
+        closed();
         waitFor(() -> session.state().tokens().size()==2);
+        // Validated Manual duplicate handling owns the setup; Cancel discards it.
+        shortcut(KeyEvent.VK_N); Thread.sleep(250); manualValues("GitHub", "niki@example.com"); click("Add");
+        if (!dialog().getTitle().equals("TOTP already exists")) throw new AssertionError("Manual entered ordinary Review");
+        snapshot("manual-duplicate"); click("Cancel"); closed();
+        if (session.state().tokens().size()!=2) throw new AssertionError("Duplicate Cancel published");
+        shortcut(KeyEvent.VK_N); Thread.sleep(250); manualValues("Example Service", "review@example.com"); click("Add");
+        click("Add Another"); closed(); waitFor(() -> session.state().tokens().size()==3);
+        shortcut(KeyEvent.VK_N); Thread.sleep(250); manualValues("GitHub", "niki@example.com"); click("Add");
+        click("Update Existing…");
+        if (!button(dialog(), "Save setup").isShowing()) throw new AssertionError("Missing replacement review");
+        click("Save setup"); closed();
         shortcut(KeyEvent.VK_N); Thread.sleep(250); text("Setup URI","otpauth://totp/GitHub:niki%40example.com?secret=MY&issuer=GitHub&algorithm=SHA512&digits=8&period=60");click("Review");snapshot("uri-review");click("Add");snapshot("duplicate-choice");
         if(edt(() -> uncheckedDialog().getRootPane().getDefaultButton().getText()).equals("Update Existing…"))throw new AssertionError("Unsafe duplicate default");
         click("Update Existing…");snapshot("update-existing-review");click("Save setup");closed();
@@ -168,7 +185,7 @@ public class S3SwingSmoke {
         shortcut(KeyEvent.VK_N); Thread.sleep(250); text("Setup URI","otpauth://totp/Abandoned:review?secret=MY");click("Review");shortcut(KeyEvent.VK_L);
         waitFor(() -> app.state()==ShellState.LOCKED);closed();snapshot("locked-after-review");
         edt(() -> app.begin(vault,"review".toCharArray(),false));waitFor(() -> app.state()==ShellState.UNLOCKED);closed();
-        if(session.state().tokens().size()!=2)throw new AssertionError("Abandoned draft published");
+        if(session.state().tokens().size()!=3)throw new AssertionError("Abandoned draft published");
         // Two deliberate fixture branches exercise the existing conflict-version Edit notice.
         // No conflict resolution is performed by this probe.
         VaultState base = session.state();

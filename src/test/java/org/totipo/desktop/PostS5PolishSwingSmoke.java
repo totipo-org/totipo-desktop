@@ -93,7 +93,7 @@ public class PostS5PolishSwingSmoke extends S5SwingSmoke {
                     if (c instanceof JTextArea area && c.getHeight() < area.getPreferredSize().height) { throw new AssertionError("Wrapped message height clipped"); }
                 }
             }
-            if (!"Review".equals(task.getRootPane().getDefaultButton().getText())) { throw new AssertionError("Acquisition semantics changed"); }
+            if (!(all(task).stream().anyMatch(c -> c instanceof AbstractButton b && b.getText().equals("Manual entry") && b.isSelected()) && task.getTitle().equals("Add TOTP") ? "Add" : "Review").equals(task.getRootPane().getDefaultButton().getText())) { throw new AssertionError("Acquisition semantics changed"); }
         });
     }
     static void validateUri(JDialog task, Rectangle original) throws Exception {

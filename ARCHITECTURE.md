@@ -341,8 +341,14 @@ Update Existing converges on the same setup replacement mutation as Change Setup
 
 Submit actions remain available with incomplete input. Activation rejects invalid
 input before submission, exposes a local field message and accessible description,
-and requests focus/scroll to the first problem. Acquisition leads to a separate
-review action. Secondary task cancellation returns to Edit; shell retirement
+and requests focus/scroll to the first problem. Under Design v0.9, URI acquisition
+leads to Review; Manual Add validates, clears source inputs and proceeds directly
+to the shared identity duplicate lookup/publication path. Change Setup and Update
+Existing retain replacement review. Duplicate Cancel destroys the owned setup and
+closes Add; it does not reconstruct the cleared secret. Design permits returning
+to the manual draft only where practical. A changed vault still invalidates a
+duplicate choice; Manual Add returns to acquisition for fresh input if no matches
+remain, without entering ordinary Review. Secondary task cancellation returns to Edit; shell retirement
 always discards the entire flow. A queued validated draft is atomically transferred
 to the session executor, or promptly wiped on retirement before execution.
 

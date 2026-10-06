@@ -13,6 +13,98 @@ import static org.totipo.desktop.TestSupport.edt;
 import static org.totipo.desktop.ui.TokenFixtures.*;
 
 class TokenManagementPanelTest {
+    @Test void manualAddAnotherPublishesDirectlyForOneOrMultipleMatches() throws Exception {
+        for (int count : new int[]{1, 2}) {
+            edt(() -> {
+                State state = count == 1 ? new State(token(1, active("Service")))
+                        : new State(token(1, active("Service")), token(2, active("Service")));
+                AtomicInteger saves = new AtomicInteger();
+                var panel = new TokenManagementPanel(state.value, null, "", () -> state.value,
+                        (base, target, draft) -> { assertNull(target); saves.incrementAndGet(); draft.close(); }, () -> {});
+                manual(panel); panel.issuer.setText("Service"); panel.account.setText("account"); panel.secret.setText("MY");
+                panel.primary.doClick(0); assertEquals("TOTP already exists", panel.title()); assertEquals(0, saves.get());
+                button(panel, "Add Another").doClick(0); assertEquals(1, saves.get());
+                assertEquals("TOTP already exists", panel.title()); assertTrue(state.calls.isEmpty()); panel.retire();
+            });
+        }
+    }
+    @Test void changedVaultInvalidatesManualDuplicateChoiceWithoutOrdinaryReview() throws Exception {
+        edt(() -> {
+            State duplicate = new State(token(1, active("Service"))), empty = new State();
+            var current = new java.util.concurrent.atomic.AtomicReference<>(duplicate.value);
+            var panel = new TokenManagementPanel(duplicate.value, null, "", current::get,
+                    (base, target, draft) -> fail("Stale choice must not publish"), () -> {});
+            manual(panel); panel.issuer.setText("Service"); panel.account.setText("account"); panel.secret.setText("MY");
+            panel.primary.doClick(0); current.set(empty.value); button(panel, "Add Another").doClick(0);
+            assertEquals("Add", panel.primary.getText()); assertTrue(SwingUtilities.isDescendingFrom(panel.secret, panel.body));
+            assertEquals(0, panel.secret.getDocument().getLength()); assertTrue(panel.notice.getText().contains("Enter the new setup again"));
+            panel.retire();
+        });
+    }
+    @Test void manualDirectAddSuppliesExactSetupOnceWithoutMountingReview() throws Exception {
+        edt(() -> {
+            State state = new State(); AtomicInteger saves = new AtomicInteger();
+            var panel = new TokenManagementPanel(state.value, null, "", () -> state.value,
+                    (base, target, draft) -> {
+                        assertSame(state.value, base); assertNull(target);
+                        try {
+                            var field = TokenDraft.class.getDeclaredField("fields"); field.setAccessible(true);
+                            assertEquals(new TokenDescriptor(TokenStatus.ACTIVE, "Service", "account",
+                                    TotpAlgorithm.SHA512, 8, java.time.Duration.ofSeconds(60)), field.get(draft));
+                        } catch (ReflectiveOperationException e) { throw new AssertionError(e); }
+                        saves.incrementAndGet(); draft.close();
+                    }, () -> {});
+            JRootPane root = new JRootPane(); root.setContentPane(panel);
+            panel.installDialog(root, title -> assertTrue(all(panel.body).stream().noneMatch(c ->
+                    c instanceof JTextArea a && a.getText().equals("Authenticator setup"))));
+            manual(panel); panel.issuer.setText("Service"); panel.account.setText("account");
+            panel.secret.setText("MY"); panel.algorithm.select(TotpAlgorithm.SHA512); panel.digits.select(8); panel.period.setText("60");
+            root.getDefaultButton().doClick(0); root.getDefaultButton().doClick(0);
+            assertEquals(1, saves.get()); assertEquals(0, panel.secret.getDocument().getLength());
+            assertTrue(state.calls.isEmpty()); panel.retire();
+        });
+    }
+    @Test void manualDuplicateCancelAndRetirementDestroyOwnedSetupWithoutRestoration() throws Exception {
+        for (int count : new int[]{1, 2}) {
+            for (String exit : List.of("Cancel", "Lock", "Replacement Lock")) {
+                edt(() -> {
+                    State state = count == 1 ? new State(token(1, active("Service")))
+                            : new State(token(1, active("Service")), token(2, active("Service")));
+                    AtomicInteger closed = new AtomicInteger();
+                    var panel = new TokenManagementPanel(state.value, null, "", () -> state.value,
+                            (base, target, draft) -> fail("Must not publish"), closed::incrementAndGet);
+                    manual(panel); panel.issuer.setText("Service"); panel.account.setText("account"); panel.secret.setText("MY");
+                    panel.primary.doClick(0); assertEquals("TOTP already exists", panel.title());
+                    assertEquals(0, panel.secret.getDocument().getLength());
+                    try {
+                        var field = TokenManagementPanel.class.getDeclaredField("setup"); field.setAccessible(true);
+                        SetupDraft owned = (SetupDraft) field.get(panel);
+                        if (exit.equals("Replacement Lock")) {
+                            if (count == 2) { all(panel).stream().filter(JRadioButton.class::isInstance)
+                                    .map(JRadioButton.class::cast).findFirst().orElseThrow().doClick(0); }
+                            panel.primary.doClick(0); assertEquals("Save setup", panel.primary.getText());
+                        }
+                        if (exit.equals("Cancel")) { panel.cancel.doClick(0); assertEquals(1, closed.get()); }
+                        else { panel.retire(); }
+                        assertNull(field.get(panel)); assertThrows(IllegalStateException.class, () -> owned.transfer(null));
+                    } catch (ReflectiveOperationException e) { throw new AssertionError(e); }
+                    panel.primary.doClick(0); assertEquals(0, panel.secret.getDocument().getLength()); assertTrue(state.calls.isEmpty());
+                });
+            }
+        }
+    }
+    @Test void manualMalformedAndInvalidSetupPreserveInputAndIdentifyActionableError() throws Exception {
+        edt(() -> {
+            State state = new State();
+            var panel = new TokenManagementPanel(state.value, null, "", () -> state.value,
+                    (base, target, draft) -> fail("Invalid input must not publish"), () -> {});
+            manual(panel); panel.secret.setText("**"); panel.primary.doClick(0);
+            assertSame(panel.secret, panel.firstInvalid()); assertEquals(2, panel.secret.getDocument().getLength());
+            panel.secret.setText("MY"); panel.period.setText("0"); panel.primary.doClick(0);
+            assertSame(panel.period, panel.firstInvalid()); assertEquals(2, panel.secret.getDocument().getLength());
+            assertTrue(SwingUtilities.isDescendingFrom(panel.secret, panel.body)); assertTrue(panel.primary.isEnabled()); panel.retire();
+        });
+    }
     static JButton button(Container root, String text) {
         return all(root).stream().filter(JButton.class::isInstance).map(JButton.class::cast).filter(b -> b.getText().equals(text)).findFirst().orElseThrow();
     }
@@ -181,10 +273,13 @@ class TokenManagementPanelTest {
             List<Dimension> measured = new ArrayList<>();
             JRootPane root = new JRootPane(); root.setContentPane(panel);
             panel.installDialog(root, title -> { measured.add(panel.taskSize()); fitsAtDefaultSize(panel); });
-            manual(panel);
+            assertEquals("Review", panel.primary.getText()); assertSame(panel.primary, root.getDefaultButton());
+            manual(panel); assertEquals("Add", panel.primary.getText());
+            assertEquals("Add", panel.primary.getAccessibleContext().getAccessibleName()); assertSame(panel.primary, root.getDefaultButton());
             all(panel).stream().filter(AbstractButton.class::isInstance).map(AbstractButton.class::cast)
                     .filter(b -> b.getText().equals("Setup URI")).findFirst().orElseThrow().doClick(0);
-            manual(panel);
+            assertEquals("Review", panel.primary.getText()); assertEquals("Review", panel.primary.getAccessibleContext().getAccessibleName());
+            manual(panel); assertEquals("Add", panel.primary.getText()); assertSame(panel.primary, root.getDefaultButton());
             assertEquals(4, measured.size());
             assertTrue(measured.get(1).height > measured.get(0).height);
             assertEquals(measured.get(0), measured.get(2)); assertEquals(measured.get(1), measured.get(3));
@@ -243,14 +338,10 @@ class TokenManagementPanelTest {
             panel.issuer.setText("x".repeat(257)); panel.primary.doClick(0); assertSame(panel.issuer, panel.firstInvalid());
             panel.issuer.setText("Service"); panel.period.setText("1.5"); panel.primary.doClick(0); assertSame(panel.period, panel.firstInvalid());
             panel.period.setText("30"); panel.secret.setText("MY"); panel.primary.doClick(0);
-            assertEquals(0, saves.get()); assertEquals(TokenManagementPanel.Stage.REVIEW, panelStage(panel));
+            assertEquals(1, saves.get());
             assertEquals(0, panel.secret.getDocument().getLength()); assertEquals(0, panel.uri.getDocument().getLength());
             panel.primary.doClick(0); assertEquals(1, saves.get()); assertTrue(state.calls.isEmpty()); panel.retire();
         });
-    }
-    private static TokenManagementPanel.Stage panelStage(TokenManagementPanel panel) {
-        // Behavior-derived stage without reflective Swing internals.
-        return panel.primary.getText().equals("Add") ? TokenManagementPanel.Stage.REVIEW : TokenManagementPanel.Stage.ACQUIRE;
     }
     @Test void uriAcquisitionReviewsNondefaultsAndNeverRedisplaysRawSecret() throws Exception {
         edt(() -> {
@@ -270,7 +361,7 @@ class TokenManagementPanelTest {
             }, () -> {});
             JRootPane root = new JRootPane(); root.setContentPane(panel); panel.installDialog(root, value -> {});
             manual(panel); panel.issuer.setText("Service"); panel.account.setText("account"); panel.secret.setText("MY");
-            panel.primary.doClick(0); panel.primary.doClick(0);
+            panel.primary.doClick(0);
             assertEquals("Update Existing…", panel.primary.getText()); assertSame(panel.cancel, root.getDefaultButton());
             assertNotNull(button(panel, "Add Another")); assertEquals(0, publications.get());
             panel.primary.doClick(0); assertEquals("Save setup", panel.primary.getText()); assertEquals(0, publications.get());
@@ -283,7 +374,7 @@ class TokenManagementPanelTest {
             var panel = new TokenManagementPanel(state.value, null, "", () -> state.value,
                     (base, target, draft) -> { assertNull(target); saves.incrementAndGet(); draft.close(); }, () -> {});
             manual(panel); panel.issuer.setText("Service"); panel.account.setText("account"); panel.secret.setText("MY");
-            panel.primary.doClick(0); panel.primary.doClick(0); panel.primary.doClick(0);
+            panel.primary.doClick(0); panel.primary.doClick(0);
             assertEquals(0, saves.get()); assertNotNull(panel.firstInvalid());
             var choices = all(panel).stream().filter(JRadioButton.class::isInstance).map(JRadioButton.class::cast).toList();
             assertEquals(2, choices.size()); assertTrue(choices.stream().noneMatch(AbstractButton::isSelected));

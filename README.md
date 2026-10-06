@@ -78,13 +78,16 @@ retry, rollback, or preferred recovery password. Earlier unresolved token-public
 warnings remain independent.
 
 **Add** / `Ctrl+N` opens Add TOTP: explicitly paste an `otpauth://totp` setup URI
-or choose Manual entry, then review the identity and non-secret setup before
-publication. Supported setups use SHA1/SHA256/SHA512, 6–8 digits, and whole periods
+and Review its identity and non-secret setup before publication, or choose Manual
+entry and Add directly after validation (Design v0.9). Supported setups use SHA1/SHA256/SHA512, 6–8 digits, and whole periods
 from 1 to 4294967295 seconds. Manual Base32 accepts ordinary spaces. Totipo does
 not inspect the clipboard for enrollment material. Matching active issuer/account
 values require an explicit Update Existing / Add Another / Cancel decision;
 multiple matches require a target choice. Update Existing reviews a proposed
-setup replacement and preserves the logical TOTP identity.
+setup replacement and preserves the logical TOTP identity. Duplicate Cancel closes
+the Add flow and destroys the owned setup: source secret inputs have already been
+securely transferred/cleared, so the manual draft is not reconstructed. Design v0.9
+permits returning to that draft only where practical.
 
 **Edit TOTP** changes issuer/account and shows a non-secret setup summary.
 **Change setup…** acquires and reviews a new complete authenticator setup;

@@ -5,6 +5,9 @@ import java.awt.event.KeyEvent;
 import java.nio.file.Path;
 import java.util.concurrent.CountDownLatch;
 import javax.swing.JPanel;
+import javax.swing.AbstractButton;
+import javax.swing.JTextField;
+import javax.swing.JRadioButton;
 import javax.swing.JPasswordField;
 import org.junit.jupiter.api.Test;
 import org.totipo.*;
@@ -44,11 +47,31 @@ class OwnedFlowLockTest {
             edt(() -> session.subscriber.onNext(fixture.state)); edt(() -> { });
             edt(() -> {
                 switch (kind) {
-                    case "add" -> view.add.run();
+                    case "add", "manual", "manual-duplicate", "manual-replacement" -> view.add.run();
                     case "edit", "setup", "delete" -> view.edit.open(fixture.state, fixture.token.alternatives().getFirst(), "Edit");
                     case "resolve", "resolve-details" -> view.resolve.open(fixture.state, fixture.token);
                     case "password" -> view.password.run();
                     default -> throw new AssertionError();
+                }
+                if (kind.startsWith("manual")) {
+                    components(view.token).stream().filter(AbstractButton.class::isInstance).map(AbstractButton.class::cast)
+                            .filter(b -> b.getText().equals("Manual entry")).findFirst().orElseThrow().doClick(0);
+                    if (!kind.equals("manual")) {
+                        var descriptor = fixture.token.alternatives().getFirst().descriptor();
+                        for (var c : components(view.token)) {
+                            if (c instanceof JTextField input) {
+                                if ("Issuer / service".equals(input.getAccessibleContext().getAccessibleName())) input.setText(descriptor.issuer());
+                                if ("Account".equals(input.getAccessibleContext().getAccessibleName())) input.setText(descriptor.account());
+                            }
+                        }
+                        password(view.token).setText("MY"); button(view.token, "Add").doClick(0);
+                        assertEquals("TOTP already exists", view.token.title());
+                        if (kind.equals("manual-replacement")) {
+                            components(view.token).stream().filter(JRadioButton.class::isInstance).map(JRadioButton.class::cast)
+                                    .findFirst().ifPresent(b -> b.doClick(0));
+                            button(view.token, "Update Existing…").doClick(0); assertNotNull(button(view.token, "Save setup"));
+                        }
+                    }
                 }
                 if (kind.equals("setup")) {
                     button(view.token, "Change setup…").doClick(0);
@@ -74,6 +97,9 @@ class OwnedFlowLockTest {
     }
     @Test void lockRetiresAddWithoutDraftConfirmation() throws Exception { retire("add", false); }
     @Test void ctrlLRetiresAdd() throws Exception { retire("add", true); }
+    @Test void lockRetiresManualForm() throws Exception { retire("manual", false); }
+    @Test void ctrlLRetiresManualDuplicate() throws Exception { retire("manual-duplicate", true); }
+    @Test void lockRetiresManualReplacementReview() throws Exception { retire("manual-replacement", false); }
     @Test void lockRetiresEditWithoutDraftConfirmation() throws Exception { retire("edit", false); }
     @Test void lockRetiresSetupReviewWithoutPublication() throws Exception { retire("setup", false); }
     @Test void ctrlLRetiresSetupReviewWithoutPublication() throws Exception { retire("setup", true); }

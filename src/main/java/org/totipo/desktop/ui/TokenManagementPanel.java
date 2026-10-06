@@ -10,7 +10,7 @@ import java.util.function.Supplier;
 import javax.swing.*;
 import static org.totipo.desktop.SetupValidation.Field;
 
-/** One session-owned task surface. Acquisition never publishes; review owns a disposable setup. */
+/** One session-owned task surface. Manual Add validates and publishes; imported/replacement review owns a disposable setup. */
 public final class TokenManagementPanel extends JPanel {
     private static final long serialVersionUID = 1L;
     @FunctionalInterface public interface Submit {
@@ -267,7 +267,7 @@ public final class TokenManagementPanel extends JPanel {
         }
     }
     private void acquisitionBody() {
-        reset(Stage.ACQUIRE, "Review"); wide(method, 0);
+        reset(Stage.ACQUIRE, method.selected() && !changing ? "Add" : "Review"); wide(method, 0);
         if (!method.selected()) {
             wide(text("Paste an otpauth:// TOTP setup URI into the field. Review it before saving."), DesktopStyle.SECTION);
             field(Field.URI, "Setup URI", uri);
@@ -343,13 +343,10 @@ public final class TokenManagementPanel extends JPanel {
                                 algorithm.selected(), digits.selected(), period.getText()); }
                         finally { Arrays.fill(input, '\0'); }
                     } else { setup = SetupUri.parse(uri.getPassword()); }
-                    clearInputs(); review(changing);
+                    clearInputs();
+                    if (method.selected() && !changing) { continueAdd(); } else { review(changing); }
                 }
-                case REVIEW -> {
-                    targetBase = current.get();
-                    List<IdentityMatches.Match> found = IdentityMatches.find(targetBase, setup.review());
-                    if (found.isEmpty()) { publish(null, targetBase); } else { duplicates(found); }
-                }
+                case REVIEW -> continueAdd();
                 case DUPLICATE -> {
                     IdentityMatches.Match selected = matches.size() == 1 ? matches.get(0) : chosen;
                     if (selected == null) { throw new SetupValidation.Invalid(Field.ACCOUNT, "Choose the existing TOTP to update, or Add Another."); }
@@ -365,12 +362,20 @@ public final class TokenManagementPanel extends JPanel {
         } catch (SetupValidation.Invalid invalid) { invalid(invalid.field(), invalid.getMessage()); }
         catch (IllegalArgumentException invalid) { invalid(Field.ALGORITHM, "Choose a supported authenticator configuration."); }
     }
+    private void continueAdd() {
+        targetBase = current.get();
+        List<IdentityMatches.Match> found = IdentityMatches.find(targetBase, setup.review());
+        if (found.isEmpty()) { publish(null, targetBase); } else { duplicates(found); }
+    }
     private void publish(TokenAlternative alternative, VaultState base) {
         // A changed active collection must be reviewed again rather than using a stale duplicate decision.
         if (original == null && current.get() != targetBase) {
             targetBase = current.get(); target = null;
             List<IdentityMatches.Match> found = IdentityMatches.find(targetBase, setup.review());
-            if (found.isEmpty()) { review(false); } else { duplicates(found); }
+            if (found.isEmpty() && method.selected()) {
+                discardSetup(); acquisitionBody();
+                notice("The vault view changed. Enter the new setup again before retrying."); return;
+            } else if (found.isEmpty()) { review(false); } else { duplicates(found); }
             notice("The vault view changed. Review your choice again."); return;
         }
         TokenDraft draft = setup.transfer(alternative == null ? null : alternative.descriptor()); discardSetup();

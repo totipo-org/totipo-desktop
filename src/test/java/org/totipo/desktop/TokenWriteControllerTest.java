@@ -113,11 +113,11 @@ class TokenWriteControllerTest {
                 .map(JButton.class::cast).findFirst().orElseThrow();
     }
     static void acquireAndAdd(TokenManagementPanel panel) {
-        // Explicit acquisition followed by a separate affirmative publication action.
+        // Manual Add validates and publishes through the common mutation path.
         var manual = components(panel).stream().filter(AbstractButton.class::isInstance).map(AbstractButton.class::cast)
                 .filter(button -> button.getText().equals("Manual entry")).findFirst().orElseThrow();
         if (!manual.isSelected()) { manual.doClick(0); }
-        password(panel).setText("MY"); button(panel, "Review").doClick(0); button(panel, "Add").doClick(0);
+        password(panel).setText("MY"); button(panel, "Add").doClick(0);
     }
     static JPasswordField password(Container root) {
         return components(root).stream().filter(JPasswordField.class::isInstance).map(JPasswordField.class::cast).findFirst().orElseThrow();
