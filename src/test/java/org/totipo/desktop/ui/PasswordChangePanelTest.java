@@ -14,7 +14,7 @@ class PasswordChangePanelTest {
     void publicInputRulesPermitBothFieldsAndIdenticalPasswords(String input) throws Exception {
         edt(() -> {
             AtomicInteger submissions = new AtomicInteger();
-            var panel = new PasswordChangePanel(value -> { submissions.incrementAndGet(); value.close(); }, () -> {});
+            var panel = new PasswordChangePanel(value -> { submissions.incrementAndGet(); value.close(); }, () -> {}, () -> true);
             panel.current.setText(input); panel.next.setText(input); panel.confirmation.setText(input);
             panel.change.doClick();
             assertEquals(1, submissions.get());
@@ -32,7 +32,7 @@ class PasswordChangePanelTest {
                 boolean valid = input.length() == 1024 || input.equals("\u00e9".repeat(512)) || input.equals("\ud83d\ude00".repeat(256));
                 edt(() -> {
                     AtomicInteger submissions = new AtomicInteger();
-                    var panel = new PasswordChangePanel(value -> { submissions.incrementAndGet(); value.close(); }, () -> {});
+                    var panel = new PasswordChangePanel(value -> { submissions.incrementAndGet(); value.close(); }, () -> {}, () -> true);
                     panel.current.setText(current ? input : "ordinary");
                     panel.next.setText(current ? "ordinary" : input);
                     panel.confirmation.setText(current ? "ordinary" : input);

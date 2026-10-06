@@ -211,6 +211,10 @@ public final class TokenManagementPanel extends JPanel {
         choices.setOpaque(false);
         for (AbstractButton button : choices.options.values()) {
             button.setUI(new javax.swing.plaf.basic.BasicToggleButtonUI() {
+                @Override protected void paintText(Graphics g, AbstractButton b, Rectangle bounds, String text) {
+                    if (b.isEnabled()) { super.paintText(g, b, bounds, text); }
+                    else { DesktopStyle.disabledText(g, b, bounds); }
+                }
                 @Override protected void paintButtonPressed(Graphics graphics, AbstractButton toggle) {
                     graphics.setColor(DesktopStyle.surfaceSelected()); graphics.fillRect(0, 0, toggle.getWidth(), toggle.getHeight());
                 }
@@ -268,7 +272,7 @@ public final class TokenManagementPanel extends JPanel {
                 IdentityMatches.Match match = found.get(i);
                 JRadioButton option = new JRadioButton("TOTP " + (i + 1) + " · " + SetupSummary.format(match.alternative().descriptor())
                         + (match.conflict() ? " · Conflicting version" : ""));
-                option.setOpaque(false); option.setForeground(DesktopStyle.text()); group.add(option); option.addActionListener(event -> chosen = match); wide(option, 12);
+                DesktopStyle.radio(option); group.add(option); option.addActionListener(event -> chosen = match); wide(option, 12);
                 if (i == 0) { inputs.put(Field.ACCOUNT, option); }
             }
             wide(text("If these setups look identical, Totipo cannot tell which one you intend. Choose deliberately or cancel."), 16);

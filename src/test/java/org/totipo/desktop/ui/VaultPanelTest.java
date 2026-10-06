@@ -59,7 +59,7 @@ class VaultPanelTest {
             menu.getItem(0).doClick(); menu.getItem(3).doClick();
             assertArrayEquals(new int[] {1, 1}, called);
             assertEquals("Refresh", menu.getItem(2).getText());
-            assertEquals(javax.swing.KeyStroke.getKeyStroke("F5"), menu.getItem(2).getAccelerator());
+            assertEquals(javax.swing.KeyStroke.getKeyStroke("control R"), menu.getItem(2).getAccelerator());
             int[] refreshes = {0}; panel.onRefresh(() -> refreshes[0]++); menu.getItem(2).doClick(0);
             assertEquals(1, refreshes[0]);
             assertNull(javax.swing.SwingUtilities.getAncestorOfClass(VaultPanel.class, panel.changePassword));

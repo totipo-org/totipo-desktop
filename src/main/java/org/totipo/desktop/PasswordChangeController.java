@@ -19,6 +19,7 @@ final class PasswordChangeController {
     private final Consumer<String> retireSession;
     private PasswordChangePanel panel;
     private boolean pending;
+    private final java.util.concurrent.atomic.AtomicReference<PasswordChangeSubmission> queued = new java.util.concurrent.atomic.AtomicReference<>();
     private boolean closing;
     private PasswordChangeResult lastResult; // Non-secret knowledge, including completion during close.
     private boolean internalFailure;
@@ -43,13 +44,15 @@ final class PasswordChangeController {
     private void submit(PasswordChangeSubmission submission) {
         Edt.require();
         if (closing || pending || panel == null) { submission.close(); return; }
-        pending = true;
+        pending = true; queued.set(submission);
         try {
             executor.execute(() -> {
+                PasswordChangeSubmission owned = queued.getAndSet(null);
+                if (owned == null) { return; }
                 PasswordChangeResult result = null;
                 boolean failed = false;
                 boolean sessionClosed = false;
-                try { result = submission.execute(session); }
+                try { result = owned.execute(session); }
                 catch (SessionClosedException closed) { sessionClosed = true; }
                 catch (RuntimeException unexpected) { failed = true; }
                 PasswordChangeResult outcome = result;
@@ -58,7 +61,8 @@ final class PasswordChangeController {
                 SwingUtilities.invokeLater(() -> accept(outcome, unexpected, closed));
             });
         } catch (RuntimeException rejected) {
-            submission.close();
+            PasswordChangeSubmission abandoned = queued.getAndSet(null);
+            if (abandoned != null) { abandoned.close(); }
             accept(null, true, false);
         }
     }
@@ -125,6 +129,8 @@ final class PasswordChangeController {
 
     void closing() {
         Edt.require(); closing = true;
+        PasswordChangeSubmission abandoned = queued.getAndSet(null);
+        if (abandoned != null) { abandoned.close(); }
         try { retirePanel(); }
         finally { gate.release(this); }
     }

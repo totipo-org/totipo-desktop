@@ -70,7 +70,7 @@ class PasswordChangeTest {
         @Override public void editMerge(MergeEditorPanel editor) { tokenForms++; }
         @Override public void editPassword(PasswordChangePanel editor) {
             panel = editor; forms++;
-            button(panel, "Change").addPropertyChangeListener("enabled", event -> {
+            button(panel, "Change Password").addPropertyChangeListener("enabled", event -> {
                 if (Boolean.TRUE.equals(event.getNewValue())) { finished.countDown(); }
             });
         }
@@ -104,7 +104,7 @@ class PasswordChangeTest {
     }
     static void enterAndSubmit(PasswordChangePanel panel) {
         fields(panel).get(0).setText("current"); fields(panel).get(1).setText("replacement"); fields(panel).get(2).setText("replacement");
-        button(panel, "Change").doClick();
+        button(panel, "Change Password").doClick();
         for (var field : fields(panel)) { assertEquals(0, field.getDocument().getLength()); }
     }
     static void wiped(char[] input) {
@@ -124,7 +124,7 @@ class PasswordChangeTest {
             h.session.result = result; h.open();
             PasswordChangePanel panel = onEdt(() -> h.view.panel);
             h.submit();
-            edt(() -> { assertFalse(h.view.available); button(panel, "Change").doClick(); panel.cancel(); h.view.password.run(); });
+            edt(() -> { assertFalse(h.view.available); button(panel, "Change Password").doClick(); panel.cancel(); h.view.password.run(); });
             h.session.release.countDown();
             boolean retiring = result == PasswordChangeResult.STALE || result == PasswordChangeResult.UNCERTAIN;
             await(retiring ? h.retired : h.view.finished);
@@ -143,7 +143,7 @@ class PasswordChangeTest {
                         assertNull(h.view.panel); assertTrue(h.view.available);
                         assertEquals("Vault password change acknowledged.", h.view.message);
                     } else {
-                        assertSame(panel, h.view.panel); assertTrue(button(panel, "Change").isEnabled());
+                        assertSame(panel, h.view.panel); assertTrue(button(panel, "Change Password").isEnabled());
                         assertFalse(h.view.available); assertTrue(message(panel).contains("not changed by this attempt"));
                         assertFalse(message(panel).contains("uncertain"));
                         if (result == PasswordChangeResult.AUTHENTICATION_FAILED) {
@@ -255,7 +255,8 @@ class PasswordChangeTest {
         var gate = onEdt(() -> new MutationGate(view::writeAvailability));
         var controller = onEdt(() -> new PasswordChangeController(session, executor, view, gate, ignored -> {}));
         try {
-            edt(() -> { controller.open(); enterAndSubmit(view.panel); controller.closing(); });
+            edt(() -> { controller.open(); enterAndSubmit(view.panel); });
+            await(session.entered); edt(controller::closing);
             session.release.countDown(); executor.submit(() -> {}).get(10, TimeUnit.SECONDS);
             edt(() -> { assertEquals(result, controller.lastResult()); assertFalse(controller.internalFailure()); });
         } finally { session.release.countDown(); executor.shutdown(); }
@@ -357,7 +358,8 @@ class PasswordChangeTest {
             var controller = onEdt(() -> new PasswordChangeController(session, executor, view,
                     new MutationGate(view::writeAvailability), ignored -> {}));
             try {
-                edt(() -> { controller.open(); enterAndSubmit(view.panel); if (closeFirst) { controller.closing(); } });
+                edt(() -> { controller.open(); enterAndSubmit(view.panel); });
+                await(session.entered); if (closeFirst) { edt(controller::closing); }
                 session.release.countDown(); executor.submit(() -> {}).get(10, TimeUnit.SECONDS);
                 edt(() -> { assertNull(controller.lastResult()); assertTrue(controller.internalFailure()); controller.closing(); });
                 wiped(session.current); wiped(session.next);
@@ -366,7 +368,7 @@ class PasswordChangeTest {
     }
 
     @ParameterizedTest @EnumSource(value = PasswordChangeResult.class, names = {"STALE", "UNCERTAIN"})
-    void retirementMessageReachesBlockingShellAndReopenIsExplicitNewSession(PasswordChangeResult result) throws Exception {
+    void passwordOutcomeRetiresToLockedShellAndReopenIsExplicitNewSession(PasswordChangeResult result) throws Exception {
         PasswordSession first = new PasswordSession(); first.result = result;
         PasswordSession second = new PasswordSession();
         Shell launcher = new Shell();
@@ -391,7 +393,7 @@ class PasswordChangeTest {
             first.release.countDown(); await(views.getFirst().disposed);
             edt(() -> {
                 assertEquals(1, opens.get()); assertEquals(1, views.size());
-                assertEquals(ShellState.BLOCKING_VAULT_STATE, app.state());
+                assertEquals(ShellState.LOCKED, app.state());
                 assertTrue(launcher.notice.contains("reopen") || launcher.notice.contains("Reopen"));
                 app.begin(java.nio.file.Path.of("same-directory"), new char[]{'f', 'r', 'e', 's', 'h'}, false);
             });

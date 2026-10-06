@@ -26,7 +26,7 @@ final class DesktopStyle {
     static Color surfaceSelected() { return mix(surface(), accent(), .08); }
     static Color text() { return readable(color("List.foreground", Color.BLACK), surface(), 4.5); }
     static Color textSecondary() { return readable(mix(text(), surface(), .25), surface(), 4.5); }
-    static Color textDisabled() { return readable(mix(text(), surface(), .45), surface(), 3); }
+    static Color textDisabled() { return readable(readable(mix(text(), surface(), .45), surface(), 3), surfaceRaised(), 3); }
     static Color border() { return mix(text(), surface(), .8); }
     static Color borderStrong() { return readable(border(), surface(), 3); }
     static Color accent() {
@@ -34,7 +34,7 @@ final class DesktopStyle {
         Color mutedBlue = new Color(65, 100, 145);
         return readable(mix(nativeAccent, mutedBlue, luminance(surface()) < .18 ? .85 : .35), surface(), 3);
     }
-    static Color focus() { return readable(accent(), surfaceSelected(), 3); }
+    static Color focus() { return readable(readable(accent(), surfaceSelected(), 3), surfaceRaised(), 3); }
     static Color onAccent() { return readable(color("List.selectionForeground", Color.WHITE), accent(), 4.5); }
     static Color info() { return accent(); }
     static Color warning() {
@@ -61,6 +61,10 @@ final class DesktopStyle {
         button.putClientProperty("totipo.actionRole", role);
         // The standard Swing delegate respects semantic fills (some L&Fs paint a fixed gradient).
         button.setUI(new javax.swing.plaf.basic.BasicButtonUI() {
+            @Override protected void paintText(Graphics g, AbstractButton b, Rectangle bounds, String text) {
+                if (b.isEnabled()) { super.paintText(g, b, bounds, text); }
+                else { disabledText(g, b, bounds); }
+            }
             @Override public void update(Graphics g, JComponent c) {
                 AbstractButton action = (AbstractButton) c;
                 if (action.isContentAreaFilled()) { paintControlSurface(g, c); }
@@ -86,6 +90,48 @@ final class DesktopStyle {
         button.setPreferredSize(new Dimension(size.width, height));
         button.setMinimumSize(new Dimension(size.width, Math.max(MINIMUM_CONTROL, height)));
     }
+    /** Keep ordinary Swing radio/group semantics; replace only the unreliable native glyph. */
+    static void radio(AbstractButton button) {
+        button.setUI(new javax.swing.plaf.basic.BasicRadioButtonUI());
+        Icon glyph = new RadioGlyph();
+        button.setIcon(glyph); button.setDisabledIcon(glyph); button.setDisabledSelectedIcon(glyph);
+        button.setOpaque(false); button.setForeground(text());
+        button.setFont(font(Typography.Body));
+        button.setIconTextGap(TIGHT);
+        button.setBorder(new ControlBorder(ActionRole.QuietAction, new Insets(MICRO, MICRO, MICRO, MICRO)));
+        button.setBorderPainted(true); button.setFocusPainted(false);
+        UIManager.put("RadioButton.disabledText", textDisabled());
+        button.addFocusListener(new java.awt.event.FocusAdapter() {
+            @Override public void focusGained(java.awt.event.FocusEvent e) { button.repaint(); }
+            @Override public void focusLost(java.awt.event.FocusEvent e) { button.repaint(); }
+        });
+    }
+    static Color radioOutline() { return readable(borderStrong(), surface(), 4.5); }
+    static final class RadioGlyph implements Icon {
+        private int size() { return Math.max(16, font(Typography.Body).getSize()); }
+        @Override public int getIconWidth() { return size(); }
+        @Override public int getIconHeight() { return size(); }
+        @Override public void paintIcon(Component c, Graphics graphics, int x, int y) {
+            AbstractButton button = (AbstractButton) c;
+            Graphics2D g = (Graphics2D) graphics.create();
+            try {
+                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g.setColor(button.isEnabled() ? radioOutline() : textDisabled());
+                g.setStroke(new BasicStroke(2));
+                g.drawOval(x + 2, y + 2, size() - 4, size() - 4);
+                if (button.isSelected()) {
+                    g.setColor(button.isEnabled() ? text() : textDisabled());
+                    int dot = Math.max(6, size() / 2);
+                    g.fillOval(x + (size() - dot) / 2, y + (size() - dot) / 2, dot, dot);
+                }
+            } finally { g.dispose(); }
+        }
+    }
+    static void disabledText(Graphics g, AbstractButton button, Rectangle bounds) {
+        g.setColor(readable(textDisabled(), button.getBackground(), 3));
+        javax.swing.plaf.basic.BasicGraphicsUtils.drawStringUnderlineCharAt(g, button.getText(),
+                button.getDisplayedMnemonicIndex(), bounds.x, bounds.y + g.getFontMetrics().getAscent());
+    }
     static void confirmDanger(JButton button) {
         action(button, ActionRole.DestructiveAction, false);
         button.setBackground(danger());
@@ -109,7 +155,18 @@ final class DesktopStyle {
         Dimension size = field.getPreferredSize();
         field.setPreferredSize(new Dimension(size.width, Math.max(CONTROL, size.height)));
     }
+    static void password(JPasswordField field) {
+        // Keep the password delegate and protected echo/accessibility contract.
+        field.setFont(font(Typography.Body)); field.setBackground(surfaceInput());
+        field.setForeground(readable(text(), surfaceInput(), 4.5)); field.setCaretColor(field.getForeground());
+        field.setBorder(new ControlBorder(null, new Insets(CONTROL_RADIUS, TIGHT, CONTROL_RADIUS, TIGHT)));
+        field.addFocusListener(new java.awt.event.FocusAdapter() {
+            @Override public void focusGained(java.awt.event.FocusEvent e) { field.repaint(); }
+            @Override public void focusLost(java.awt.event.FocusEvent e) { field.repaint(); }
+        });
+    }
     static void menus(JMenuBar bar) {
+        UIManager.put("MenuItem.disabledForeground", textDisabled());
         for (int i = 0; i < bar.getMenuCount(); i++) {
             JMenu menu = bar.getMenu(i);
             if (menu != null) { menuSpacing(menu, true); }

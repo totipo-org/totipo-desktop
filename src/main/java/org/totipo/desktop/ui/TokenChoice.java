@@ -21,6 +21,7 @@ final class TokenChoice<T> extends JPanel {
             String text = label.apply(value);
             AbstractButton button = radio ? new JRadioButton(text) : new JToggleButton(text);
             button.getAccessibleContext().setAccessibleName(name + " " + text);
+            if (radio) { DesktopStyle.radio(button); }
             group.add(button); options.put(value, button); add(button);
         }
         select(values.get(0));

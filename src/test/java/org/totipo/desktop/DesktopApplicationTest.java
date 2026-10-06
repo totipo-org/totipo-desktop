@@ -26,16 +26,25 @@ class DesktopApplicationTest {
             assertFalse(SwingUtilities.isEventDispatchThread()); creates.incrementAndGet(); return create.apply(password);
         }
     }
-    @Test void emptyPasswordCreationRequiresExplicitDecisionButOpenDoesNot() throws Exception {
+    @Test void emptyPasswordCreationAndOpenRequireExplicitDecision() throws Exception {
         for (boolean create : new boolean[] {false, true}) { for (boolean confirm : new boolean[] {false, true}) {
-            Access access = new Access(); Shell shell = new Shell(); shell.allowEmptyPassword = confirm;
+            Access access = new Access(); Shell shell = new Shell(); shell.allowEmptyPassword = confirm; shell.allowEmptyOpenPassword = confirm;
             var app = onEdt(() -> new DesktopApplication(access, shell, path -> new Window()));
             try {
                 edt(() -> app.begin(DIRECTORY, new char[0], create)); await(shell.ready);
-                assertEquals(create ? 1 : 0, shell.emptyConfirmations);
-                assertEquals(create && confirm ? 1 : 0, access.creates.get()); assertEquals(create ? 0 : 1, access.opens.get());
+                assertEquals(1, shell.emptyConfirmations);
+                assertEquals(create && confirm ? 1 : 0, access.creates.get()); assertEquals(!create && confirm ? 1 : 0, access.opens.get());
             } finally { edt(app::shutdown); await(shell.disposed); }
         } }
+    }
+    @Test void lockDuringEmptyPasswordDecisionAbandonsConfirmedAttempt() throws Exception {
+        Access access = new Access(); Shell shell = new Shell(); shell.allowEmptyOpenPassword = true;
+        var app = onEdt(() -> new DesktopApplication(access, shell, path -> new Window()));
+        char[] password = new char[0]; shell.duringEmptyConfirmation = app::lock;
+        try {
+            edt(() -> app.begin(DIRECTORY, password, false)); await(shell.ready);
+            assertEquals(1, shell.emptyConfirmations); assertEquals(0, access.opens.get());
+        } finally { edt(app::shutdown); await(shell.disposed); }
     }
     @Test void shutdownAndReentrantActionsDuringEmptyConfirmationCannotCreate() throws Exception {
         Access access = new Access(); Shell shell = new Shell(); shell.allowEmptyPassword = true;
@@ -46,7 +55,7 @@ class DesktopApplicationTest {
     }
     @Test void nonSessionOpenOutcomesAreDistinctInlineAndWipePassword() throws Exception {
         List<OpenResult> results = List.of(new OpenResult.Absent(), new OpenResult.Unavailable(), new OpenResult.InvalidVault(), new OpenResult.AuthenticationFailed());
-        List<String> messages = List.of("No vault", "unavailable", "invalid or unsupported", "password");
+        List<String> messages = List.of("No vault", "unavailable", "invalid or uses an unsupported", "password");
         for (int i = 0; i < results.size(); i++) {
             OpenResult result = results.get(i); Access access = new Access(); char[] password = {'s'};
             access.open = received -> { assertSame(password, received); assertEquals('s', received[0]); return result; };
@@ -113,13 +122,22 @@ class DesktopApplicationTest {
             assertEquals(1, session.closes.get()); assertEquals("totipo-application", session.closeThread); assertTrue(app.executorShutdown());
         }
     }
-    @Test void failedContentConstructionClosesUnclaimedSession() throws Exception {
-        Access access = new Access(); Session session = new Session(); access.open = password -> new OpenResult.Opened(session);
-        Shell shell = new Shell(); var app = onEdt(() -> new DesktopApplication(access, shell, path -> { throw new IllegalStateException(); }));
-        try {
-            edt(() -> app.begin(DIRECTORY, new char[] {'p'}, false)); await(shell.ready); assertEquals(1, session.closes.get());
-            edt(() -> assertEquals(ShellState.BLOCKING_VAULT_STATE, app.state()));
-        } finally { edt(app::shutdown); await(shell.disposed); }
+    @Test void failedContentConstructionClosesUnclaimedSessionAndRetainsAffirmedTarget() throws Exception {
+        for (boolean create : List.of(false, true)) {
+            Access access = new Access(); Session session = new Session();
+            access.open = password -> new OpenResult.Opened(session);
+            access.create = password -> new CreateVaultResult.Created(session);
+            Shell shell = new Shell(); var store = new RememberedVaultTest.Store(null);
+            var app = onEdt(() -> new DesktopApplication(access, shell, path -> { throw new IllegalStateException(); },
+                    new org.totipo.desktop.clipboard.TotpClipboard(), store));
+            try {
+                edt(() -> app.begin(DIRECTORY, new char[] {'p'}, create)); await(shell.ready); assertEquals(1, session.closes.get());
+                edt(() -> { assertEquals(ShellState.BLOCKING_VAULT_STATE, app.state());
+                    assertEquals(DIRECTORY.toAbsolutePath().normalize(), app.selectedVault());
+                    if (create) { assertEquals(app.selectedVault(), store.path); }
+                });
+            } finally { edt(app::shutdown); await(shell.disposed); }
+        }
     }
     @Test void onePasswordOperationIsAcceptedAndRejectedBufferIsWiped() throws Exception {
         Access access = new Access(); CountDownLatch entered = new CountDownLatch(1), release = new CountDownLatch(1);

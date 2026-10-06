@@ -1,4 +1,4 @@
 package org.totipo.desktop;
 
-/** Read-only belongs to the unlocked VaultState, not this navigation state. */
+/** Persistent navigation states; operation failures do not introduce a global read-only mode. */
 public enum ShellState { NO_VAULT, LOCKED, UNLOCKED, BLOCKING_VAULT_STATE }

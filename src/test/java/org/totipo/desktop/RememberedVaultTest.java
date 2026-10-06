@@ -134,6 +134,14 @@ class RememberedVaultTest {
             edt(() -> { assertEquals(ShellState.LOCKED, app.state()); assertEquals(a, app.selectedVault()); assertEquals(a, store.path); }); }
         finally { stop(app, shell); }
     }
+    @Test void cancellingChangeWhenPreviousLocationDisappearedFallsBackToNoVault() throws Exception {
+        Path a = vault("disappeared"); Shell shell = new Shell(); Store store = new Store(a); var app = app(new Access(), shell, store);
+        try {
+            edt(app::show); await(shell.ready); Files.delete(a.resolve("vault")); Files.delete(a); choose(shell, null);
+            edt(() -> { assertEquals(ShellState.NO_VAULT, app.state()); assertNull(app.selectedVault());
+                assertTrue(shell.notice.contains("previous vault location is unavailable")); });
+        } finally { stop(app, shell); }
+    }
     @Test void noVaultChooserCancelStaysNoVault() throws Exception {
         Shell shell = new Shell(); Store store = new Store(null); var app = app(new Access(), shell, store);
         try { edt(app::show); choose(shell, null); edt(() -> assertEquals(ShellState.NO_VAULT, app.state())); assertNull(store.path); }

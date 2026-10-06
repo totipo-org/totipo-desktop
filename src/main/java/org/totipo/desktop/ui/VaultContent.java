@@ -16,6 +16,7 @@ public final class VaultContent implements VaultView {
     public VaultContent(ShellFrame owner) {
         Edt.require();
         this.owner = owner;
+        panel.aboutAction(() -> owner.aboutVault(panel.changesAvailable() ? "Unlocked; changes available" : "Unlocked; changes temporarily unavailable", panel.diagnosticSummary()));
     }
 
     @Override public void actions(Runnable refresh, Runnable close) {

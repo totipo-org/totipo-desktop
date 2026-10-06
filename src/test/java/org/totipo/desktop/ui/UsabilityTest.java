@@ -92,7 +92,7 @@ class UsabilityTest {
             JTextField search = find(panel, JTextField.class); search.setText("query");
             invoke(panel, JComponent.WHEN_IN_FOCUSED_WINDOW, KeyStroke.getKeyStroke(KeyEvent.VK_F, SwingUsability.menuMask()));
             assertEquals("query", search.getSelectedText());
-            assertEquals(3, panel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).keys().length);
+            assertEquals(4, panel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).keys().length);
             panel.closing();
         });
     }

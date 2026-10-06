@@ -14,6 +14,7 @@ public interface ShellView {
     Path chooseDirectory(Path initialLocation, boolean create);
     PasswordPromptResult password(Path directory, boolean create, PasswordPromptContext context);
     boolean confirmEmptyPassword();
+    default boolean confirmEmptyOpenPassword() { return false; }
     void busy(String status, boolean busy);
     void message(String title, String text);
     void showWindow();

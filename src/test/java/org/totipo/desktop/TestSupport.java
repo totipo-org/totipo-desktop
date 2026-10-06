@@ -138,6 +138,11 @@ public final class TestSupport {
         final List<PasswordPromptContext> passwordContexts = new ArrayList<>();
         boolean allowEmptyPassword;
         int emptyConfirmations;
+        boolean allowEmptyOpenPassword = true;
+        @Override public boolean confirmEmptyOpenPassword() {
+            Edt.require(); assertTrue(busy); emptyConfirmations++;
+            duringEmptyConfirmation.run(); return allowEmptyOpenPassword;
+        }
         boolean busy;
         char[] password = {'p'};
         PasswordPromptResult.Action passwordAction;

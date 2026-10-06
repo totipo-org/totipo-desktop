@@ -1,10 +1,10 @@
 package org.totipo.desktop;
 
 /** Validates human input without allocating an encoded copy or retaining characters. */
-final class PasswordInput {
+public final class PasswordInput {
     private PasswordInput() { }
 
-    static boolean valid(char[] password) {
+    public static boolean valid(char[] password) {
         // Saturate the count but continue validating UTF-16 throughout the input.
         int bytes = 0;
         for (int i = 0; i < password.length; i++) {

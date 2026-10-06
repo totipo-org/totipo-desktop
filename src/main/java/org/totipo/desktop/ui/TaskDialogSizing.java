@@ -38,6 +38,14 @@ final class TaskDialogSizing {
         fit(dialog, content, content.preferredTaskWidth(), content::taskSize);
     }
 
+    static void fit(JDialog dialog, PasswordChangePanel content) {
+        fit(dialog, content, content.preferredTaskWidth(), content::taskSize);
+    }
+
+    static void fit(JDialog dialog, AboutVaultPanel content) {
+        fit(dialog, content, content.preferredTaskWidth(), content::taskSize);
+    }
+
     private static void fit(JDialog dialog, JPanel content, int preferredWidth,
                             java.util.function.IntFunction<Dimension> measured) {
         GraphicsConfiguration display = dialog.getGraphicsConfiguration();

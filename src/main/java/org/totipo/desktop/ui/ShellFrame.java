@@ -21,6 +21,7 @@ public final class ShellFrame extends JFrame implements ShellView {
     private VaultPanel mounted;
     public ShellFrame() {
         super("Totipo"); Edt.require();
+        landing.detailsAction(() -> aboutVault("Cannot safely open", landing.error.getText()));
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
         setContentPane(landing);
         setMinimumSize(VaultPanel.MINIMUM_SIZE);
@@ -52,12 +53,25 @@ public final class ShellFrame extends JFrame implements ShellView {
             setJMenuBar(landingMenus(busy));
         } else { landing.clear(); }
         revalidate(); repaint();
+        if (next == ShellState.LOCKED && !busy) {
+            SwingUtilities.invokeLater(() -> { if (state == ShellState.LOCKED) { landing.password.requestFocusInWindow(); } });
+        }
+    }
+    public void aboutVault(String availability, String diagnostics) {
+        if (selected == null) { return; }
+        JDialog dialog = new JDialog(this, "About This Vault", false);
+        AboutVaultPanel content = new AboutVaultPanel(selected, availability, diagnostics, dialog::dispose);
+        dialog.setContentPane(content); content.installDialog(dialog.getRootPane());
+        TaskDialogSizing.fit(dialog, content); dialog.setLocationRelativeTo(this); dialog.setVisible(true);
     }
     private JMenuBar landingMenus(boolean busy) {
         JMenuBar bar = new JMenuBar(); JMenu file = new JMenu("File"); JMenu vault = new JMenu("Vault");
         JMenuItem leave = new JMenuItem("Exit"); leave.addActionListener(event -> exit.run()); file.add(leave);
         JMenuItem change = new JMenuItem("Change Vault…"); change.setEnabled(!busy);
         change.addActionListener(event -> select.run()); vault.add(change);
+        JMenuItem about = new JMenuItem("About This Vault…"); about.setEnabled(selected != null && !busy);
+        about.addActionListener(event -> aboutVault(state == ShellState.LOCKED ? "Locked" : "Cannot safely open", landing.error.getText()));
+        vault.add(about);
         bar.add(file); bar.add(vault); DesktopStyle.menus(bar); return bar;
     }
     void mount(VaultPanel panel) {
@@ -83,11 +97,16 @@ public final class ShellFrame extends JFrame implements ShellView {
     @Override public PasswordPromptResult password(Path directory, boolean create, PasswordPromptContext context) {
         return PasswordPrompt.ask(this, directory, create, context);
     }
+    @Override public boolean confirmEmptyOpenPassword() {
+        return JOptionPane.showOptionDialog(this, "Open this vault with an empty password?",
+                "Open with Empty Password?", JOptionPane.DEFAULT_OPTION, JOptionPane.WARNING_MESSAGE,
+                null, new Object[] {"Open Anyway", "Cancel"}, "Cancel") == 0;
+    }
     @Override public boolean confirmEmptyPassword() {
-        Object[] choices = {"Create with empty password", "Cancel"};
-        return JOptionPane.showOptionDialog(this, "An empty password provides no password secrecy.\n"
-                + "Anyone with the vault bootstrap can try passwords offline; Argon2id increases guessing cost.\n"
-                + "Create with an empty password?", "Confirm empty vault password", JOptionPane.DEFAULT_OPTION,
+        Object[] choices = {"Create Without Password", "Cancel"};
+        return JOptionPane.showOptionDialog(this,
+                "An empty password provides no password secrecy. Anyone with a copy of the vault may open it.",
+                "Create with Empty Password?", JOptionPane.DEFAULT_OPTION,
                 JOptionPane.WARNING_MESSAGE, null, choices, choices[1]) == 0;
     }
     @Override public void busy(String text, boolean busy) { }

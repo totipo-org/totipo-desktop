@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.totipo.desktop.TestSupport.*;
 
 class ApplicationQuitTest {
+    @org.junit.jupiter.api.io.TempDir Path directory;
     /** Headless window stand-in with the production menu panel and window-close callback. */
     private static final class MenuWindow extends Window {
         final VaultPanel panel = new VaultPanel();
@@ -24,6 +25,7 @@ class ApplicationQuitTest {
     @Test void mainWindowCloseRunsSameQuitPathWithoutReturningToLauncher() throws Exception { quit(false); }
 
     @Test void changeVaultCancelStaysLockedUntilExplicitExit() throws Exception {
+        java.nio.file.Files.writeString(directory.resolve("vault"), "TOTIPO-VLT");
         Session session = new Session(); Shell launcher = new Shell(); Window window = new Window();
         VaultAccess access = new VaultAccess() {
             public OpenResult open(Path path, char[] password) { return new OpenResult.Opened(session); }
@@ -31,7 +33,7 @@ class ApplicationQuitTest {
         };
         var app = onEdt(() -> new DesktopApplication(access, launcher, path -> window));
         try {
-            edt(() -> app.begin(Path.of("vault"), new char[] {'p'}, false)); await(launcher.ready);
+            edt(() -> app.begin(directory, new char[] {'p'}, false)); await(launcher.ready);
             edt(() -> { launcher.ready = new CountDownLatch(1); launcher.directory = null; window.changeVault.run(); });
             await(launcher.ready);
             edt(() -> { assertEquals(ShellState.LOCKED, app.state()); launcher.close.run(); });

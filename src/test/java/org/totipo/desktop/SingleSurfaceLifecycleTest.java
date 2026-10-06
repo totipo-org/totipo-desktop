@@ -92,7 +92,9 @@ class SingleSurfaceLifecycleTest {
             });
             await(f.sessions.getFirst().closeEntered); assertEquals(0, f.shell.directories);
             f.releaseClose.countDown(); await(f.shell.ready);
-            edt(() -> { assertEquals(ShellState.LOCKED, f.app.state()); assertEquals(TARGET, f.app.selectedVault());
+            // This fixture has no filesystem vault. Cancellation must report its unavailable location.
+            // RememberedVaultTest separately covers an available previous target staying LOCKED.
+            edt(() -> { assertEquals(ShellState.NO_VAULT, f.app.state()); assertNull(f.app.selectedVault());
                 assertEquals(1, f.shell.directories); assertEquals(1, f.contents.size()); });
             assertEquals(1, f.opens.get());
         }

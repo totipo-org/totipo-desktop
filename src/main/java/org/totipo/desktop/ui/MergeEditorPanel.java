@@ -113,13 +113,7 @@ public final class MergeEditorPanel extends JPanel {
         button.getAccessibleContext().setAccessibleName(accessible); styleRadio(button); trackFocus(button); return button;
     }
     private static void styleRadio(AbstractButton button) {
-        button.setOpaque(false); button.setForeground(DesktopStyle.text()); button.setFont(DesktopStyle.font(DesktopStyle.Typography.Body));
-        button.setBorder(new DesktopStyle.ControlBorder(DesktopStyle.ActionRole.QuietAction, new Insets(4, 4, 4, 4)));
-        button.setBorderPainted(true);
-        button.addFocusListener(new FocusAdapter() {
-            @Override public void focusGained(FocusEvent e) { button.repaint(); }
-            @Override public void focusLost(FocusEvent e) { button.repaint(); }
-        });
+        DesktopStyle.radio(button);
     }
     private void details() {
         if (busy || retired || stale) { return; }

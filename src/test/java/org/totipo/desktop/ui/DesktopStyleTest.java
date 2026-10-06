@@ -111,7 +111,7 @@ class DesktopStyleTest {
                         assertNotNull(menu.getItem(j).getAccessibleContext());
                     }
                 }
-                assertEquals(KeyStroke.getKeyStroke("F5"), bar.getMenu(1).getItem(2).getAccelerator());
+                assertEquals(KeyStroke.getKeyStroke("control R"), bar.getMenu(1).getItem(2).getAccelerator());
                 var menu = bar.getMenu(0); menu.addSeparator(); DesktopStyle.menus(bar);
                 assertEquals(10, menu.getMenuComponent(1).getPreferredSize().height);
             } finally { vault.closing(); }
@@ -156,7 +156,7 @@ class DesktopStyleTest {
             Object[] previous = java.util.Arrays.stream(keys).map(UIManager::get).toArray();
             try {
                 for (Color surface : List.of(new Color(248, 248, 248), new Color(28, 28, 28))) {
-                    UIManager.put("List.background", surface); UIManager.put("Panel.background", surface);
+                    UIManager.put("List.background", surface); UIManager.put("Panel.background", surface.getRed() > 128 ? new Color(238, 238, 238) : surface);
                     UIManager.put("List.foreground", surface.getRed() > 128 ? Color.BLACK : Color.WHITE);
                     Color cyan = new Color(0, 240, 255); UIManager.put("List.selectionBackground", cyan);
                     Color warning = DesktopStyle.warning(), danger = DesktopStyle.danger();
@@ -167,6 +167,7 @@ class DesktopStyleTest {
                     assertTrue(accentHsb[2] < nativeHsb[2], "Interaction color avoids the bright native cyan treatment");
                     assertTrue(DesktopStyle.contrast(accent, surface) >= 3);
                     assertTrue(DesktopStyle.contrast(DesktopStyle.focus(), DesktopStyle.surfaceSelected()) >= 3);
+                    assertTrue(DesktopStyle.contrast(DesktopStyle.focus(), DesktopStyle.surfaceRaised()) >= 3);
                     assertTrue(DesktopStyle.contrast(DesktopStyle.onAccent(), accent) >= 4.5);
                     UIManager.put("List.selectionBackground", new Color(80, 120, 190));
                     assertEquals(warning, DesktopStyle.warning()); assertEquals(danger, DesktopStyle.danger());
@@ -241,7 +242,7 @@ class DesktopStyleTest {
             Object[] previous = java.util.Arrays.stream(keys).map(UIManager::get).toArray();
             try {
                 for (Color surface : List.of(new Color(248, 248, 248), new Color(28, 28, 28))) {
-                    UIManager.put("List.background", surface); UIManager.put("Panel.background", surface);
+                    UIManager.put("List.background", surface); UIManager.put("Panel.background", surface.getRed() > 128 ? new Color(238, 238, 238) : surface);
                     UIManager.put("TextField.background", surface);
                     UIManager.put("List.foreground", surface.getRed() > 128 ? new Color(75, 75, 75) : new Color(195, 195, 195));
                     UIManager.put("List.selectionBackground", new Color(80, 120, 190));
@@ -249,8 +250,10 @@ class DesktopStyleTest {
                     assertTrue(DesktopStyle.contrast(DesktopStyle.text(), surface) >= 4.5);
                     assertTrue(DesktopStyle.contrast(DesktopStyle.textSecondary(), surface) >= 4.5);
                     assertTrue(DesktopStyle.contrast(DesktopStyle.textDisabled(), surface) >= 3);
+                    assertTrue(DesktopStyle.contrast(DesktopStyle.textDisabled(), DesktopStyle.surfaceRaised()) >= 3);
                     assertTrue(DesktopStyle.contrast(DesktopStyle.warning(), surface) >= 4.5);
                     assertTrue(DesktopStyle.contrast(DesktopStyle.focus(), DesktopStyle.surfaceSelected()) >= 3);
+                    assertTrue(DesktopStyle.contrast(DesktopStyle.focus(), DesktopStyle.surfaceRaised()) >= 3);
                     assertTrue(DesktopStyle.contrast(DesktopStyle.onAccent(), DesktopStyle.accent()) >= 4.5);
                     assertNotEquals(DesktopStyle.warning(), DesktopStyle.danger());
                     var row = new TokenRowPanel(token(1, active("A")), () -> {}, () -> {}, () -> {}, i -> {});

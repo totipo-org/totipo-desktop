@@ -14,15 +14,18 @@ public final class ShellPanel extends JPanel {
     private static final long serialVersionUID = 1L;
     final JLabel identity = new JLabel("Totipo");
     final JLabel path = new JLabel();
+    final JButton details = new JButton("Details…");
+    final JPanel detailsRow = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEADING, 0, 0));
     final JLabel status = new JLabel("No vault selected");
     final JPasswordField password = new JPasswordField(24);
     final JLabel passwordLabel = SwingUsability.label("Password", password);
     final JLabel error = new JLabel();
+    final JTextArea explanation = new JTextArea();
     final JButton primary = new JButton("Select Vault");
     final JButton secondary = new JButton("Create New Vault…");
     final JPanel task = new JPanel(new GridBagLayout());
     final JPanel actionRow = SwingUsability.taskActions(primary, secondary);
-    final EmptyState welcome = new EmptyState(identity, error, 480);
+    final EmptyState welcome = new EmptyState(identity, explanation, 480);
     static final int MAX_TASK_WIDTH = 560;
     private transient Runnable select = () -> { };
     private transient Runnable create = () -> { };
@@ -42,8 +45,13 @@ public final class ShellPanel extends JPanel {
         path.getAccessibleContext().setAccessibleName("Vault location");
         password.getAccessibleContext().setAccessibleName("Password");
         // Preserve JPasswordField's password delegate and echo/accessibility behavior.
-        password.setBorder(BorderFactory.createCompoundBorder(password.getBorder(), BorderFactory.createEmptyBorder(6, 8, 6, 8)));
+        DesktopStyle.password(password);
         error.setForeground(DesktopStyle.danger());
+        explanation.setEditable(false); explanation.setOpaque(false); explanation.setLineWrap(true); explanation.setWrapStyleWord(true);
+        explanation.setFont(DesktopStyle.font(DesktopStyle.Typography.Body)); explanation.setForeground(DesktopStyle.danger());
+        explanation.getAccessibleContext().setAccessibleName("Vault state details");
+        DesktopStyle.action(details, DesktopStyle.ActionRole.QuietAction, false);
+        detailsRow.setOpaque(false); detailsRow.add(details);
         DesktopStyle.action(primary, DesktopStyle.ActionRole.PrimaryAction, false);
         DesktopStyle.action(secondary, DesktopStyle.ActionRole.QuietAction, false);
         for (JComponent field : new JComponent[] {identity, path, status, passwordLabel, password, error}) {
@@ -61,6 +69,9 @@ public final class ShellPanel extends JPanel {
         int availableWidth = Math.max(0, getWidth() - margins.left - margins.right);
         int availableHeight = Math.max(0, getHeight() - margins.top - margins.bottom);
         int width = Math.min(MAX_TASK_WIDTH, availableWidth);
+        explanation.setSize(width, Integer.MAX_VALUE / 1024);
+        explanation.setMinimumSize(new Dimension(0, explanation.getPreferredSize().height));
+        task.invalidate();
         int height = Math.min(task.getPreferredSize().height, availableHeight);
         task.setBounds(margins.left + (availableWidth - width) / 2,
                 margins.top + (int) ((availableHeight - height) * .42), width, height);
@@ -81,8 +92,9 @@ public final class ShellPanel extends JPanel {
             row = taskLine(passwordLabel, row, 24);
             row = taskLine(password, row, 8);
         }
-        if (error.isVisible()) { row = taskLine(error, row, 12); }
-        taskLine(actionRow, row, 24);
+        if (error.isVisible()) { row = taskLine(explanation, row, 12); }
+        row = taskLine(actionRow, row, 24);
+        if (details.isVisible()) { taskLine(detailsRow, row, 8); }
         task.revalidate();
     }
     private int taskLine(JComponent component, int row, int gap) {
@@ -100,6 +112,7 @@ public final class ShellPanel extends JPanel {
     public void actions(Runnable select, Runnable create, Consumer<char[]> open) {
         this.select = select; this.create = create; this.open = open;
     }
+    public void detailsAction(Runnable action) { details.addActionListener(event -> action.run()); }
     public void retryAction(Runnable action) { retry = action; }
     private void activate() {
         if (!primary.isEnabled()) { return; }
@@ -122,10 +135,14 @@ public final class ShellPanel extends JPanel {
         path.setText(selected == null ? "" : selected.toString()); path.setVisible(selected != null);
         path.setToolTipText(selected == null ? null : selected.toString());
         path.getAccessibleContext().setAccessibleDescription(selected == null ? null : selected.toString());
-        status.setText(next == ShellState.NO_VAULT || next == ShellState.LOCKED ? "" : "This vault cannot be opened.");
+        status.setText(next == ShellState.NO_VAULT || next == ShellState.LOCKED ? "" : "Totipo can’t safely open this vault");
         status.setVisible(!status.getText().isEmpty());
         password.setVisible(next == ShellState.LOCKED); passwordLabel.setVisible(next == ShellState.LOCKED);
+        details.setVisible(next == ShellState.BLOCKING_VAULT_STATE);
+        details.setEnabled(!busy);
         error.setText(notice); error.setVisible(!notice.isEmpty());
+        explanation.setText(notice); explanation.setVisible(!notice.isEmpty());
+        explanation.setForeground(next == ShellState.NO_VAULT ? DesktopStyle.textSecondary() : DesktopStyle.danger());
         error.setToolTipText(notice.isEmpty() ? null : notice);
         primary.setText(next == ShellState.NO_VAULT ? "Select Vault" : next == ShellState.BLOCKING_VAULT_STATE ? "Try Again" : "Open");
         secondary.setText(next == ShellState.NO_VAULT ? "Create New Vault…" : "Change Vault…");

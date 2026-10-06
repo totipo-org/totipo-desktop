@@ -59,4 +59,38 @@ class NioPasswordChangeTest {
             }
         } finally { Arrays.fill(old, '\0'); Arrays.fill(wrong, '\0'); Arrays.fill(next, '\0'); }
     }
+
+    @Test void unlockedSessionDoesNotAuthorizeReplacementWithEmptyCurrentPassword() {
+        char[] current = {'o', 'l', 'd'}, next = {'n', 'e', 'w'};
+        try {
+            try (var session = assertInstanceOf(CreateVaultResult.Created.class, NioTotipo.create(directory, current)).session()) {
+                var fingerprint = session.fingerprint();
+                assertEquals(PasswordChangeResult.AUTHENTICATION_FAILED, session.changePassword(new char[0], next));
+                assertEquals(fingerprint, session.fingerprint());
+                assertNotNull(session.state()); session.requestRefresh();
+                // A local authentication failure leaves ordinary mutation semantics intact.
+                try (var builder = session.state().createToken()) { assertNotNull(builder); }
+            }
+            assertInstanceOf(OpenResult.AuthenticationFailed.class, NioTotipo.open(directory, next));
+            try (var reopened = assertInstanceOf(OpenResult.Opened.class, NioTotipo.open(directory, current)).session()) {
+                assertNotNull(reopened.state());
+            }
+        } finally { Arrays.fill(current, '\0'); Arrays.fill(next, '\0'); }
+    }
+
+    @Test void emptyCurrentPasswordAuthenticatesOnlyWhenActualPasswordIsEmpty() {
+        char[] current = new char[0], next = {'n', 'e', 'w'};
+        try {
+            VaultFingerprint fingerprint;
+            try (var session = assertInstanceOf(CreateVaultResult.Created.class, NioTotipo.create(directory, current)).session()) {
+                fingerprint = session.fingerprint();
+                assertEquals(PasswordChangeResult.CHANGED, session.changePassword(current, next));
+            }
+            assertInstanceOf(OpenResult.AuthenticationFailed.class, NioTotipo.open(directory, current));
+            try (var reopened = assertInstanceOf(OpenResult.Opened.class, NioTotipo.open(directory, next)).session()) {
+                assertEquals(fingerprint, reopened.fingerprint());
+            }
+        } finally { Arrays.fill(next, '\0'); }
+    }
+
 }

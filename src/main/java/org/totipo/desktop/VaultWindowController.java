@@ -23,6 +23,7 @@ final class VaultWindowController {
     private final MutationGate gate;
     private final Consumer<String> retirementMessage;
     private String retirementReason;
+    private boolean reopenRequired;
     private VaultState latest;
     private boolean closing;
     private boolean closeSucceeded;
@@ -53,7 +54,7 @@ final class VaultWindowController {
         gate = new MutationGate(view::writeAvailability);
         writes = new TokenWriteController(executor, view, this::close, gate);
         passwords = new PasswordChangeController(session, executor, view, gate, reason -> {
-            if (!closing) { retirementReason = reason; close(); }
+            if (!closing) { retirementReason = reason; reopenRequired = true; close(); }
         });
         subscriber = new StateSubscriber(this::render, () -> close(true), this::close);
     }
@@ -175,6 +176,8 @@ final class VaultWindowController {
             });
         }
     }
+
+    boolean reopenRequired() { Edt.require(); return reopenRequired; }
 
     boolean executorShutdown() {
         return executor.isShutdown();

@@ -11,9 +11,9 @@ final class EmptyState extends JPanel {
     private static final long serialVersionUID = 1L;
     final JPanel content = new JPanel(new GridBagLayout());
     final JLabel heading;
-    final JLabel explanation;
+    final JComponent explanation;
     private final int maximumWidth;
-    EmptyState(JLabel heading, JLabel explanation, int maximumWidth) {
+    EmptyState(JLabel heading, JComponent explanation, int maximumWidth) {
         super(null); Edt.require();
         this.heading = heading; this.explanation = explanation; this.maximumWidth = maximumWidth;
         setOpaque(false); content.setOpaque(false);
@@ -28,7 +28,7 @@ final class EmptyState extends JPanel {
     void compose(JButton... actions) {
         content.removeAll();
         heading.setHorizontalAlignment(SwingConstants.CENTER);
-        explanation.setHorizontalAlignment(SwingConstants.CENTER);
+        if (explanation instanceof JLabel label) { label.setHorizontalAlignment(SwingConstants.CENTER); }
         line(heading, 0, 0, true);
         int row = 1;
         if (explanation.isVisible()) { line(explanation, row++, 12, true); }
@@ -49,6 +49,10 @@ final class EmptyState extends JPanel {
     @Override public void doLayout() {
         Insets margin = getInsets();
         int width = Math.min(maximumWidth, Math.max(0, getWidth() - margin.left - margin.right));
+        if (explanation instanceof JTextArea text) {
+            text.setSize(width, Integer.MAX_VALUE / 1024);
+            text.setMinimumSize(new Dimension(0, text.getPreferredSize().height)); content.invalidate();
+        }
         int availableHeight = Math.max(0, getHeight() - margin.top - margin.bottom);
         int height = Math.min(content.getPreferredSize().height, availableHeight);
         content.setBounds(margin.left + (getWidth() - margin.left - margin.right - width) / 2,

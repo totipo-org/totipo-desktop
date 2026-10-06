@@ -102,9 +102,13 @@ public class S3SwingSmoke {
         }
         robot=new Robot(); robot.setAutoDelay(60);
         edt(() -> {
+            if (!theme.equals("native")) {
+                try { UIManager.setLookAndFeel(UIManager.getCrossPlatformLookAndFeelClassName()); }
+                catch (ReflectiveOperationException | UnsupportedLookAndFeelException e) { throw new AssertionError(e); }
+            }
             if(theme.equals("dark")) {
-                for(String key:List.of("Panel.background","List.background","TextField.background","PasswordField.background","TextArea.background","ToggleButton.background","RadioButton.background","Button.background","Viewport.background","ScrollPane.background")) UIManager.put(key,new Color(38,42,47));
-                for(String key:List.of("Label.foreground","List.foreground","TextField.foreground","PasswordField.foreground","TextArea.foreground","ToggleButton.foreground","RadioButton.foreground","Button.foreground"))UIManager.put(key,new Color(230,232,235));
+                for(String key:List.of("Panel.background","List.background","TextField.background","PasswordField.background","TextArea.background","ToggleButton.background","RadioButton.background","Button.background","Viewport.background","ScrollPane.background", "MenuBar.background", "Menu.background", "MenuItem.background", "PopupMenu.background")) UIManager.put(key,new Color(38,42,47));
+                for(String key:List.of("Label.foreground","List.foreground","TextField.foreground","PasswordField.foreground","TextArea.foreground","ToggleButton.foreground","RadioButton.foreground","Button.foreground", "Menu.foreground", "MenuItem.foreground"))UIManager.put(key,new Color(230,232,235));
                 UIManager.put("List.selectionBackground",new Color(80,120,190));UIManager.put("List.selectionForeground",Color.WHITE);
             }
             ApplicationFonts.install();

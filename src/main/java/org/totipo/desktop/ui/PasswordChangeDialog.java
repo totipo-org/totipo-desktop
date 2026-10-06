@@ -9,14 +9,15 @@ import javax.swing.JFrame;
 final class PasswordChangeDialog extends JDialog {
     private static final long serialVersionUID = 1L;
     PasswordChangeDialog(JFrame owner, PasswordChangePanel panel) {
-        super(owner, "Change Password", false);
+        super(owner, "Change Vault Password", false);
         Edt.require();
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
         setContentPane(panel);
         panel.installDialog(getRootPane());
         addWindowListener(new WindowAdapter() {
+            @Override public void windowOpened(WindowEvent event) { panel.focusInitialField(); }
             @Override public void windowClosing(WindowEvent event) { panel.cancel(); }
         });
-        pack(); SwingUsability.fit(this, getWidth(), getHeight()); setLocationRelativeTo(owner);
+        TaskDialogSizing.fit(this, panel); setLocationRelativeTo(owner);
     }
 }

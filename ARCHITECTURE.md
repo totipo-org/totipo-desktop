@@ -107,8 +107,9 @@ cleared when dismissed. Cancellation/rejection wipes any retrieved primary array
 It rejects unpaired surrogates and more than 1024 UTF-8 bytes. Empty input and all
 other valid Unicode within the limit are accepted. Creating with an empty password
 requires a separate explicit warning/confirmation, with Cancel as the default.
-The application reserves the shell during this dialog and rechecks shutdown.
-Opening an existing empty-password vault requires no creation confirmation.
+The application reserves the shell during this dialog and rechecks shutdown and
+lock generation. Opening with an empty password uses its own explicit Open Anyway
+confirmation; no password is retained for that decision or retry.
 Once accepted for background work, the operation owns the primary array and wipes
 it in `finally`, whether NIO returns a session, another outcome, or throws. This is
 best-effort JVM secret hygiene, not a secure-erasure guarantee. No passwords are
@@ -215,7 +216,7 @@ and eight logical pixels between actions. Toolbars and TokenRow actions retain
 their independent layouts.
 The unlocked collection has one Search/count/Add row. Search expands; count is
 secondary and Add has its natural command width at the trailing edge. Refresh
-is menu/F5 only. With zero semantic TOTPs, the header is hidden and the result
+is Vault-menu/Ctrl+R (with F5 retained) only. With zero semantic TOTPs, the header is hidden and the result
 area uses EmptyState with No TOTPs yet, explanatory text and primary Add. With
 zero search matches, the header remains and EmptyState offers quiet Clear Search.
 Filtered count is M of N; unfiltered count is N TOTPs. Clear Search follows the
@@ -225,7 +226,12 @@ so centering follows viewport space rather than list preferred height. The copy
 notification still overlays that same result area. Conflict header padding is
 balanced above/below its vertically centered title and Resolve control; its
 semantic edge, children and resolver callbacks are preserved.
-Read-only remains an attribute of usable session state. Wrong password remains
+Design v0.8 defines no inferred global Read-only state or Open Read-Only mode.
+Java 0.1.3 exposes no global storage access capability; desktop does not probe
+permissions or infer one from operation failures. The single MutationGate owns
+workflow/session availability, including reservation and retirement. A future
+explicit read-only session/capability requires separate product design.
+Wrong password remains
 LOCKED with inline feedback; required invalid/unsupported or unavailable state
 blocks ordinary token content. Try Again returns to the password form. No raw
 password is retained for retry. The existing API cannot distinguish every
@@ -509,11 +515,19 @@ therefore reserves no slot. Password handling never clears that notice.
 when cancellation is allowed. The form uses three `JPasswordField`s, calls only
 `getPassword`, and never converts passwords to Strings. `PasswordChangeSubmission`
 reuses `PasswordInput` for current and new arrays: valid UTF-16 and at most 1024
-UTF-8 bytes. Empty and identical passwords are allowed. It compares new and
+UTF-8 bytes. Empty and identical passwords are allowed; the UI requires explicit
+Change Password Anyway confirmation for an empty replacement. Design v0.8 requires
+current-password reauthentication even in an unlocked session. The form collects
+Current password, New password and Confirm new password; Java 0.1.3 supplies the
+aligned public changePassword(current, new) API. No unlock password is cached. It compares new and
 confirmation arrays directly and wipes confirmation immediately after comparison
 (or on validation rejection). Rejection wipes current/new too. The panel clears
 all three documents before disabling controls and invoking the submission callback.
 Cancel or vault close clears unsent documents and constructs no operation.
+The concise form explains retained copies, validates on activation, focuses the
+first problem, and uses one outer scroller with a separate footer. Its owned window
+is titled Change Vault Password. STALE/UNCERTAIN retire to LOCKED with the operation
+notice, rather than classifying the vault itself as invalid or blocking.
 
 One submission owns the two remaining caller arrays exclusively. It travels only
 to one task on the existing `totipo-session-N` executor, never into application,
@@ -549,13 +563,14 @@ STALE/UNCERTAIN retirement immediately marks the window closing on EDT, disables
 actions, clears the form, cancels state presentation and stops TOTP through the
 existing close path. Session close is queued on the session executor. After close
 and content retirement, `DesktopApplication` presents the reopen-required explanation
-in BLOCKING_VAULT_STATE, unless shutdown has begun. No interactive stale session
-remains while it is read. There is no automatic Open. Try Again and an explicit Open create an ordinary new
+in LOCKED, unless shutdown has begun. No interactive stale session
+remains while it is read. There is no automatic Open. An explicit Open creates an ordinary new
 session with no old state, heads, alternatives, partial/retry handles or password
 arrays carried into it.
 
 Window close and application shutdown mark closing immediately, clear unsent
-forms, and queue cleanup/close behind any submitted password call. They never
+forms, discard/wipe any still-queued password submission, and queue cleanup/close
+behind a password call that has already started. They never
 interrupt KDF/replacement or wait on EDT. Every eventual typed result retains its
 meaning internally, including CHANGED, but late delivery cannot restore controls,
 reopen the form or show normal success/error UI. STALE/UNCERTAIN close remains
@@ -684,3 +699,21 @@ CI tests. It consumes public high-level NioTotipo APIs beneath an operator-chose
 test root, with a unique disposable child and bounded observation waits. Native
 GUI/clipboard and filesystem qualification remain evidence about exact environments,
 not protocol guarantees or general platform support.
+
+## S5 safe vault details and choices
+
+Vault → About This Vault is available for a known location in locked, unlocked
+and blocking states. Blocking Details opens the same safe secondary surface.
+Only display name, normalized location, high-level state, the explicit absence of
+an API write-access signal, and a bounded observation/open notice are shown.
+The public API supplies no format/version metadata; no value is fabricated.
+Values are enabled, selectable, read-only text. No session, fingerprint, token,
+secret group, Head, password or code object is supplied to that panel.
+
+Shared RadioChoice styling uses ordinary JRadioButton/BasicRadioButtonUI and
+ButtonGroup keyboard/accessibility semantics, with a scale-aware high-contrast
+ring/dot icon and independent focus border. Exclusive choices retain checked
+semantics and bold selected labels. Disabled action text uses the shared contrast
+floor; password fields retain their password delegates with shared focus borders.
+The [S5 report](review/S5_FINAL_CONFORMANCE_REPORT.md) records truthful API granularity,
+the per-item committed Design v0.8 matrix, tests and limited platform qualification.

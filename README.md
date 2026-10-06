@@ -5,7 +5,7 @@ hardening, unreleased and NOT QUALIFIED**. The feature set includes explicit
 TOTP clipboard copying, alongside merge/conflict resolution, token create,
 ordinary update, and publication uncertainty. S2 adds a persistent application
 shell and desktop locking on the committed S1 visual foundation. The application supports local
-vault create/open, observation and diagnostics, read-only logical-token/TOTP
+vault create/open, observation and diagnostics, logical-token/TOTP
 browsing, manual Base32 token creation, and ordinary update of an explicitly
 selected semantic alternative. One application window contains no-vault, locked,
 unlocked, or blocking vault content, with at most one session. Refresh requests local observation.
@@ -113,7 +113,7 @@ secrets, and storage/synchronization provider copies are not erased. Password
 change rewraps the same root key; it does not rotate the root, revoke old bootstrap copies,
 provide rollback protection, or recover from root compromise.
 
-Creating with an empty password requires a separate explicit confirmation.
+Creating or opening with an empty password requires a separate explicit confirmation.
 Existing empty-password vaults remain readable. Possession of the vault bootstrap
 permits offline password guessing; Argon2id raises its cost, not its possibility.
 Before creating in a location with object-looking files but a missing `vault`,
@@ -177,7 +177,13 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for threading, state, and ownership polic
 See also the [M1b report](review/M1B_READ_ONLY_TOKEN_REPORT.md) and
 [M2a review report](review/M2A_CREATE_UPDATE_PUBLICATION_REPORT.md) and
 [M2b review report](review/M2B_MERGE_RESOLUTION_REPORT.md).
-See the [M3a password-change report](review/M3A_PASSWORD_CHANGE_REPORT.md) for lifecycle and validation evidence.
+See the [S5 final conformance report](review/S5_FINAL_CONFORMANCE_REPORT.md) for
+current vault states, safe About details, password UX, accessibility and qualification.
+Committed Design v0.8 requires current-password reauthentication for password
+changes, supported by Java 0.1.3. It defines no inferred global Read-only mode.
+Desktop preserves operation-specific failures and uncertainty; it does not probe
+storage permissions or fabricate unavailable vault-format metadata.
+The [M3a password-change report](review/M3A_PASSWORD_CHANGE_REPORT.md) records historical evidence.
 
 ## Packaging and qualification (M4a)
 

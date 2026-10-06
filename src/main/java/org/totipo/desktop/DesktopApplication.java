@@ -114,15 +114,15 @@ public final class DesktopApplication {
         }
         busy = true;
         render();
-        if (create && password.length == 0) {
-            boolean confirmed = false;
-            try { confirmed = shell.confirmEmptyPassword(); }
-            finally {
-                if (!confirmed || shuttingDown) { Arrays.fill(password, '\0'); finishOperation(); }
-            }
-            if (!confirmed || shuttingDown) { return; }
-        }
         long attempt = generation;
+        if (password.length == 0) {
+            boolean confirmed = false;
+            try { confirmed = create ? shell.confirmEmptyPassword() : shell.confirmEmptyOpenPassword(); }
+            finally {
+                if (!confirmed || shuttingDown || attempt != generation) { Arrays.fill(password, '\0'); finishOperation(); }
+            }
+            if (!confirmed || shuttingDown || attempt != generation) { return; }
+        }
         executor.execute(() -> {
             OpenResult opened = null;
             CreateVaultResult created = null;
@@ -144,6 +144,8 @@ public final class DesktopApplication {
             return;
         }
         if (session != null) {
+            selected = directory.toAbsolutePath().normalize();
+            if (create != null) { preferences.setLastVault(selected); }
             VaultView view = null;
             try {
                 view = content.apply(directory);
@@ -155,8 +157,6 @@ public final class DesktopApplication {
                 notice = "Vault content could not be opened.";
                 closeUnclaimed(session); return;
             }
-            selected = directory.toAbsolutePath().normalize();
-            if (create != null) { preferences.setLastVault(selected); }
             state = ShellState.UNLOCKED; notice = "";
             VaultWindowController owner = controller;
             view.quitAction(this::shutdown);
@@ -181,8 +181,8 @@ public final class DesktopApplication {
         } else {
             state = ShellState.BLOCKING_VAULT_STATE;
             notice = open instanceof OpenResult.Absent ? "No vault was found at this location."
-                    : open instanceof OpenResult.Unavailable ? "This vault is unavailable. Try again."
-                    : open instanceof OpenResult.InvalidVault ? "This vault's required data is invalid or unsupported."
+                    : open instanceof OpenResult.Unavailable ? "Required vault data is unavailable. Try opening again."
+                    : open instanceof OpenResult.InvalidVault ? "Required vault data is invalid or uses an unsupported format."
                     : "The vault operation failed unexpectedly.";
         }
         finishOperation();
@@ -225,7 +225,25 @@ public final class DesktopApplication {
         boolean handedOff = false;
         try {
             Path target = shell.chooseDirectory(selected, create);
-            if (target == null || shuttingDown) { return; }
+            if (shuttingDown) { return; }
+            if (target == null) {
+                if (!create && selected != null) {
+                    Path previous = selected;
+                    long attempt = generation;
+                    handedOff = true;
+                    executor.execute(() -> {
+                        boolean found = VaultTarget.recognizable(previous);
+                        SwingUtilities.invokeLater(() -> {
+                            if (!shuttingDown && attempt == generation && !found) {
+                                selected = null; state = ShellState.NO_VAULT;
+                                notice = "The previous vault location is unavailable. Select a vault to continue.";
+                            }
+                            finishOperation();
+                        });
+                    });
+                }
+                return;
+            }
             target = target.toAbsolutePath().normalize();
             if (create) {
                 try (var result = shell.password(target, true, PasswordPromptContext.EXPLICIT)) {
@@ -261,7 +279,7 @@ public final class DesktopApplication {
         inactivity.retired(); timer.stop();
         if (!owner.closeSucceeded()) { shutdown(); }
         if (state == ShellState.UNLOCKED) {
-            state = notice.isEmpty() ? ShellState.LOCKED : ShellState.BLOCKING_VAULT_STATE;
+            state = notice.isEmpty() || owner.reopenRequired() ? ShellState.LOCKED : ShellState.BLOCKING_VAULT_STATE;
         }
         boolean choose = chooseAfterClose; chooseAfterClose = false;
         if (choose && !shuttingDown) { choose(false); }
