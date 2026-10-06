@@ -302,10 +302,20 @@ class PostS5PolishTest {
                         JPanel content = (JPanel) resolve.getParent(); JLabel label = TokenBrowserTest.find(content, JLabel.class);
                         assertEquals(label.getBounds().getCenterY(), resolve.getBounds().getCenterY(), .5);
                         assertEquals(resolve.getPreferredSize(), resolve.getSize());
-                        assertEquals(DesktopStyle.TIGHT, content.getInsets().top); assertEquals(content.getInsets().top, content.getInsets().bottom);
-                        assertEquals(Math.max(label.getPreferredSize().height, resolve.getPreferredSize().height) + 2 * DesktopStyle.TIGHT, content.getPreferredSize().height);
+                        assertEquals(DesktopStyle.COMPACT, content.getInsets().top); assertEquals(content.getInsets().top, content.getInsets().bottom);
+                        assertEquals(Math.max(label.getPreferredSize().height, resolve.getPreferredSize().height) + 2 * DesktopStyle.COMPACT, content.getPreferredSize().height);
                         JPanel wrapper = (JPanel) content.getParent();
                         assertEquals(content.getPreferredSize().height + DesktopStyle.BORDER, wrapper.getPreferredSize().height);
+                        // Measure the visible header band from the group's top edge to its divider,
+                        // including ancestor padding; centered child bounds alone missed this gap.
+                        Container group = wrapper.getParent();
+                        Rectangle actionInGroup = SwingUtilities.convertRectangle(resolve.getParent(), resolve.getBounds(), group);
+                        Component divider = ((BorderLayout) wrapper.getLayout()).getLayoutComponent(BorderLayout.SOUTH);
+                        Rectangle dividerInGroup = SwingUtilities.convertRectangle(divider.getParent(), divider.getBounds(), group);
+                        int above = actionInGroup.y;
+                        int below = dividerInGroup.y - actionInGroup.y - actionInGroup.height;
+                        assertEquals(above, below, "Resolve has balanced space from group top to divider");
+                        assertEquals(DesktopStyle.COMPACT, above);
                         Rectangle r = SwingUtilities.convertRectangle(resolve.getParent(), resolve.getBounds(), panel.list);
                         for (TokenRowPanel child : panel.rows) {
                             Rectangle action = SwingUtilities.convertRectangle(child.show.getParent(), child.show.getBounds(), panel.list);

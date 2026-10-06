@@ -1036,3 +1036,54 @@ Final `git diff --stat` (tracked files; excludes the three existing untracked fi
  .../org/totipo/desktop/ui/U4ConflictGroupTest.java |   9 +-
  34 files changed, 813 insertions(+), 186 deletions(-)
 ```
+
+
+## Correction: balance the entire conflict header band
+
+Started with a clean tree on `main` at committed HEAD
+`302a7115654a8c4ce4c2aa5ef3bb1e8233a7aa49` (`polish all components`).
+User review of `dark-list-after-direct-cancel.png` correctly found unequal space
+above/below Resolve. The prior optical acceptance was incomplete: it checked the
+button/content row but missed its ancestor's padding. The conflict group's 8-unit
+top inset added to the header's 8-unit top inset, leaving **16 above Resolve versus
+8 below it before the divider**. This was an outer header-band defect, not an
+additional amber-border/font defect.
+
+The group now has zero top inset; the header owns its existing symmetric 8/8 vertical
+padding. Group bottom spacing, button border/margins/font-derived height, trailing
+width/right edge, natural content centerline and separate divider remain intact.
+No position offset or extra height was introduced. Countdown/reveal/code/Copy and
+management flows were not changed.
+
+The existing 14/28-point header test now measures from the full group's top edge to
+the action and from the action's bottom to the divider, requiring equal 8-unit gaps.
+This catches the ancestor-padding defect missed by centered child bounds alone.
+Exact changed files: TokenBrowserPanel.java, PostS5PolishTest.java and this report.
+
+Validation: `./gradlew clean test build verifyDistributionArchives --console=plain`
+**PASS, 457 tests**, zero failures/errors/skips; archive inventory unchanged.
+PostS5PolishSwingSmoke **PASS dark, light, dark 20-point**. Reviewed updated
+`dark-list-after-direct-cancel.png`, `light-list-after-direct-cancel.png` and
+`dark-font20-list-after-direct-cancel.png` under `review/screenshots/polish/`;
+all show balanced space around Resolve. The first light run crossed independent
+reveal expiries and its five-revealed-row smoke assertion found only two remaining
+reveals; a fresh-fixture rerun passed. No authorization was extended to satisfy the
+harness. Graphical environment remains Linux/Xvfb/Metal/DejaVu, not a physical display.
+Both Nix commands were attempted and remain unavailable (exit 127, nix not found).
+`git diff --check` passes; index empty. Three files remain unstaged/uncommitted;
+no commit, tag, release or push.
+
+
+User requested more visible padding after the 8/8 correction. The final header now
+owns **12 units above and 12 below Resolve** (shared COMPACT spacing); the group's
+removed duplicate top inset stays removed. Button geometry and horizontal padding
+remain unchanged. The natural header band grows with the requested symmetric
+spacing. PostS5PolishTest's whole-band checks and CollectionCompositionTest's
+header-inset expectations now verify this 12/12 policy. The latter initially failed
+on its old hard-coded 8-unit expectation; updating that expectation restored the
+full suite. Final clean Gradle test/build/archive run: **PASS, 457 tests**, zero
+failures/errors/skips, unchanged archive inventory. All three polish smokes pass;
+refreshed dark/light/dark-20-point direct-cancel screenshots were reviewed and show
+the larger balanced gaps. Diff check passes and index remains empty. The current
+four-file unstaged scope is TokenBrowserPanel.java, PostS5PolishTest.java,
+CollectionCompositionTest.java and this report. No commit/tag/release/push.

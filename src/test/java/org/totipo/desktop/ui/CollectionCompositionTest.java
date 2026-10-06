@@ -145,7 +145,7 @@ class CollectionCompositionTest {
                 var wrapper = (JPanel) group.getComponent(0);
                 var header = (JPanel) ((BorderLayout) wrapper.getLayout()).getLayoutComponent(BorderLayout.CENTER);
                 var heading = TokenBrowserTest.find(header, JLabel.class); var resolve = buttons(header).getFirst();
-                assertEquals(8, header.getInsets().top); assertEquals(8, header.getInsets().bottom);
+                assertEquals(DesktopStyle.COMPACT, header.getInsets().top); assertEquals(DesktopStyle.COMPACT, header.getInsets().bottom);
                 assertEquals(heading.getBounds().getCenterY(), resolve.getBounds().getCenterY(), .5);
                 assertEquals("Resolve", resolve.getText()); assertEquals(2, browser.rows.size()); assertTrue(state.calls.isEmpty());
                 assertTrue(browser.rows.stream().allMatch(row -> row.token.hasConflict()));

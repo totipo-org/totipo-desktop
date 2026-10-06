@@ -150,11 +150,11 @@ public final class TokenBrowserPanel extends JPanel {
                     @Override public Dimension getMaximumSize() { return new Dimension(Integer.MAX_VALUE, getPreferredSize().height); }
                 }; group.setLayout(new BoxLayout(group, BoxLayout.Y_AXIS));
                 group.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0, DesktopStyle.SEMANTIC_EDGE, 0, 0, conflictAccent()),
-                        BorderFactory.createEmptyBorder(DesktopStyle.TIGHT, 0, DesktopStyle.TIGHT, 0)));
+                        BorderFactory.createEmptyBorder(0, 0, DesktopStyle.TIGHT, 0)));
                 group.setBackground(DesktopStyle.surface());
                 group.getAccessibleContext().setAccessibleName("This token has conflicting versions");
                 JPanel header = new JPanel(new GridBagLayout()); header.setOpaque(false); header.setFocusable(false);
-                header.setBorder(BorderFactory.createEmptyBorder(DesktopStyle.TIGHT, DesktopStyle.COMPACT - DesktopStyle.SEMANTIC_EDGE, DesktopStyle.TIGHT, DesktopStyle.COMPACT));
+                header.setBorder(BorderFactory.createEmptyBorder(DesktopStyle.COMPACT, DesktopStyle.COMPACT - DesktopStyle.SEMANTIC_EDGE, DesktopStyle.COMPACT, DesktopStyle.COMPACT));
                 JLabel warning = TokenRowPanel.literal("Conflict"); warning.setToolTipText("This token has conflicting versions");
                 warning.setForeground(DesktopStyle.warning());
                 // Adjacent compact text shares metrics, as well as the outer centerline.
