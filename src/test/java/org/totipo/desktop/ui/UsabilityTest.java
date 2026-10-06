@@ -141,8 +141,9 @@ class UsabilityTest {
             AtomicInteger cancelled = new AtomicInteger();
             var panel = new MergeEditorPanel(org.totipo.desktop.MergeInputs.capture(state.value, token),
                     draft -> fail(), cancelled::incrementAndGet);
-            JRootPane root = new JRootPane(); root.setContentPane(panel); panel.installDialog(root);
-            assertEquals("Save", root.getDefaultButton().getText());
+            JRootPane root = new JRootPane(); root.setContentPane(panel); panel.installDialog(root, () -> {});
+            assertEquals("Resolve", root.getDefaultButton().getText());
+            all(panel).stream().filter(JButton.class::isInstance).map(JButton.class::cast).filter(b -> b.getText().equals("Combine details…")).findFirst().orElseThrow().doClick();
             assertLabels(panel); assertNotNull(find(panel, JScrollPane.class));
             JPasswordField secret = find(panel, JPasswordField.class); secret.setText("MY");
             panel.busy(true, "Saving merge…");
@@ -195,8 +196,6 @@ class UsabilityTest {
     @Test void decisionsHaveSafeDefaultsAndLongContentRemainsScrollable() throws Exception {
         edt(() -> {
             VaultPanel panel = new VaultPanel(); JRootPane root = new JRootPane(); root.setContentPane(panel);
-            panel.additionalConflict(() -> {}, () -> fail(), () -> {});
-            assertEquals("Review latest and merge again", root.getDefaultButton().getText());
             panel.publicationUncertain(true, false, () -> fail(), () -> fail()); assertNull(root.getDefaultButton());
             panel.clearUncertainty();
             var longValue = "<html>long issuer account ".repeat(1000);

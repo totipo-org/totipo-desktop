@@ -40,18 +40,21 @@ class DirectoryPickerTest {
             }
         });
     }
-    @Test void platformHiddenDirectoryIsOmittedWhenSupported() throws Exception {
-        Path hidden = Files.createDirectory(directory.resolve("platform-hidden"));
+    @Test void platformHiddenDirectoryIsOmitted() throws Exception {
+        boolean windows = directory.getFileSystem().getSeparator().equals("\\");
+        // Unix hidden names do not need DOS attributes (which may advertise support
+        // but require unavailable extended attributes inside a build sandbox).
+        Path hidden = Files.createDirectory(directory.resolve(windows ? "platform-hidden" : ".platform-hidden"));
         Path ordinary = Files.createDirectory(directory.resolve("ordinary"));
-        if (Files.getFileStore(hidden).supportsFileAttributeView("dos")) {
+        if (windows) {
             Files.setAttribute(hidden, "dos:hidden", true);
         }
-        boolean platformHidden = Files.isHidden(hidden);
+        assertTrue(Files.isHidden(hidden));
         edt(() -> {
             try (var picker = new DirectoryPicker(directory.resolve("vault"), path -> { }, () -> { }, Runnable::run)) {
                 var model = (DefaultListModel<Path>) picker.directories.getModel();
                 assertTrue(model.contains(ordinary));
-                assertEquals(!platformHidden, model.contains(hidden));
+                assertFalse(model.contains(hidden));
             }
         });
     }

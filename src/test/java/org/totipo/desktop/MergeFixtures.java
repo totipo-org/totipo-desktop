@@ -89,6 +89,7 @@ final class MergeFixtures {
                     (p, m, args) -> {
                         String call = m.getName(); record(call);
                         return switch (call) {
+                            case "keep" -> { assertTrue(selected.contains(args[0])); values.put("keep", args[0]); yield p; }
                             case "competingValues" -> competition;
                             case "secretChoices" -> choices;
                             case "unresolvedFields" -> unresolved ? List.of("issuer") : List.of();

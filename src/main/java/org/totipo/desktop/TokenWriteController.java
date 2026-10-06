@@ -13,16 +13,14 @@ final class TokenWriteController {
     private final MutationGate gate;
     private final Runnable closeSession;
     private TokenManagementPanel editor;
-    private VaultState current;
+    private volatile VaultState current;
     private SaveResult.Saved savedResult;
     private final java.util.concurrent.atomic.AtomicReference<TokenDraft> queuedDraft = new java.util.concurrent.atomic.AtomicReference<>();
     private MergeEditorPanel mergeEditor;
     private boolean merge;
-    private boolean original;
-    private boolean decision;
     private TokenId mergeId;
-    private PartialResolution partial; // Session executor only.
-    private VaultState reviewBase; // EDT descriptive state, never browser authority.
+    private volatile MergeInputs mergeInputs;
+    private final java.util.concurrent.atomic.AtomicReference<MergeDraft> queuedMerge = new java.util.concurrent.atomic.AtomicReference<>();
     private boolean active;
     private boolean pending;
     private volatile boolean closing;
@@ -38,7 +36,7 @@ final class TokenWriteController {
         Edt.require();
         if (closing || active || base == null || !gate.acquire(this)) { return; }
         active = true;
-        merge = false; original = false;
+        merge = false;
         create = alternative == null;
         if (current == null) { current = base; }
         editor = new TokenManagementPanel(base, alternative, explanation, () -> current,
@@ -46,102 +44,88 @@ final class TokenWriteController {
         view.manageToken(editor);
     }
 
-    void current(VaultState state) { Edt.require(); current = state; }
+    void current(VaultState state) {
+        Edt.require(); current = state;
+        if (mergeEditor != null && !sameConflict(state)) {
+            MergeDraft abandonedDraft = queuedMerge.getAndSet(null);
+            if (abandonedDraft != null) { abandonedDraft.close(); pending = false; }
+            if (!pending) { changedConflict(); }
+        }
+    }
+    private boolean sameConflict(VaultState state) {
+        MergeInputs captured = mergeInputs;
+        if (state == null || captured == null) { return false; }
+        TokenState token = state.token(mergeId).orElse(null);
+        return token != null && token.hasConflict() && token.unresolvedReferences().isEmpty()
+                && token.alternatives().size() == captured.captured().size()
+                && token.alternatives().containsAll(captured.captured());
+    }
+    private void changedConflict() {
+        if (mergeEditor != null) { mergeEditor.changed(this::reviewCurrent); }
+    }
+    private void reviewCurrent() {
+        Edt.require(); if (closing || pending || !active) { return; }
+        VaultState base = current; TokenId id = mergeId;
+        finish();
+        TokenState token = base == null ? null : base.token(id).orElse(null);
+        if (token != null && token.hasConflict() && token.alternatives().size() >= 2 && token.unresolvedReferences().isEmpty()) {
+            openMerge(base, token);
+        } else { view.writeWarning("The conflict changed. Review the current TOTP state.",
+                "The conflict changed. Review the current TOTP state."); }
+    }
 
     void openMerge(VaultState base, TokenState token) {
         Edt.require();
         if (closing || active || base == null || token == null || !token.hasConflict()
-                || token.alternatives().size() < 2 || !gate.acquire(this)) { return; }
-        active = true; merge = true; original = false; create = false;
-        mergeId = token.id();
-        mergeEditor = new MergeEditorPanel(MergeInputs.capture(base, token), this::submitMerge, this::cancel);
+                || token.alternatives().size() < 2 || !token.unresolvedReferences().isEmpty() || !gate.acquire(this)) { return; }
+        active = true; merge = true; create = false;
+        mergeId = token.id(); current = base; mergeInputs = MergeInputs.capture(base, token);
+        mergeEditor = new MergeEditorPanel(mergeInputs, this::submitMerge, this::cancel);
         view.editMerge(mergeEditor);
     }
 
     private void submitMerge(MergeDraft draft) {
         Edt.require();
-        if (closing || pending || !active) { draft.close(); return; }
-        pending = true;
+        if (closing || pending || !active || !sameConflict(current)) {
+            draft.close(); if (!closing && active && !pending) { changedConflict(); } return;
+        }
+        pending = true; queuedMerge.set(draft);
         executor.execute(() -> {
+            MergeDraft owned = queuedMerge.getAndSet(null);
+            if (owned == null) { return; }
+            if (closing) { owned.close(); return; }
+            if (!sameConflict(current)) {
+                owned.close();
+                SwingUtilities.invokeLater(() -> { if (!closing) { pending = false; changedConflict(); } }); return;
+            }
             try {
-                SaveResult result = MergeWrites.save(draft);
+                SaveResult result = MergeWrites.save(owned);
                 if (result instanceof SaveResult.AdditionalConflict conflict) {
-                    partial = conflict.resolution();
+                    closePartialQuietly(conflict.resolution());
                     VaultState latest = conflict.latest();
                     SwingUtilities.invokeLater(() -> {
-                        if (closing) { return; }
-                        pending = false; decision = true; reviewBase = latest;
-                        retireEditor();
-                        view.additionalConflict(this::reviewLatest, this::confirmOriginal, this::discardPartial);
+                        if (!closing) { pending = false; current = latest;
+                            mergeEditor.changed("New conflict information appeared while you were resolving this conflict.\nNothing from this resolution was published.\nReview the updated conflict before continuing.", this::reviewCurrent); }
                     });
-                } else { acceptPartialResult((PartialSaveResult) result); }
+                } else { acceptMergeResult((PartialSaveResult) result); }
             } catch (MergeWrites.InconsistentDraft mismatch) {
-                deliver(Outcome.INTERNAL_PREPARATION_FAILURE, null, "Internal merge draft problem. Nothing was published.");
+                deliver(Outcome.INTERNAL_PREPARATION_FAILURE, null, "Internal resolution draft problem. Nothing was published.");
             } catch (RuntimeException unexpected) {
-                deliver(Outcome.INTERNAL_FAILURE, null, "Internal merge operation problem; publication outcome could not be determined.");
+                deliver(Outcome.INTERNAL_FAILURE, null, "The resolution could not be completed; publication outcome could not be determined.");
             }
         });
     }
-    private void acceptPartialResult(PartialSaveResult result) {
-        if (result instanceof SaveResult.Saved) { deliver(Outcome.SAVED, null, null); }
+    private void acceptMergeResult(PartialSaveResult result) {
+        if (result instanceof SaveResult.Saved saved) { savedResult = saved; deliver(Outcome.SAVED, null, null); }
         else if (result instanceof SaveResult.PublicationUncertain uncertain) {
             retry = uncertain.retry(); deliver(Outcome.UNCERTAIN, null, null);
         } else if (result instanceof SaveResult.Failed failed) { deliver(Outcome.FAILED, failed.reason(), null); }
     }
-    private void reviewLatest() { releasePartial(true); }
-    private void discardPartial() { releasePartial(false); }
-    private void releasePartial(boolean review) {
-        Edt.require();
-        if (closing || pending || !decision) { return; }
-        pending = true; decision = false; view.clearUncertainty();
-        VaultState base = reviewBase; TokenId id = mergeId; reviewBase = null;
-        executor.execute(() -> {
-            boolean cleaned = cleanupPartial();
-            SwingUtilities.invokeLater(() -> {
-                if (closing) { return; }
-                finish();
-                if (review) {
-                    TokenState token = base.token(id).orElse(null);
-                    if (token != null && token.hasConflict() && token.alternatives().size() >= 2) { openMerge(base, token); }
-                    else { view.writeWarning("The supplied reviewed state no longer has a complete semantic conflict.",
-                            "The token no longer has conflicting versions to resolve."); }
-                }
-                if (!cleaned) { view.writeWarning("Internal resolution cleanup error. Nothing from the discarded merge was published.",
-                        "The conflict resolution could not be discarded cleanly. Nothing from it was saved."); }
-            });
-        });
-    }
-    private void confirmOriginal() {
-        Edt.require();
-        if (closing || pending || !decision) { return; }
-        view.confirmOriginalResolution(this::publishOriginal);
-    }
-    private void publishOriginal() {
-        Edt.require();
-        if (closing || pending || !decision) { return; }
-        pending = true; decision = false; original = true; reviewBase = null;
-        view.clearUncertainty(); view.writeMessage("Publishing original merge resolution…");
-        executor.execute(() -> {
-            PartialResolution owned = partial; partial = null;
-            try {
-                PartialSaveResult result;
-                try { result = owned.save(); }
-                finally { closePartialQuietly(owned); }
-                acceptPartialResult(result);
-            } catch (RuntimeException unexpected) {
-                deliver(Outcome.INTERNAL_FAILURE, null, "Internal original-resolution operation problem; publication outcome could not be determined.");
-            }
-        });
-    }
     private static boolean closePartialQuietly(PartialResolution owned) {
         try { if (owned != null) { owned.close(); } return true; }
         catch (RuntimeException cleanupFailure) {
-            System.err.println("Totipo: partial resolution cleanup failure (details redacted)."); return false;
+            System.err.println("Totipo: discarded resolution cleanup failure (details redacted)."); return false;
         }
-    }
-    private boolean cleanupPartial() {
-        PartialResolution owned = partial; partial = null;
-        return closePartialQuietly(owned);
     }
 
     private void submit(VaultState base, TokenAlternative alternative, TokenDraft draft) {
@@ -183,8 +167,8 @@ final class TokenWriteController {
             pending = false;
             if (outcome == Outcome.SAVED) {
                 finish();
-                if (!merge && savedResult != null) { view.mutationAcknowledged(savedResult); savedResult = null; }
-                view.writeMessage(merge ? (original ? "Original merge resolution publication acknowledged." : "Merge publication acknowledged.")
+                if (savedResult != null) { view.mutationAcknowledged(savedResult); savedResult = null; }
+                view.writeMessage(merge ? "Resolution publication acknowledged."
                         : create ? "Token publication acknowledged." : "Token update publication acknowledged.");
             } else if (outcome == Outcome.UNCERTAIN) {
                 retireEditor();
@@ -198,9 +182,8 @@ final class TokenWriteController {
                     case UNRESOLVED_FIELDS -> "Required token fields were unresolved; this operation was not published.";
                     case SESSION_CLOSING -> throw new IllegalStateException("Handled above");
                 };
-                if (original) { finish(); view.writeWarning(message + " Review the observed conflict to start a new merge.",
-                        "The conflict resolution was not saved. Review the token and try again."); }
-                else if (merge) { mergeEditor.busy(false, message + " Re-enter a new secret if required before saving."); }
+                if (merge) { if (!sameConflict(current)) { changedConflict(); }
+                    else { mergeEditor.busy(false, message + " Re-enter a new secret if required before saving."); } }
                 else { editor.busy(false, message + " Re-enter a new secret if required before saving."); }
             } else {
                 finish();
@@ -212,13 +195,13 @@ final class TokenWriteController {
     }
 
     private void showUncertainty(boolean busy) {
-        if (merge) { view.mergePublicationUncertain(original, busy, this::retry, this::stop); }
+        if (merge) { view.mergePublicationUncertain(busy, this::retry, this::stop); }
         else { view.publicationUncertain(create, busy, this::retry, this::stop); }
     }
 
     void retry() {
         Edt.require();
-        if (closing || pending || !active || editor != null || mergeEditor != null || decision) { return; }
+        if (closing || pending || !active || editor != null || mergeEditor != null) { return; }
         pending = true;
         showUncertainty(true);
         executor.execute(() -> {
@@ -262,7 +245,7 @@ final class TokenWriteController {
 
     void stop() {
         Edt.require();
-        if (closing || pending || !active || editor != null || mergeEditor != null || decision) { return; }
+        if (closing || pending || !active || editor != null || mergeEditor != null) { return; }
         pending = true;
         showUncertainty(true);
         executor.execute(() -> {
@@ -288,16 +271,18 @@ final class TokenWriteController {
         if (mergeEditor != null) { mergeEditor.retire(); mergeEditor = null; view.retireEditor(); }
     }
     private void finish() {
-        retireEditor(); active = false; pending = false; decision = false; reviewBase = null;
+        retireEditor(); active = false; pending = false; mergeInputs = null;
         view.clearUncertainty();
         view.abandonedPublication(abandoned);
         gate.release(this);
     }
     void closing() {
         Edt.require(); closing = true;
+        MergeDraft abandonedMerge = queuedMerge.getAndSet(null);
+        if (abandonedMerge != null) { abandonedMerge.close(); }
         TokenDraft abandonedDraft = queuedDraft.getAndSet(null);
         if (abandonedDraft != null) { abandonedDraft.close(); }
-        retireEditor(); active = false; pending = false; decision = false; reviewBase = null; current = null;
+        retireEditor(); active = false; pending = false; mergeInputs = null; current = null;
         view.clearUncertainty(); view.writeAvailability(false);
         executor.execute(this::cleanupQuietly);
     }
@@ -308,7 +293,6 @@ final class TokenWriteController {
         }
     }
     private void cleanup() {
-        cleanupPartial();
         PublicationRetry owned = retry; retry = null;
         if (owned != null) { owned.close(); }
     }

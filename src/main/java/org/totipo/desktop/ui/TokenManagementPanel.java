@@ -207,7 +207,7 @@ public final class TokenManagementPanel extends JPanel {
         }));
         acquisitionBody();
     }
-    private static void styleChoices(TokenChoice<?> choices) {
+    static void styleChoices(TokenChoice<?> choices) {
         choices.setOpaque(false);
         for (AbstractButton button : choices.options.values()) {
             button.setUI(new javax.swing.plaf.basic.BasicToggleButtonUI() {

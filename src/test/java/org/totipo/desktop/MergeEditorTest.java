@@ -36,15 +36,15 @@ class MergeEditorTest {
             final int index = selected;
             var fake = new Recording(); fake.results.add(TokenWritesTest.saved()); var submitted = new AtomicReference<MergeDraft>();
             edt(() -> {
-                var panel = new MergeEditorPanel(fake.inputs(), submitted::set, () -> {});
-                assertFalse(button(panel, "Save").isEnabled());
+                var panel = new MergeEditorPanel(fake.inputs(), submitted::set, () -> {}); button(panel, "Combine details…").doClick();
+                assertTrue(button(panel, "Save Resolution").isEnabled()); button(panel, "Save Resolution").doClick(); assertNull(submitted.get());
                 assertTrue(components(panel).stream().noneMatch(JComboBox.class::isInstance));
                 assertTrue(components(panel).stream().filter(JRadioButton.class::isInstance).map(JRadioButton.class::cast).noneMatch(JRadioButton::isSelected));
-                assertTrue(components(panel).stream().filter(JButton.class::isInstance).map(JButton.class::cast).noneMatch(b -> List.of("Continue", "Back").contains(b.getText())));
+                assertTrue(button(panel, "Back").isEnabled());
                 chooseFirst(panel);
                 if (index == 1) { option(panel, "Deleted").doClick(); }
                 var setups = components(panel).stream().filter(JRadioButton.class::isInstance).map(JRadioButton.class::cast).filter(b -> b.getText().startsWith("Setup used by")).toList();
-                setups.get(index).doClick(); button(panel, "Save").doClick(); assertNotNull(submitted.get()); panel.retire();
+                setups.get(index).doClick(); button(panel, "Save Resolution").doClick(); assertNotNull(submitted.get()); panel.retire();
             });
             assertInstanceOf(SaveResult.Saved.class, MergeWrites.save(submitted.get()));
             var expected = fake.token.alternatives().get(index);
@@ -59,39 +59,39 @@ class MergeEditorTest {
     @Test void literalReadonlyChoicesCustomAutoSelectionAndEmptyValue() throws Exception {
         var fake = new Recording(); fake.results.add(TokenWritesTest.saved()); var submitted = new AtomicReference<MergeDraft>();
         edt(() -> {
-            var panel = new MergeEditorPanel(fake.inputs(), submitted::set, () -> {}); chooseFirst(panel);
+            var panel = new MergeEditorPanel(fake.inputs(), submitted::set, () -> {}); button(panel, "Combine details…").doClick(); chooseFirst(panel);
             for (var component : components(panel)) {
                 if (component instanceof JTextField field && field.getAccessibleContext().getAccessibleName() != null && field.getAccessibleContext().getAccessibleName().contains(" choice:")) {
                     assertFalse(field.isEditable()); assertTrue(field.isEnabled());
                 }
             }
             var issuer = customText(panel, "issuer"); focus(issuer); issuer.setText("<html>literal\n issuer");
-            var account = customText(panel, "account"); focus(account); assertTrue(button(panel, "Save").isEnabled());
-            button(panel, "Save").doClick(); panel.retire();
+            var account = customText(panel, "account"); focus(account); assertTrue(button(panel, "Save Resolution").isEnabled());
+            button(panel, "Save Resolution").doClick(); panel.retire();
         });
         MergeWrites.save(submitted.get()); assertEquals("<html>literal\n issuer", fake.values.get("issuer")); assertEquals("", fake.values.get("account"));
     }
     @Test void agreedFieldsEditableAndSetupDeduplicatesPublicEquality() throws Exception {
         edt(() -> {
             var fake = new Recording(List.of(alternative(0), alternative(0)), true);
-            var panel = new MergeEditorPanel(fake.inputs(), MergeDraft::close, () -> {});
-            assertTrue(button(panel, "Save").isEnabled());
+            var panel = new MergeEditorPanel(fake.inputs(), MergeDraft::close, () -> {}); button(panel, "Combine details…").doClick();
+            assertTrue(button(panel, "Save Resolution").isEnabled());
             assertEquals(1, components(panel).stream().filter(JRadioButton.class::isInstance).map(JRadioButton.class::cast).filter(b -> b.getText().equals("Keep existing setup")).count());
             assertEquals("issuer 0", customText(panel, "issuer").getText()); customText(panel, "issuer").setText("changed");
-            assertTrue(button(panel, "Save").isEnabled()); panel.retire();
+            assertTrue(button(panel, "Save Resolution").isEnabled()); panel.retire();
         });
     }
     @Test void customSetupValidatesAndClearsSecretOnSwitchAndCancel() throws Exception {
         var fake = new Recording(); fake.ownedSecret = new byte[1]; fake.results.add(TokenWritesTest.saved()); var submitted = new AtomicReference<MergeDraft>();
         edt(() -> {
-            var panel = new MergeEditorPanel(fake.inputs(), submitted::set, () -> {}); chooseFirst(panel);
+            var panel = new MergeEditorPanel(fake.inputs(), submitted::set, () -> {}); button(panel, "Combine details…").doClick(); chooseFirst(panel);
             focus(password(panel)); assertTrue(option(panel, "Use a different authenticator setup").isSelected());
             password(panel).setText("MY"); chooseFirst(panel); assertEquals(0, password(panel).getPassword().length);
-            password(panel).setText("!"); button(panel, "Save").doClick(); assertNull(submitted.get()); assertEquals(0, password(panel).getPassword().length);
+            password(panel).setText("!"); button(panel, "Save Resolution").doClick(); assertNull(submitted.get()); assertEquals(0, password(panel).getPassword().length);
             password(panel).setText("MY"); option(panel, "SHA512").doClick(); option(panel, "8").doClick();
             var spinner = components(panel).stream().filter(JSpinner.class::isInstance).map(JSpinner.class::cast).findFirst().orElseThrow(); spinner.setValue(4294967295L);
-            button(panel, "Save").doClick(); assertNotNull(submitted.get()); assertEquals(0, password(panel).getPassword().length); panel.retire();
-            var cancelled = new MergeEditorPanel(fake.inputs(), d -> fail(), () -> {}); password(cancelled).setText("MY"); cancelled.cancel(); assertEquals(0, password(cancelled).getPassword().length);
+            button(panel, "Save Resolution").doClick(); assertNotNull(submitted.get()); assertEquals(0, password(panel).getPassword().length); panel.retire();
+            var cancelled = new MergeEditorPanel(fake.inputs(), d -> fail(), () -> {}); button(cancelled, "Combine details…").doClick(); password(cancelled).setText("MY"); cancelled.cancel(); assertEquals(0, password(cancelled).getPassword().length);
         });
         MergeWrites.save(submitted.get()); assertEquals(TotpAlgorithm.SHA512, fake.values.get("algorithm")); assertEquals(8, fake.values.get("digits")); assertEquals(java.time.Duration.ofSeconds(4294967295L), fake.values.get("period")); assertTrue(fake.used.isEmpty());
     }

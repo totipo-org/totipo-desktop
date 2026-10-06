@@ -97,12 +97,16 @@ derive codes. Lock immediately retires these flows and discards temporary input.
 After an acknowledged change, emitted state supplies the updated list. Codes stay
 concealed, and a nonmatching search is retained with an explicit Clear Search option.
 
-**Resolve Conflict…** separately offers all captured alternatives or a deliberate
-subset, then explicit field-by-field resolution and secret equality-group selection.
-No automatic winner or automatic merge is chosen. New relevant information stops
-normal merge publication and offers fresh review, cancellation, or explicitly
-confirmed publication of the frozen original resolution. The latter may leave
-competing alternatives.
+**Resolve Conflict** first offers one choice per complete semantic version, with
+no preselection. Resolve validates on activation and uses Java's whole-Alternative
+`keep(...)` operation. **Combine details…** opens the secondary composition path:
+agreed text is editable once; disagreements offer existing read-only values and a
+custom row. Status is Active / Deleted, and Authenticator Setup is one atomic choice
+of secret + algorithm + digits + period. Existing secrets are never displayed.
+Back discards detailed choices and temporary secret; Cancel publishes nothing.
+New conflict information requires **Review Updated Conflict**, with a fresh
+unselected resolver. Uncertain publication uses the frozen retry capability rather
+than creating another resolution. Lock retires either screen immediately.
 
 Deleted (TOMBSTONED) is logical deletion: tombstones and immutable history retain
 secrets, and storage/synchronization provider copies are not erased. Password
@@ -128,7 +132,7 @@ Stopping releases the retry capability and leaves a persistent warning for that
 open session: publication may already have occurred. Starting Create again makes
 a distinct token, not a retry. Acknowledged publication and finished local
 observation do not mean synchronization, freshness or complete history.
-Protocol target: Totipo Vault Format **v1/r18**, through released Totipo Java 0.1.1.
+Protocol target: Totipo Vault Format **v1/r18**, through released Totipo Java 0.1.3.
 Local configured-store acknowledgement is not remote synchronization or rollback
 protection. Provider qualification remains limited; local NIO integration tests do
 not establish guarantees for arbitrary filesystems or remote providers.
@@ -140,8 +144,8 @@ git clone https://github.com/totipo-org/totipo-desktop.git
 cd totipo-desktop
 ```
 
-Gradle resolves `org.totipo:totipo-storage-nio:0.1.1` and its transitive
-`org.totipo:totipo-core:0.1.1` from Maven Central. Internet access is needed
+Gradle resolves `org.totipo:totipo-storage-nio:0.1.3` and its transitive
+`org.totipo:totipo-core:0.1.3` from Maven Central. Internet access is needed
 for first resolution unless dependencies are already cached or Nix-provided.
 
 Build with **JDK 25** in `JAVA_HOME` (toolchain auto-download is disabled).
@@ -226,19 +230,22 @@ Java configuration. The desktop entry is Totipo / Utility / Terminal=false, with
 no handlers, autostart or placeholder icon. Vaults remain user-selected paths;
 installation directories are never vault storage.
 
-**M4b repin status:** Human-operated Nix dependency-cache regeneration passed.
-The reviewed generated `package-deps.json` contains the released Totipo 0.1.1
-JAR/module/POM hashes, retains BC 1.86, and has no unrelated dependency changes.
-Human-operated x86_64-linux flake check, build and forced rebuild passed;
-the full supplied package inventory has the expected files, and all four JAR
-hashes match the verified Gradle distribution. The operator also reported a
-successful launch and quick smoke test. Native qualification remains separate.
-No Nix command was run by the agent. Current evidence and qualification limits
-are in [the M4b report](review/M4B_TOTIPO_JAVA_0_1_1_R18_REPIN_REPORT.md).
-Prior M4a package evidence does not validate this repin. Native qualification
-remains UNQUALIFIED. Do not hand-edit dependency hashes.
+**S4 dependency pin:** The desktop consumes Java 0.1.3 directly after 0.1.1.
+Gradle locks, verification hashes and Nix download pins track the published artifacts;
+BC 1.86 is unchanged. Current build, API and graphical evidence is in
+[the S4 report](review/S4_CONFLICT_RESOLUTION_REPORT.md). The operator confirmed
+`nix build path:.`, `nix build --rebuild path:.` and `nix flake check path:.`
+pass for S4. Native qualification remains UNQUALIFIED. Dependency hashes must
+be derived from the actual published artifacts and reviewed.
 
-From the repository root, generate/refresh using the official update script:
+From the repository root, generate/refresh using the flake app, which runs the
+official Gradle dependency-cache update script for the current system:
+
+```sh
+nix run path:.#update-package-deps
+```
+
+To build and run that script directly instead:
 
 ```fish
 set update_script (

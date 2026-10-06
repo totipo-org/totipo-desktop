@@ -5,8 +5,8 @@ M2b added explicit field-oriented merge and frozen-resolution decisions to M2a
 manual token create/update and explicit publication retry/abandonment, building on
 M1a session/window lifecycle, observation/diagnostics and refresh, and M1b
 logical-token/TOTP browsing. The single-project Swing application consumes
-released Maven modules: desktop -> `org.totipo:totipo-storage-nio:0.1.1` ->
-`org.totipo:totipo-core:0.1.1`. Desktop does not build Java core/storage from
+released Maven modules: desktop -> `org.totipo:totipo-storage-nio:0.1.3` ->
+`org.totipo:totipo-core:0.1.3`. Desktop does not build Java core/storage from
 source. `org.totipo.storage.nio.NioTotipo` remains the filesystem entry point;
 `VaultSession`, `VaultState` and other `org.totipo` application APIs remain the
 core boundary. Desktop never consumes storage SPI or implementation internals.
@@ -318,7 +318,7 @@ saved identity. Delete uses the target's descriptor with TOMBSTONED status and n
 secret ingress. No desktop protocol persistence is implemented.
 
 `SetupUri` is a small TOTP-only application ingress parser because the consumed
-published Java 0.1.1 JAR has no enrollment parser. It rejects HOTP, malformed URIs,
+published Java 0.1.3 JAR has no enrollment parser. It rejects HOTP, malformed URIs,
 ambiguous/repeated or unsupported parameters, issuer disagreement, invalid Base32,
 unsupported algorithms/digits, and out-of-domain periods. URI secrets use strict
 Base32. `SetupValidation` applies Java's identity UTF-8 limits and setup bounds;
@@ -347,8 +347,7 @@ an optimistic row or reveal a code. Pure deleted logical TOTPs are omitted from
 the active collection; existing conflict child presentation remains unchanged.
 The legacy `TokenEditorPanel`/`TokenEditDialog` is retained for the older isolated
 editor boundary tests and shared sizing/scroll-body helpers, but S3 actions route
-exclusively through `TokenManagementPanel`. Conflict resolution itself is deferred
-to S4 and retains its existing MergeEditorPanel/publication behavior.
+exclusively through `TokenManagementPanel`. S4 conflict resolution uses the session-owned `MergeEditorPanel` described below.
 
 A submitted `TokenDraft` exclusively owns its decoded byte array and immutable
 non-secret descriptor. Ownership transfers to one executor task. `TokenWrites`
@@ -377,8 +376,8 @@ heads selected by that receiving state (or the alternative's captured heads).
 It does not parent unrelated alternatives, invoke a merge gate or resolve conflict.
 No head-level update, rebasing, winner selection or merge exists in this path.
 
-`TokenWriteController` admits one write workflow per window, including merge and
-partial-resolution decisions. Create/Edit/Resolve disable throughout it; Refresh and ordinary state/TOTP delivery stay
+`TokenWriteController` admits one write workflow per window, including conflict resolution and
+publication retry. Create/Edit/Resolve disable throughout it; Refresh and ordinary state/TOTP delivery stay
 available. Save validation occurs on EDT, then controls disable before one task
 is submitted to the existing session executor. Repeated clicks cannot queue more
 writes. There is no extra executor, subscription, polling or automatic retry.
@@ -428,129 +427,66 @@ reopen an editor, reinstall uncertainty UI, or start another retry. Session clos
 still invalidates core-owned handles, even if an unexpected cleanup failure occurs.
 
 
-## Explicit merge resolution (M2b)
+## Conflict resolution (S4)
 
-Resolve Conflict… is separate from Edit Alternative… and appears only for
-`hasConflict()` with at least two complete semantic alternatives. Equal heads,
-diagnostics, or unresolved references alone do not enable it. Unresolved references
-do not veto a real semantic conflict; the existing technical warning remains visible.
-Tombstoned alternatives are complete merge inputs, without any status preference.
+The modeless `MergeEditorPanel` opens first with one radio per semantic Alternative.
+It uses ordinary displayed-identity ordering; tied Version labels imply no priority.
+Heads and client metadata never choose, sort or vote for a resolution. No version
+is preselected, and merely focusing a radio does not select it or derive a code.
+Whole-version Resolve validates on activation, then submits `MergeDraft.keep`.
+`MergeWrites` calls `capturedBase.merge(tokenId)`, `keep(capturedAlternative)` and
+`save()` on the session executor. It applies no individual field or secret setters.
+Java performs the complete semantic transfer and validates the captured basis.
 
-`MergeInputs` captures the exact receiving `VaultState`, `TokenState`, token ID
-through that token, complete alternative list and descriptive `TokenCompetition`
-when the workflow opens. Later state emissions continue to drive the browser/TOTP
-but never rewrite the capture. Input selection initially includes every captured
-alternative, with literal descriptors and head IDs. Alternative numbers express no
-priority. At least two must be selected; changing a single alternative belongs to
-ordinary Edit Alternative.
+Combine details starts a fresh draft independently of any whole-version selection.
+Issuer/account disagreements deduplicate exact existing values, with read-only
+selectable fields and one custom row. Agreed fields are editable once. Active /
+Deleted is finite; Authenticator Setup is atomic. Setup grouping requires public
+secret-equivalence membership plus equal algorithm/digits/period. No existing
+secret bytes or current codes enter display/equality models. Existing setup selection
+uses its complete configuration and a representative mapped to a builder-issued
+`MergeSecretChoice`. Custom setup uses S3 `SetupValidation` and `SetupDraft` for all
+four values together, with temporary bytes transferred to `TokenDraft`/`NewSecret`.
+No Base32 or setup-validation implementation is duplicated.
 
-Continue freezes a copied list of selected alternatives. All-selected Save calls
-exactly `capturedBase.merge(tokenId)` for the receiving state's full frontier.
-A deliberately selected strict subset calls exactly
-`capturedBase.merge(selectedAlternatives)` with those captured references. Omitted
-alternatives are not silently included, and the form warns they may remain competing.
-The desktop never treats an omitted member of the original frontier as new information.
+Back publishes nothing and discards detailed choices and custom secret, as the
+form explains. Returning to simple resolution clears the whole-version selection.
+Cancel/close, changing conflict, Lock and retirement clear abandoned secret input.
+Both primary actions remain enabled for incomplete choices. Activation exposes
+local textual messages, focuses the first problem and scrolls it into view. One
+outer scroller contains the form; the footer stays outside it. `TaskDialogSizing`
+measures natural content, caps against usable screen space and keeps growing visible
+dialogs within the screen. There is no new form framework or graphical dependency.
 
-`MergeInputs.selectedCompetition()` intersects each core field-value membership and
-secret-group membership with the selection, discarding empty intersections. It
-retains the core's values and equality groups; descriptors, heads, metadata time and
-TOTP codes do not establish equality or voting priority. Going Back discards field
-choices and clears new-secret input; the input step preserves the checked subset
-for deliberate changes and builds a fresh resolution form on Continue.
+`MergeInputs` retains the original immutable public state and Alternative references.
+The existing controller receives emitted current state. A missing/resolved conflict,
+new Alternative set or unresolved observation invalidates the draft; it is never
+silently rebased. This uses public Alternative equality/membership, not local causal
+logic. A queued operation rechecks current descriptive state before builder creation.
+Java remains authoritative for the fresh-observation/new-information gate, including
+new causal information supporting an already-known value.
 
-The modeless `MergeEditorPanel` resolves status, issuer, account, algorithm, digits,
-period and secret independently. Agreed fields are prefilled and remain changeable;
-disagreeing fields start without a selection and disable Save until explicitly
-resolved. Existing choices include their Alternative memberships. Status and
-algorithm permit all pinned enum values. Issuer/account offer literal Other… text,
-with no added string policy. Digits and integral-second period use the same public
-`TokenDescriptor` validation as M2a (6–8 and 1–4294967295). Controls and renderers
-render stored strings literally, without Swing HTML.
+`AdditionalConflict` is definite non-publication. The executor closes its returned
+`PartialResolution` without save. The form clears its secret and displays Review
+Updated Conflict / Cancel. Review rebuilds from the supplied latest/current emitted
+state without prior semantic selections; a disappeared conflict ends with an
+explanation. There is no original/partial publication affordance. Browser authority
+continues to come only from emitted state.
 
-Secret groups expose only Alternative memberships. One agreed group defaults to
-keeping it; multiple groups have no default. Replacement accepts the M2a Base32
-caller-secret ingress. The submitted `MergeDraft` owns immutable non-secret fields,
-`MergeInputs`, a captured representative alternative for an existing secret group,
-or newly decoded owned bytes. It contains no builder, secret choice, partial or
-retry capability. It delegates field application/secret ingress to the small M2a
-`TokenDraft` helper without changing ordinary create/update semantics.
+Only `Saved` closes the task as ordinary success. Its acknowledged ID/revisions
+follow S3's emitted-state result presentation; no optimistic row, reveal or success
+dialog is introduced. Definite failures retain the form for deliberate retry.
+`PublicationUncertain` retires the draft and exposes the existing exact frozen
+publication retry/stop path, with resolution-specific uncertainty wording and advice
+to refresh/reopen. It never automatically constructs another semantic mutation.
 
-`MergeWrites` constructs, inspects (`competingValues`, `secretChoices`,
-`unresolvedFields`), populates, saves and closes a short-lived `MergeToken` entirely
-on the session executor. A descriptive `SecretGroup` is never passed to it. The
-representative alternative must match exactly one choice issued by this exact
-builder; missing/ambiguous mappings publish nothing. All intended fields are applied,
-and an unexpectedly nonempty unresolved list prevents save. `NewSecret.copyOf`
-occurs there, immediately wipes desktop bytes, synchronously supplies the builder,
-and closes promptly. Draft scope also wipes on factory/setter/save failure.
-Metadata remains at the public API default.
+The existing `MutationGate` owns the entire resolver/retry session. A queued
+`MergeDraft` has exclusive atomic ownership and is discarded on retirement before
+execution. Already executing work can finish, but late UI results are ignored and
+returned retry capabilities are cleaned up on the session executor before closure.
+Builder cleanup never overwrites an affirmed publication result. There is no extra
+executor, filesystem watcher, protocol/storage manipulation or synchronization path.
 
-The core alone owns the normal merge fresh-observation/new-information gate,
-including causal relevance of new heads with already-known semantic values. There
-is no second desktop freshness check or latest-state substitution.
-
-## Merge results, partial ownership and renewed review
-
-Normal merge Saved says “Merge publication acknowledged.” The editor retires; only
-emitted states change browser rows. This promises neither global conflict freedom
-nor peer observation. All definite Failed reasons retain editable non-secret form
-state for a deliberate new Save from the same base, except SESSION_CLOSING, which
-starts close. OBSERVATION_UNAVAILABLE explicitly states that nothing was published;
-it is not a conflict result. Consumed replacement secrets must be re-entered.
-
-AdditionalConflict is definite non-publication, with newly relevant information
-and an independently owned frozen original resolution. The builder is terminal.
-The controller retires the form, keeps `PartialResolution` only in executor-owned
-operation state, and presents Review latest and merge again (the normal/default
-action), Publish original resolution anyway, and Cancel. Neither publication nor
-review happens automatically. Subsequent state emissions cannot alter that partial.
-
-Review Latest or Cancel takes and clears the owned partial, then closes it on the
-session executor without save. Cleanup errors produce a generic cleanup message,
-not persistence uncertainty; session close is the final invalidation backstop.
-After cleanup, Review looks up the full TokenId in `AdditionalConflict.latest()`.
-A remaining conflict opens a fresh input-selection workflow using exactly that state,
-with all its alternatives selected and no prior resolutions, subset or new secret.
-Otherwise the workflow ends with an explanation. The supplied state never replaces
-the browser's latest emitted state. Repeated AdditionalConflict/Review cycles are
-unbounded human decisions, each retiring the previous partial.
-
-Publish Original requires a second explicit confirmation explaining that it uses
-the exact original selected inputs and resolution, omits newly observed information,
-and skips the merge new-information check. It can leave competing alternatives.
-Only the executor calls `PartialResolution.save()`; it constructs no new merge or
-update and performs no desktop semantic gate. The narrowed `PartialSaveResult`
-permits only Saved, Failed, and PublicationUncertain:
-
-- Saved consumes/retires the partial and says “Original merge resolution publication
-  acknowledged.” It does not claim the new conflict was resolved.
-- Failed retires/closes the partial, states definite non-publication, and restores
-  write actions (or closes for SESSION_CLOSING). It never saves the same partial again.
-- PublicationUncertain retires the partial and transfers sole publication authority
-  to the independently returned `PublicationRetry`.
-
-Normal and partial merge uncertainty reuse M2a's exact-byte retry/stop machinery,
-with operation-specific wording. There is no Review Latest action while a retry
-is owned, no plaintext recipe retained for retry, and no merge reconstruction.
-Stop remains sticky across observations and later acknowledged writes.
-
-## Merge close races and cleanup knowledge
-
-The one-write-workflow slot covers input selection, field editing, normal merge,
-AdditionalConflict decisions, partial save and publication retry. Refresh, state
-rendering and TOTP remain independent until close. Closing clears unsaved secret
-input and disables the modeless editor without creating a builder. An in-flight
-merge, partial save or retry is never interrupted. Executor cleanup is queued
-behind that work and ahead of session close, including capabilities returned while
-closing. No late completion may reopen decision or retry UI; unpublished partials
-are closed without save, without creating sticky uncertainty solely from abandonment.
-
-Once a save returns a semantic result, subsequent builder/handle cleanup cannot
-erase it. AdditionalConflict keeps its independent partial despite builder-close
-failure; partial Saved/Failed/PublicationUncertain survive partial-close failure,
-including ownership of a usable retry successor. Cleanup logs are generic and
-redacted. Tests use public fakes and deterministic latches for these races; the
-real NIO smoke does not attempt to manufacture AdditionalConflict with filesystem races.
 
 ## Explicit password-wrapper change (M3a)
 
@@ -561,7 +497,7 @@ password recovery subsystem. Only public `VaultSession.changePassword` is invoke
 
 `MutationGate` is a small EDT-owned per-window reservation. `TokenWriteController`
 keeps its existing token semantics and owns the reservation throughout Create,
-Update, Merge, AdditionalConflict, partial save, and publication retry/stop cleanup.
+Update, Resolve, AdditionalConflict review, and publication retry/stop cleanup.
 `PasswordChangeController` acquires the same reservation before opening its modeless
 form, retaining it throughout submitted work and editable definite failures. The
 gate disables Create/Edit/Resolve/Change Password and rejects stale callbacks as
@@ -651,12 +587,12 @@ Search is not persisted, logged or included in titles/diagnostics.
 Find, Refresh and Create use Swing action maps. Button and shortcut Refresh/Create
 share Actions and enabled state; MutationGate retains sole workflow ownership.
 Dialog Escape forwards existing guarded Cancel cleanup, and busy work cannot be
-interrupted. Ordinary form defaults are Save/Continue/Change; AdditionalConflict
-keeps Review Latest as default and uncertainty has no default. Original publication
-remains an explicit confirmed decision. There are no destructive shortcuts.
+interrupted. Ordinary form defaults are Save/Resolve/Change; updated-conflict review
+uses Review Updated Conflict as default and uncertainty has no default. Partial
+publication is unavailable. There are no destructive shortcuts.
 
-Focus requests occur only after showing the vault or through user actions, never
-from state emissions. Standard list navigation remains intact. Accessible metadata
+Ordinary list focus is preserved across state emissions. Resolver invalidation
+focuses its explicit updated-conflict review action. Standard list navigation remains intact. Accessible metadata
 must never contain entered passwords or secrets. Current visible TOTP label text
 remains accessible and is cleared with the existing code lifetime; static descriptions
 contain no codes. Labels identify inputs, conflict/unresolved evidence remains text,

@@ -118,8 +118,8 @@ stdenv.mkDerivation (finalAttrs: {
     grep -F -- '-XX:+DisableAttachMechanism' "$out/lib/totipo-desktop/bin/totipo-desktop-unwrapped"
     test "$(find "$out/lib/totipo-desktop/lib" -type f -name '*.jar' | wc -l)" -eq 4
     test -f "$out/lib/totipo-desktop/lib/totipo-desktop-${version}.jar"
-    test -f "$out/lib/totipo-desktop/lib/totipo-storage-nio-0.1.1.jar"
-    test -f "$out/lib/totipo-desktop/lib/totipo-core-0.1.1.jar"
+    test -f "$out/lib/totipo-desktop/lib/totipo-storage-nio-0.1.3.jar"
+    test -f "$out/lib/totipo-desktop/lib/totipo-core-0.1.3.jar"
     test -f "$out/lib/totipo-desktop/lib/bcprov-jdk18on-1.86.jar"
     for jar in build/install/totipo-desktop/lib/*.jar; do
       cmp "$jar" "$out/lib/totipo-desktop/lib/$(basename "$jar")"

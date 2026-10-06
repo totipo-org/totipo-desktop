@@ -27,7 +27,6 @@ public final class VaultPanel extends JPanel {
     private String operationWarning = "";
     private boolean abandonedWarning;
     private boolean uncertainWarning;
-    private boolean decisionWarning;
     private final JPanel reading = new JPanel(new BorderLayout(8, 8));
     private final JPanel messages = new JPanel(new BorderLayout(0, 12));
     private final JPanel heading = new JPanel(new BorderLayout(0, DesktopStyle.COMPACT));
@@ -150,7 +149,6 @@ public final class VaultPanel extends JPanel {
     private void updateNotification() {
         String warning = observationWarning;
         if (!operationWarning.isEmpty()) { warning += (warning.isEmpty() ? "" : " ") + operationWarning; }
-        if (decisionWarning) { warning += (warning.isEmpty() ? "" : " ") + "The vault changed while saving. Review the token before continuing."; }
         if (uncertainWarning || abandonedWarning) {
             warning += (warning.isEmpty() ? "" : " ") + "A change may already have been saved. Review the save options before trying again.";
         }
@@ -160,7 +158,7 @@ public final class VaultPanel extends JPanel {
     private void updateHeading() { heading.setVisible(notification.isVisible() || reading.isVisible() || messages.isVisible()); }
     public void clearUncertainty() {
         Edt.require();
-        uncertainWarning = false; decisionWarning = false; updateNotification();
+        uncertainWarning = false; updateNotification();
         if (getRootPane() != null) { getRootPane().setDefaultButton(null); }
         uncertainty.removeAll(); uncertainty.setVisible(false); updateMessages(); uncertainty.revalidate(); uncertainty.repaint();
     }
@@ -184,31 +182,11 @@ public final class VaultPanel extends JPanel {
         uncertainty.revalidate(); uncertainty.repaint();
     }
 
-    public void additionalConflict(Runnable review, Runnable publish, Runnable cancel) {
-        clearUncertainty();
-        decisionWarning = true; updateNotification(); uncertainty.setVisible(true); updateMessages();
-        JTextArea text = new JTextArea("New relevant token information was observed before this merge could be published. Nothing from this merge has been published.");
-        text.setEditable(false); text.setLineWrap(true); text.setWrapStyleWord(true); text.setRows(2);
-        uncertainty.add(text, BorderLayout.CENTER);
-        JPanel choices = new JPanel(new GridLayout(0, 1));
-        String[] labels = {"Review latest and merge again", "Publish original resolution anyway", "Cancel"};
-        Runnable[] actions = {review, publish, cancel};
-        for (int i = 0; i < labels.length; i++) {
-            JButton button = new JButton(labels[i]); Runnable action = actions[i];
-            button.addActionListener(event -> action.run()); choices.add(button);
-        }
-        uncertainty.add(choices, BorderLayout.SOUTH); uncertainty.revalidate(); uncertainty.repaint();
-        JButton reviewButton = (JButton) choices.getComponent(0);
-        if (getRootPane() != null) { getRootPane().setDefaultButton(reviewButton); }
-        reviewButton.requestFocusInWindow();
-    }
-    public void mergePublicationUncertain(boolean original, boolean busy, Runnable retry, Runnable stop) {
+    public void mergePublicationUncertain(boolean busy, Runnable retry, Runnable stop) {
         publicationUncertain(false, busy, retry, stop);
         JTextArea text = (JTextArea) ((BorderLayout) uncertainty.getLayout()).getLayoutComponent(BorderLayout.CENTER);
-        text.setText((original
-                ? "Totipo could not confirm whether your original conflict resolution was saved."
-                : "Totipo could not confirm whether this conflict resolution was saved.")
-                + "\nIt may already be saved. Retry sends the exact same resolution again. Stop retrying does not undo a save or prove it failed.");
+        text.setText("Totipo could not confirm whether this conflict resolution was saved."
+                + "\nRefresh or reopen the vault before deciding what to do next. Retry sends the exact same resolution again. Stop retrying does not undo a save or prove it failed.");
     }
 
     public void onRefresh(Runnable action) {

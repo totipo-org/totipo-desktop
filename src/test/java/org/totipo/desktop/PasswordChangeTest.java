@@ -314,19 +314,17 @@ class PasswordChangeTest {
         } finally { session.release.countDown(); edt(app::shutdown); await(launcher.disposed); }
     }
 
-    @Test void updateEditorAndPartialSaveAlsoExcludePasswordWorkflow() throws Exception {
+    @Test void updateEditorAndResolutionAlsoExcludePasswordWorkflow() throws Exception {
         try (TokenWriteControllerTest.Harness h = new TokenWriteControllerTest.Harness()) {
             edt(() -> h.view.edit.open(h.recording.state, MergeFixtures.alternative(0), ""));
             h.event("editor"); edt(h.view::passwordBlocked);
         }
         try (MergeControllerTest.Harness h = new MergeControllerTest.Harness()) {
-            var partial = new MergeFixtures.Partial(); partial.result = TokenWritesTest.saved();
-            partial.release = new CountDownLatch(1);
+            h.fake.results.add(TokenWritesTest.saved()); h.fake.release = new CountDownLatch(1);
             try {
-                h.decision(partial, new MergeFixtures.Recording());
-                edt(h.view.publish); h.event("confirm"); edt(h.view.confirm); await(partial.entered);
+                h.open(); edt(h.view::passwordBlocked); h.save(); await(h.fake.entered);
                 edt(h.view::passwordBlocked);
-            } finally { partial.release.countDown(); }
+            } finally { h.fake.release.countDown(); }
             h.event("finished");
         }
     }

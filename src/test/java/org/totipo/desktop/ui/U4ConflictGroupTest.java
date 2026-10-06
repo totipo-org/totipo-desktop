@@ -139,7 +139,7 @@ class U4ConflictGroupTest {
                 panel.render(unavailable.value); buttons(panel.list, "Resolve").get(0).doClick(0);
                 assertEquals(2, panel.rows.size()); panel.rows.get(0).show.doClick(0); assertEquals(1, unavailable.calls.size());
                 var resolver = new MergeEditorPanel(org.totipo.desktop.MergeInputs.capture(unavailable.value, incomplete), draft -> fail(), () -> {});
-                assertFalse(buttons(resolver, "Save").get(0).isEnabled()); resolver.retire();
+                assertFalse(buttons(resolver, "Resolve").get(0).isEnabled()); resolver.retire();
             } finally { panel.closing(); }
         });
     }

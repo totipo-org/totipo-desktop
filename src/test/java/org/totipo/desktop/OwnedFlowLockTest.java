@@ -46,7 +46,7 @@ class OwnedFlowLockTest {
                 switch (kind) {
                     case "add" -> view.add.run();
                     case "edit", "setup", "delete" -> view.edit.open(fixture.state, fixture.token.alternatives().getFirst(), "Edit");
-                    case "resolve" -> view.resolve.open(fixture.state, fixture.token);
+                    case "resolve", "resolve-details" -> view.resolve.open(fixture.state, fixture.token);
                     case "password" -> view.password.run();
                     default -> throw new AssertionError();
                 }
@@ -56,6 +56,7 @@ class OwnedFlowLockTest {
                     button(view.token, "Review").doClick(0);
                 }
                 if (kind.equals("delete")) { button(view.token, "Delete TOTP…").doClick(0); }
+                if (kind.equals("resolve-details")) { button(view.merge, "Combine details…").doClick(0); }
                 JPanel form = view.token != null ? view.token : view.merge != null ? view.merge : view.passwords;
                 assertNotNull(form);
                 var secrets = components(form).stream().filter(JPasswordField.class::isInstance).map(JPasswordField.class::cast).toList();
@@ -80,6 +81,8 @@ class OwnedFlowLockTest {
     @Test void ctrlLRetiresDeleteConfirmationWithoutPublication() throws Exception { retire("delete", true); }
     @Test void ctrlLRetiresEdit() throws Exception { retire("edit", true); }
     @Test void lockRetiresResolverWithoutDraftConfirmation() throws Exception { retire("resolve", false); }
+    @Test void lockRetiresDetailedResolver() throws Exception { retire("resolve-details", false); }
+    @Test void ctrlLRetiresDetailedResolver() throws Exception { retire("resolve-details", true); }
     @Test void ctrlLRetiresResolver() throws Exception { retire("resolve", true); }
     @Test void lockRetiresPasswordChangeAndClearsAllFields() throws Exception { retire("password", false); }
     @Test void ctrlLRetiresPasswordChange() throws Exception { retire("password", true); }

@@ -27,9 +27,7 @@ public interface VaultView {
     interface MergeAction { void open(VaultState base, org.totipo.TokenState token); }
     default void mergeAction(MergeAction action) { }
     default void editMerge(MergeEditorPanel editor) { }
-    default void additionalConflict(Runnable review, Runnable publish, Runnable cancel) { }
-    default void confirmOriginalResolution(Runnable confirmed) { }
-    default void mergePublicationUncertain(boolean original, boolean busy, Runnable retry, Runnable stop) {
+    default void mergePublicationUncertain(boolean busy, Runnable retry, Runnable stop) {
         publicationUncertain(false, busy, retry, stop);
     }
     default void tokenActions(Runnable create, EditAction edit) { }

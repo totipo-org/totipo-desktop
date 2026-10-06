@@ -35,10 +35,10 @@ class TextRoundTripTest {
         var submitted = new AtomicReference<MergeDraft>();
         edt(() -> {
             var panel = new MergeEditorPanel(fake.inputs(), submitted::set, () -> {});
-            MergeEditorTest.chooseFirst(panel);
+            button(panel, "Combine details…").doClick(); MergeEditorTest.chooseFirst(panel);
             MergeEditorTest.customText(panel, "issuer").setText(ISSUER);
             MergeEditorTest.customText(panel, "account").setText(ACCOUNT);
-            button(panel, "Save").doClick(); panel.retire();
+            button(panel, "Save Resolution").doClick(); panel.retire();
         });
         assertInstanceOf(SaveResult.Saved.class, MergeWrites.save(submitted.get()));
         assertEquals(ISSUER, fake.values.get("issuer")); assertEquals(ACCOUNT, fake.values.get("account"));

@@ -31,6 +31,15 @@ final class TaskDialogSizing {
     }
 
     static void fit(JDialog dialog, TokenManagementPanel content) {
+        fit(dialog, content, content.preferredTaskWidth(), content::taskSize);
+    }
+
+    static void fit(JDialog dialog, MergeEditorPanel content) {
+        fit(dialog, content, content.preferredTaskWidth(), content::taskSize);
+    }
+
+    private static void fit(JDialog dialog, JPanel content, int preferredWidth,
+                            java.util.function.IntFunction<Dimension> measured) {
         GraphicsConfiguration display = dialog.getGraphicsConfiguration();
         Rectangle bounds = display.getBounds();
         Insets screen = Toolkit.getDefaultToolkit().getScreenInsets(display);
@@ -38,12 +47,17 @@ final class TaskDialogSizing {
                 bounds.height - screen.top - screen.bottom);
         dialog.addNotify();
         Insets decoration = dialog.getInsets();
-        int width = Math.min(content.preferredTaskWidth(), usable.width - decoration.left - decoration.right);
-        content.setPreferredSize(content.taskSize(width));
+        int width = Math.min(preferredWidth, usable.width - decoration.left - decoration.right);
+        content.setPreferredSize(measured.apply(width));
         // Pack counts the root pane and native decorations once, after complete measurement.
         dialog.pack();
         dialog.setSize(capped(dialog.getSize(), usable));
         dialog.validate();
+        if (dialog.isVisible()) {
+            int left = bounds.x + screen.left, top = bounds.y + screen.top;
+            dialog.setLocation(Math.max(left, Math.min(dialog.getX(), left + usable.width - dialog.getWidth())),
+                    Math.max(top, Math.min(dialog.getY(), top + usable.height - dialog.getHeight())));
+        }
     }
 
     static Dimension capped(Dimension natural, Dimension usable) {

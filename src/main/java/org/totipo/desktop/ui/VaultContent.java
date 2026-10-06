@@ -5,7 +5,6 @@ import org.totipo.desktop.clipboard.TotpClipboard;
 import org.totipo.VaultState;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
-import javax.swing.JOptionPane;
 
 /** Session-owned content and child flows inside the persistent application frame. */
 public final class VaultContent implements VaultView {
@@ -42,28 +41,17 @@ public final class VaultContent implements VaultView {
         editor = new javax.swing.JDialog(owner, "Resolve Conflict", false);
         editor.setDefaultCloseOperation(javax.swing.JDialog.DO_NOTHING_ON_CLOSE);
         editor.setContentPane(content);
-        content.installDialog(editor.getRootPane());
+        javax.swing.JDialog owned = editor;
+        content.installDialog(editor.getRootPane(), () -> TaskDialogSizing.fit(owned, content));
         editor.addWindowListener(new WindowAdapter() {
+            @Override public void windowOpened(WindowEvent event) { content.focusInitialField(); }
             @Override public void windowClosing(WindowEvent event) { content.cancel(); }
         });
-        SwingUsability.fit(editor, TokenEditorPanel.PREFERRED_SIZE.width, TokenEditorPanel.PREFERRED_SIZE.height);
-        editor.setMinimumSize(new java.awt.Dimension(Math.min(TokenEditorPanel.MINIMUM_SIZE.width, editor.getWidth()),
-                Math.min(TokenEditorPanel.MINIMUM_SIZE.height, editor.getHeight())));
+        editor.setMinimumSize(new java.awt.Dimension(Math.min(560, editor.getWidth()), Math.min(260, editor.getHeight())));
         editor.setLocationRelativeTo(owner); editor.setVisible(true);
     }
-    @Override public void additionalConflict(Runnable review, Runnable publish, Runnable cancel) {
-        panel.additionalConflict(review, publish, cancel);
-    }
-    @Override public void confirmOriginalResolution(Runnable confirmed) {
-        String text = "This publishes the exact resolution you already chose, based on the original selected inputs.\n"
-                + "It does not include the newly observed information and does not run the merge new-information check again.\n"
-                + "The resulting token may still have competing alternatives.";
-        Object[] choices = {"Cancel", "Publish original resolution anyway"};
-        if (JOptionPane.showOptionDialog(owner, text, "Publish original resolution anyway", JOptionPane.DEFAULT_OPTION,
-                JOptionPane.WARNING_MESSAGE, null, choices, choices[0]) == 1) { confirmed.run(); }
-    }
-    @Override public void mergePublicationUncertain(boolean original, boolean busy, Runnable retry, Runnable stop) {
-        panel.mergePublicationUncertain(original, busy, retry, stop);
+    @Override public void mergePublicationUncertain(boolean busy, Runnable retry, Runnable stop) {
+        panel.mergePublicationUncertain(busy, retry, stop);
     }
     @Override public void tokenActions(Runnable create, EditAction edit) { panel.tokenActions(create, edit); }
     @Override public void writeAvailability(boolean available) { panel.writeAvailability(available); }

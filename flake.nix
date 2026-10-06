@@ -17,14 +17,23 @@
         pkgs = import nixpkgs {
           inherit system;
         };
+        desktop = pkgs.callPackage ./package.nix {
+          jdk = pkgs.jdk25;
+          gradle = pkgs.gradle_9.override { java = pkgs.jdk25; };
+        };
       in
       {
         formatter = pkgs.nixpkgs-fmt;
 
         packages = pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
-          default = pkgs.callPackage ./package.nix {
-            jdk = pkgs.jdk25;
-            gradle = pkgs.gradle_9.override { java = pkgs.jdk25; };
+          default = desktop;
+        };
+
+        apps = pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
+          update-package-deps = {
+            type = "app";
+            program = "${desktop.mitmCache.updateScript}";
+            meta.description = "Update the Gradle dependency cache in package-deps.json";
           };
         };
 

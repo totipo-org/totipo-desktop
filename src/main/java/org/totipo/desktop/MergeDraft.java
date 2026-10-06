@@ -8,6 +8,19 @@ public final class MergeDraft implements AutoCloseable {
     private final MergeInputs inputs;
     private final TokenAlternative secretRepresentative;
     private final TokenDraft values;
+    private final TokenAlternative wholeVersion;
+
+    /** Whole-version intent stays opaque: only Java keep() transfers its semantic value. */
+    public static MergeDraft keep(MergeInputs inputs, TokenAlternative alternative) {
+        return new MergeDraft(inputs, alternative);
+    }
+    private MergeDraft(MergeInputs inputs, TokenAlternative alternative) {
+        this.inputs = Objects.requireNonNull(inputs);
+        if (!inputs.captured().contains(Objects.requireNonNull(alternative)) || !inputs.fullFrontier()) {
+            throw new IllegalArgumentException("Choose a captured version of the complete conflict.");
+        }
+        wholeVersion = alternative; secretRepresentative = null; values = null;
+    }
 
     public MergeDraft(MergeInputs inputs, TokenDescriptor fields, TokenAlternative representative, byte[] newSecret) {
         this.inputs = Objects.requireNonNull(inputs);
@@ -17,10 +30,17 @@ public final class MergeDraft implements AutoCloseable {
             throw new IllegalArgumentException("Choose an existing secret group or enter a new secret.");
         }
         secretRepresentative = representative;
+        wholeVersion = null;
         values = new TokenDraft(fields, newSecret);
+    }
+    public MergeDraft(MergeInputs inputs, TokenDraft values) {
+        this.inputs = Objects.requireNonNull(inputs);
+        this.values = Objects.requireNonNull(values);
+        secretRepresentative = null; wholeVersion = null;
     }
     MergeInputs inputs() { return inputs; }
     void apply(MergeToken builder) {
+        if (wholeVersion != null) { builder.keep(wholeVersion); return; }
         // Builder-issued descriptions/capabilities stay within this executor operation.
         Objects.requireNonNull(builder.competingValues());
         var choices = builder.secretChoices();
@@ -33,5 +53,5 @@ public final class MergeDraft implements AutoCloseable {
         values.apply(builder);
         if (!builder.unresolvedFields().isEmpty()) { throw new MergeWrites.InconsistentDraft(); }
     }
-    @Override public void close() { values.close(); }
+    @Override public void close() { if (values != null) { values.close(); } }
 }

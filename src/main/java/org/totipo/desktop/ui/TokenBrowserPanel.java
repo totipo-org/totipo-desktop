@@ -330,7 +330,12 @@ public final class TokenBrowserPanel extends JPanel {
             row.edit.setEnabled(!closed && writeAvailable && !row.token.alternatives().isEmpty());
             row.edit.setToolTipText(writeAvailable ? "Edit TOTP" : "Changes are unavailable while another change is in progress or the vault session is closing.");
         }
-        resolveButtons.forEach(button -> button.setEnabled(!closed && writeAvailable));
+        resolveButtons.forEach(button -> {
+            button.setEnabled(!closed && writeAvailable);
+            String explanation = !closed && writeAvailable ? "Choose a version or combine details to resolve this conflict."
+                    : "Changes are unavailable while another change is in progress or the vault session is closing.";
+            button.setToolTipText(explanation); button.getAccessibleContext().setAccessibleDescription(explanation);
+        });
     }
     private void editSelected() { if (selectedRow != null) { editRow(selectedRow); } }
     private void editRow(TokenRowPanel row) {

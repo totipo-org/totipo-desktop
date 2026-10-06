@@ -50,7 +50,7 @@ class U4ResolverTest {
         edt(() -> {
             var a = active("A"); var b = alternative(TokenStatus.TOMBSTONED, "B", "account", TotpAlgorithm.SHA256, 8, 45);
             var token = token(1, a, b); var state = new State(token);
-            var panel = new MergeEditorPanel(MergeInputs.capture(state.value, token), MergeDraft::close, () -> {});
+            var panel = new MergeEditorPanel(MergeInputs.capture(state.value, token), MergeDraft::close, () -> {}); option(panel, "Combine details…").doClick();
             try {
                 assertEquals(List.of("Issuer", "Account", "Status", "Authenticator Setup"), sections(panel).stream().map(p -> title(p.getBorder())).toList());
                 var parent = section(panel, "Issuer").getParent();
@@ -86,7 +86,7 @@ class U4ResolverTest {
                 assertEquals(1, components(panel).stream().filter(JScrollPane.class::isInstance).count());
                 assertFalse(components(TokenBrowserTest.find(panel, JScrollPane.class)).contains(panel.save));
                 assertFalse(components(TokenBrowserTest.find(panel, JScrollPane.class)).contains(panel.cancel));
-                assertEquals(TokenEditorPanel.MINIMUM_SIZE, panel.getMinimumSize());
+                assertTrue(panel.preferredTaskWidth() >= 680);
             } finally { panel.retire(); }
         });
     }
@@ -97,11 +97,11 @@ class U4ResolverTest {
             var a = alternative(TokenStatus.ACTIVE, longValue, longValue, TotpAlgorithm.SHA1, 6, 30);
             var b = alternative(TokenStatus.ACTIVE, "B", "other", TotpAlgorithm.SHA1, 6, 30);
             var token = token(1, a, b); var state = new State(token);
-            var panel = new MergeEditorPanel(MergeInputs.capture(state.value, token), MergeDraft::close, () -> {});
+            var panel = new MergeEditorPanel(MergeInputs.capture(state.value, token), MergeDraft::close, () -> {}); option(panel, "Combine details…").doClick();
             try {
                 var account = section(panel, "Account"); assertEquals(3, radios(account).size());
                 assertEquals(List.of(longValue, "other", ""), textFields(account).stream().map(JTextField::getText).toList());
-                for (Dimension size : List.of(panel.getPreferredSize(), panel.getMinimumSize())) {
+                for (Dimension size : List.of(panel.taskSize(680), new Dimension(560, 400))) {
                     panel.setSize(size); layout(panel);
                     var scroll = TokenBrowserTest.find(panel, JScrollPane.class);
                     assertEquals(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER, scroll.getHorizontalScrollBarPolicy());
@@ -134,19 +134,19 @@ class U4ResolverTest {
                 var b = variants.get(i); var all = List.of(a, b); var token = token(1, all, List.of(new SecretGroup(all)), a.heads(), List.of(), true);
                 var state = new State(token); var inputs = MergeInputs.capture(state.value, token);
                 assertEquals(i == 0, MergeEditorPanel.sameSetup(inputs, a, b));
-                var panel = new MergeEditorPanel(inputs, MergeDraft::close, () -> {}); assertEquals(i == 0 ? 1 : 2, setups(panel).size()); panel.retire();
+                var panel = new MergeEditorPanel(inputs, MergeDraft::close, () -> {}); option(panel, "Combine details…").doClick(); assertEquals(i == 0 ? 1 : 2, setups(panel).size()); panel.retire();
             }
             var b = active("B"); var all = List.of(a, b);
             for (List<SecretGroup> groups : List.of(List.of(new SecretGroup(List.of(a)), new SecretGroup(List.of(b))), List.<SecretGroup>of())) {
                 var token = token(1, all, groups, a.heads(), List.of(), true); var state = new State(token);
-                var panel = new MergeEditorPanel(MergeInputs.capture(state.value, token), MergeDraft::close, () -> {}); assertEquals(2, setups(panel).size()); panel.retire();
+                var panel = new MergeEditorPanel(MergeInputs.capture(state.value, token), MergeDraft::close, () -> {}); option(panel, "Combine details…").doClick(); assertEquals(2, setups(panel).size()); panel.retire();
             }
         });
     }
     @Test void everyCustomSetupControlAutoSelectsAndSwitchClearsSecret() throws Exception {
         edt(() -> {
             var token = token(1, active("A"), active("B")); var state = new State(token);
-            var panel = new MergeEditorPanel(MergeInputs.capture(state.value, token), MergeDraft::close, () -> {});
+            var panel = new MergeEditorPanel(MergeInputs.capture(state.value, token), MergeDraft::close, () -> {}); option(panel, "Combine details…").doClick();
             var existing = setups(panel).get(0); var custom = option(panel, "Use a different authenticator setup");
             var secret = TokenBrowserTest.find(panel, JPasswordField.class); var period = TokenBrowserTest.find(panel, JSpinner.class);
             for (Runnable action : List.<Runnable>of(() -> focus(secret), () -> secret.setText("MY"), () -> option(panel, "SHA256").doClick(),
@@ -160,7 +160,7 @@ class U4ResolverTest {
     @Test void textValuesDeduplicateAndClickFocusAndTypingSelectLiteralCustom() throws Exception {
         edt(() -> {
             var a = active("A"); var b = active("A"); var c = active("<html>B"); var token = token(1, a, b, c); var state = new State(token);
-            var panel = new MergeEditorPanel(MergeInputs.capture(state.value, token), MergeDraft::close, () -> {});
+            var panel = new MergeEditorPanel(MergeInputs.capture(state.value, token), MergeDraft::close, () -> {}); option(panel, "Combine details…").doClick();
             var existing = components(panel).stream().filter(JTextField.class::isInstance).map(JTextField.class::cast)
                     .filter(f -> f.getAccessibleContext().getAccessibleName() != null && f.getAccessibleContext().getAccessibleName().startsWith("Issuer choice:")).toList();
             assertEquals(2, existing.size()); assertEquals(List.of("A", "<html>B"), existing.stream().map(JTextField::getText).toList());
@@ -177,9 +177,9 @@ class U4ResolverTest {
     @Test void resolverLayoutAndStatusUseEditorControlsWithoutProtocolLanguage() throws Exception {
         edt(() -> {
             var a = active("A"); var b = alternative(TokenStatus.TOMBSTONED, "B", "account", TotpAlgorithm.SHA1, 6, 30); var token = token(1, a, b); var state = new State(token);
-            var panel = new MergeEditorPanel(MergeInputs.capture(state.value, token), MergeDraft::close, () -> {});
+            var panel = new MergeEditorPanel(MergeInputs.capture(state.value, token), MergeDraft::close, () -> {}); option(panel, "Combine details…").doClick();
             assertFalse(option(panel, "Active").isSelected()); assertFalse(option(panel, "Deleted").isSelected());
-            assertFalse(option(panel, "Save").isEnabled()); assertEquals(TokenEditorPanel.PREFERRED_SIZE, panel.getPreferredSize());
+            assertTrue(option(panel, "Save Resolution").isEnabled()); assertTrue(panel.taskSize(680).height > 0);
             assertEquals(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER, TokenBrowserTest.find(panel, JScrollPane.class).getHorizontalScrollBarPolicy());
             var spinner = TokenBrowserTest.find(panel, JSpinner.class); var model = (SpinnerNumberModel) spinner.getModel();
             assertEquals(1L, model.getMinimum()); assertEquals(4294967295L, model.getMaximum()); assertInstanceOf(Long.class, model.getValue());

@@ -86,9 +86,6 @@ class VaultPanelTest {
                 panel.writeWarning("The change could not be completed."); assertTrue(panel.notification.isVisible());
                 panel.render(new State().value); assertTrue(panel.notification.isVisible());
                 panel.writeMessage("Token publication acknowledged."); assertFalse(panel.notification.isVisible());
-                panel.additionalConflict(() -> {}, () -> {}, () -> {}); assertTrue(panel.notification.isVisible());
-                assertTrue(find(panel.notification, javax.swing.JTextArea.class).getText().contains("vault changed"));
-                panel.clearUncertainty(); assertFalse(panel.notification.isVisible());
             } finally { panel.closing(); }
         });
     }
