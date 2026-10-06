@@ -31,6 +31,7 @@ public interface VaultView {
         publicationUncertain(false, busy, retry, stop);
     }
     default void tokenActions(Runnable create, EditAction edit) { }
+    default void deleteAction(EditAction delete) { }
     default void writeAvailability(boolean available) { }
     default void manageToken(TokenManagementPanel editor) { }
     default void mutationAcknowledged(org.totipo.SaveResult.Saved saved) { }

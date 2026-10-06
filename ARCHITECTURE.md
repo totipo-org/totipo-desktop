@@ -369,11 +369,12 @@ fresh secret input when the operation needs it.
 
 ## Captured update basis and serialized workflow
 
-The browser offers Edit Token for one complete semantic alternative, including
-multiple equal heads. A conflicted token offers an initially unselected
-Alternative N selector and Edit Alternative…; explanatory text appears before
-opening the editor in that choice dialog. The normal editor has only a concise
-deletion-history helper. No complete alternative means no edit.
+The browser exposes Edit…, Delete…, and View Diagnostics… through the Token menu
+and textual row context menus. Right-click, Shift+F10, and the Menu key target the
+selected semantic Alternative without revealing or deriving a code. Conflict
+children target that exact Alternative, including multiple equal heads; editing
+or deleting a version does not resolve its peers. No complete Alternative means
+no mutation action. Repeated rows retain only Show Code / Copy.
 
 Opening captures the exact receiving VaultState and TokenAlternative. New state
 emissions neither rewrite the draft nor replace this basis. Historical same-session

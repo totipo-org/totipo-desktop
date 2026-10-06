@@ -31,7 +31,7 @@ class TokenEditingBrowserTest {
             } finally { panel.closing(); }
         });
     }
-    @Test void inlineAndMenuEditSharePathAndClearRevealWithoutDeriving() throws Exception {
+    @Test void contextAndMenuEditSharePathAndClearRevealWithoutDeriving() throws Exception {
         edt(() -> {
             var panel = browser(new MutableClock()); var a = active("issuer"); var state = new State(token(1, a));
             List<TokenAlternative> edited = new ArrayList<>(); panel.onEdit((base, selected, explanation) -> edited.add(selected));

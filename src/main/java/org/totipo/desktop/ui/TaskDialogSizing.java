@@ -31,7 +31,14 @@ final class TaskDialogSizing {
     }
 
     static void fit(JDialog dialog, TokenManagementPanel content) {
+        // The preceding stage's resize floor must not constrain this stage's pack.
+        dialog.setMinimumSize(new Dimension());
         fit(dialog, content, content.preferredTaskWidth(), content::taskSize);
+        dialog.setMinimumSize(tokenTaskMinimum(dialog.getSize()));
+    }
+
+    static Dimension tokenTaskMinimum(Dimension packed) {
+        return new Dimension(Math.min(560, packed.width), Math.min(260, packed.height));
     }
 
     static void fit(JDialog dialog, MergeEditorPanel content) {

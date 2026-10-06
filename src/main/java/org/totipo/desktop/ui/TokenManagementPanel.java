@@ -16,6 +16,8 @@ public final class TokenManagementPanel extends JPanel {
     @FunctionalInterface public interface Submit {
         void save(VaultState base, TokenAlternative target, TokenDraft draft);
     }
+    public enum DeleteOrigin { EDIT, DIRECT }
+    private DeleteOrigin deleteOrigin = DeleteOrigin.EDIT;
     enum Stage { EDIT, ACQUIRE, REVIEW, DUPLICATE, REPLACE_REVIEW, DELETE }
     final JTextField issuer = new JTextField(24), account = new JTextField(24);
     final JPasswordField secret = new JPasswordField(24), uri = new JPasswordField(24);
@@ -25,9 +27,9 @@ public final class TokenManagementPanel extends JPanel {
     final JButton primary = new JButton(), cancel = new JButton("Cancel");
     final JPanel body = new JPanel(new GridBagLayout());
     final JTextArea notice = text("");
-    private final JPanel actions = new JPanel(new FlowLayout(FlowLayout.TRAILING, 8, 0));
+    private final JPanel actions = SwingUsability.taskActionRow();
     private final JPanel actionRow = new JPanel(new BorderLayout(16, 0));
-    private final JPanel footer = new JPanel(new BorderLayout(0, 16));
+    private final JPanel footer = new JPanel(new BorderLayout());
     private final JScrollPane scroll;
     private final EnumMap<Field, JComponent> inputs = new EnumMap<>(Field.class);
     private final EnumMap<Field, JTextArea> errors = new EnumMap<>(Field.class);
@@ -49,13 +51,20 @@ public final class TokenManagementPanel extends JPanel {
     private boolean changing, busy, retired;
     private int row;
     private JComponent firstInvalid;
+    private int acquisitionWidth;
 
     public TokenManagementPanel(VaultState base, TokenAlternative original, String explanation,
                                 Supplier<VaultState> current, Submit submit, Runnable abandon) {
+        this(base, original, explanation, current, submit, abandon, DeleteOrigin.EDIT);
+    }
+    public TokenManagementPanel(VaultState base, TokenAlternative original, String explanation,
+                                Supplier<VaultState> current, Submit submit, Runnable abandon, DeleteOrigin origin) {
         Edt.require();
+        this.deleteOrigin = java.util.Objects.requireNonNull(origin);
+        if (origin == DeleteOrigin.DIRECT && original == null) { throw new IllegalArgumentException("Delete requires a target"); }
         this.editBase = base; this.original = original; this.explanation = explanation;
         this.current = current; this.submit = submit; this.abandon = abandon;
-        setLayout(new BorderLayout(0, 24)); setBorder(BorderFactory.createEmptyBorder(24, 24, 24, 24));
+        setLayout(new BorderLayout(0, 8)); setBorder(BorderFactory.createEmptyBorder(24, 24, 8, 24));
         setBackground(DesktopStyle.surface()); body.setBackground(DesktopStyle.surface());
         issuer.getDocument().putProperty("filterNewlines", Boolean.FALSE);
         account.getDocument().putProperty("filterNewlines", Boolean.FALSE);
@@ -63,14 +72,7 @@ public final class TokenManagementPanel extends JPanel {
         for (JPasswordField input : List.of(secret, uri)) {
             // Standard password delegate retains echo/accessibility while respecting the semantic palette.
             input.setUI(new javax.swing.plaf.basic.BasicPasswordFieldUI());
-            input.setBackground(DesktopStyle.surfaceInput()); input.setForeground(DesktopStyle.text()); input.setCaretColor(DesktopStyle.text());
-            input.setBorder(new DesktopStyle.ControlBorder(null, new Insets(6, 8, 6, 8)));
-            Dimension natural = input.getPreferredSize();
-            input.setPreferredSize(new Dimension(natural.width, Math.max(DesktopStyle.CONTROL, natural.height)));
-            input.addFocusListener(new java.awt.event.FocusAdapter() {
-                @Override public void focusGained(java.awt.event.FocusEvent event) { input.repaint(); }
-                @Override public void focusLost(java.awt.event.FocusEvent event) { input.repaint(); }
-            });
+            DesktopStyle.password(input);
         }
         for (TokenChoice<?> choices : List.of(algorithm, digits)) { styleChoices(choices); }
         TokenEditorPanel.FormBody wrapper = new TokenEditorPanel.FormBody(); wrapper.setBackground(DesktopStyle.surface()); wrapper.setOpaque(false);
@@ -80,11 +82,13 @@ public final class TokenManagementPanel extends JPanel {
         add(scroll, BorderLayout.CENTER);
         footer.setOpaque(false); actions.setOpaque(false); actionRow.setOpaque(false);
         actionRow.add(actions, BorderLayout.EAST);
+        notice.setBorder(BorderFactory.createEmptyBorder(0, 0, DesktopStyle.NORMAL, 0));
         notice.setVisible(false); footer.add(notice, BorderLayout.NORTH); footer.add(actionRow, BorderLayout.SOUTH); add(footer, BorderLayout.SOUTH);
         DesktopStyle.action(cancel, DesktopStyle.ActionRole.SecondaryAction, false);
         primary.addActionListener(event -> activate());
         cancel.addActionListener(event -> cancel());
-        if (original == null) { acquisition(false); } else {
+        if (origin == DeleteOrigin.DIRECT) { delete(); }
+        else if (original == null) { acquisition(false); } else {
             issuer.setText(original.descriptor().issuer()); account.setText(original.descriptor().account()); edit();
         }
     }
@@ -100,6 +104,10 @@ public final class TokenManagementPanel extends JPanel {
         return taskSize(preferredTaskWidth());
     }
     int preferredTaskWidth() {
+        // Add keeps its established width when corrected acquisition enters review too.
+        return acquisitionWidth > 0 && (stage == Stage.ACQUIRE || original == null) ? acquisitionWidth : naturalTaskWidth();
+    }
+    private int naturalTaskWidth() {
         Insets padding = getInsets();
         Insets edge = scroll.getInsets();
         Insets viewport = scroll.getViewportBorder() == null ? new Insets(0, 0, 0, 0)
@@ -125,15 +133,22 @@ public final class TokenManagementPanel extends JPanel {
         (stage == Stage.EDIT ? issuer : stage == Stage.ACQUIRE ? method.options.get(false) : cancel).requestFocusInWindow();
     }
     private void reset(Stage next, String action) {
+        // Each stage owns its natural height. Drop the preceding pack/viewport hints
+        // before notifying the owner to measure the newly composed body.
+        setPreferredSize(null); scroll.getViewport().setPreferredSize(null);
         stage = next; row = 0; body.removeAll(); actions.removeAll(); inputs.clear(); errors.clear(); firstInvalid = null;
         Component leading = ((BorderLayout) actionRow.getLayout()).getLayoutComponent(BorderLayout.WEST);
         if (leading != null) { actionRow.remove(leading); }
         notice.setText(""); notice.setVisible(false);
-        primary.setText(action); DesktopStyle.action(primary, DesktopStyle.ActionRole.PrimaryAction, false);
+        primary.setText(action); primary.getAccessibleContext().setAccessibleDescription(null); DesktopStyle.action(primary, DesktopStyle.ActionRole.PrimaryAction, false);
         actions.add(cancel); actions.add(primary);
     }
     private void finishLayout() { revalidate(); repaint(); }
-    private void finishTask() { finishLayout(); defaults(); }
+    private void finishTask() {
+        finishLayout(); defaults();
+        // Content changes are measured/packed by the owner before focus may scroll a field.
+        scroll.getViewport().setViewPosition(new Point());
+    }
     private void heading(String text) {
         JTextArea heading = text(text); heading.setFont(DesktopStyle.font(DesktopStyle.Typography.SectionTitle)); wide(heading, 24);
     }
@@ -146,13 +161,14 @@ public final class TokenManagementPanel extends JPanel {
     }
     private void field(Field key, String name, JComponent control) {
         GridBagConstraints c = new GridBagConstraints(); c.gridx = 0; c.gridy = row; c.anchor = GridBagConstraints.FIRST_LINE_START;
-        c.insets = new Insets(12, 0, 0, 16); JLabel label = SwingUsability.label(name, control); label.setFont(DesktopStyle.font(DesktopStyle.Typography.Body));
-        label.setForeground(DesktopStyle.textSecondary()); body.add(label, c);
+        int gap = stage == Stage.ACQUIRE && row == 1 ? DesktopStyle.SECTION : DesktopStyle.COMPACT;
+        c.insets = new Insets(gap, 0, 0, 16); JLabel label = SwingUsability.label(name, control); label.setFont(DesktopStyle.font(DesktopStyle.Typography.Body));
+        label.setForeground(DesktopStyle.textSecondary()); DesktopStyle.formLabel(label, control); body.add(label, c);
         JPanel group = new JPanel(new BorderLayout(0, 4)); group.setOpaque(false); group.add(control, BorderLayout.NORTH);
         JTextArea error = text(""); error.setForeground(DesktopStyle.danger()); error.setVisible(false);
         error.getAccessibleContext().setAccessibleName(name + " validation"); group.add(error, BorderLayout.CENTER);
         errors.put(key, error); inputs.put(key, control); trackFocus(control);
-        c.gridx = 1; c.weightx = 1; c.fill = GridBagConstraints.HORIZONTAL; c.insets = new Insets(12, 0, 0, 0);
+        c.gridx = 1; c.weightx = 1; c.fill = GridBagConstraints.HORIZONTAL; c.insets = new Insets(gap, 0, 0, 0);
         body.add(group, c); row++;
     }
     private void trackFocus(JComponent component) {
@@ -161,7 +177,7 @@ public final class TokenManagementPanel extends JPanel {
             component.addFocusListener(new java.awt.event.FocusAdapter() {
                 @Override public void focusGained(java.awt.event.FocusEvent event) {
                     if (!retired && SwingUtilities.isDescendingFrom(component, body)) {
-                        body.scrollRectToVisible(SwingUtilities.convertRectangle(component.getParent(), component.getBounds(), body));
+                        scrollToControl(component);
                     }
                 }
             });
@@ -169,6 +185,10 @@ public final class TokenManagementPanel extends JPanel {
         for (Component child : component.getComponents()) {
             if (child instanceof JComponent control) { trackFocus(control); }
         }
+    }
+    private void scrollToControl(JComponent component) {
+        Rectangle bounds = SwingUtilities.convertRectangle(component.getParent(), component.getBounds(), body);
+        if (!body.getVisibleRect().contains(bounds)) { body.scrollRectToVisible(bounds); }
     }
     static JTextArea text(String value) {
         JTextArea area = new JTextArea(value); area.setEditable(false); area.setOpaque(false);
@@ -192,19 +212,30 @@ public final class TokenManagementPanel extends JPanel {
             wide(text("You are editing this version only. Saving does not resolve the other conflicting versions."), 0);
         }
         field(Field.ISSUER, "Issuer / service", issuer); field(Field.ACCOUNT, "Account", account);
-        heading("Authenticator setup"); wide(text(SetupSummary.format(original.descriptor())), 8);
-        wide(secondary("Change setup…", () -> acquisition(true), false), 8);
+        JLabel heading = TokenRowPanel.literal("Authenticator setup");
+        heading.setFont(DesktopStyle.font(DesktopStyle.Typography.SectionTitle));
+        JPanel setupRow = new JPanel(new GridBagLayout()); setupRow.setOpaque(false);
+        GridBagConstraints h = new GridBagConstraints(); h.gridx = 0; h.weightx = 1;
+        h.fill = GridBagConstraints.HORIZONTAL; h.anchor = GridBagConstraints.CENTER;
+        setupRow.add(heading, h);
+        h.gridx = 1; h.weightx = 0; h.fill = GridBagConstraints.NONE; h.insets = new Insets(0, 16, 0, 0);
+        setupRow.add(secondary("Change setup…", () -> acquisition(true), false), h);
+        wide(setupRow, 24); wide(text(SetupSummary.format(original.descriptor())), 8);
         JButton delete = secondary("Delete TOTP…", this::delete, true);
         delete.getAccessibleContext().setAccessibleDescription("Delete " + TokenPresentation.identity(original.descriptor()));
-        actionRow.add(delete, BorderLayout.WEST, 0); finishTask();
+        JPanel leading = SwingUsability.taskActionRow(); leading.add(delete);
+        actionRow.add(leading, BorderLayout.WEST, 0); finishTask();
     }
     private void acquisition(boolean change) {
         discardSetup(); changing = change; target = change ? original : null; targetBase = change ? editBase : null;
         method = new TokenChoice<>("Acquisition method", List.of(false, true), manual -> manual ? "Manual entry" : "Setup URI", false);
-        styleChoices(method);
+        method.segmented();
         method.options.values().forEach(button -> button.addActionListener(event -> {
             if (!busy && !retired) { clearInputs(); acquisitionBody(); }
         }));
+        // Measure both real bodies before the first pack; retain width, not height.
+        method.select(true); acquisitionBody(); acquisitionWidth = Math.max(acquisitionWidth, naturalTaskWidth());
+        method.select(false); acquisitionBody(); acquisitionWidth = Math.max(acquisitionWidth, naturalTaskWidth());
         acquisitionBody();
     }
     static void styleChoices(TokenChoice<?> choices) {
@@ -223,9 +254,12 @@ public final class TokenManagementPanel extends JPanel {
             button.setFont(DesktopStyle.font(DesktopStyle.Typography.Body).deriveFont(button.isSelected() ? Font.BOLD : Font.PLAIN));
             button.addItemListener(event -> button.setFont(DesktopStyle.font(DesktopStyle.Typography.Body)
                     .deriveFont(button.isSelected() ? Font.BOLD : Font.PLAIN)));
-            button.setBorder(new DesktopStyle.ControlBorder(null, new Insets(6, 8, 6, 8)));
+            button.setBorder(new DesktopStyle.ControlBorder(null, new Insets(DesktopStyle.CONTROL_PADDING_Y, DesktopStyle.TIGHT,
+                    DesktopStyle.CONTROL_PADDING_Y, DesktopStyle.TIGHT)));
+            button.setFont(DesktopStyle.font(DesktopStyle.Typography.Body).deriveFont(Font.BOLD));
             Dimension natural = button.getPreferredSize();
             button.setPreferredSize(new Dimension(natural.width, Math.max(DesktopStyle.CONTROL, natural.height)));
+            button.setFont(DesktopStyle.font(DesktopStyle.Typography.Body).deriveFont(button.isSelected() ? Font.BOLD : Font.PLAIN));
             button.addFocusListener(new java.awt.event.FocusAdapter() {
                 @Override public void focusGained(java.awt.event.FocusEvent event) { button.repaint(); }
                 @Override public void focusLost(java.awt.event.FocusEvent event) { button.repaint(); }
@@ -235,7 +269,7 @@ public final class TokenManagementPanel extends JPanel {
     private void acquisitionBody() {
         reset(Stage.ACQUIRE, "Review"); wide(method, 0);
         if (!method.selected()) {
-            wide(text("Paste an otpauth:// TOTP setup URI into the field. Review it before saving."), 16);
+            wide(text("Paste an otpauth:// TOTP setup URI into the field. Review it before saving."), DesktopStyle.SECTION);
             field(Field.URI, "Setup URI", uri);
         } else {
             if (!changing) { field(Field.ISSUER, "Issuer / service", issuer); field(Field.ACCOUNT, "Account", account); }
@@ -280,10 +314,15 @@ public final class TokenManagementPanel extends JPanel {
         JButton another = secondary("Add Another", () -> publish(null, targetBase), false);
         actions.add(another, 1); finishTask(); cancel.requestFocusInWindow();
     }
+    public void requestDelete() {
+        Edt.require();
+        if (!busy && !retired && stage == Stage.EDIT) { delete(); }
+    }
     private void delete() {
         clearInputs(); reset(Stage.DELETE, "Delete TOTP"); identity(original.descriptor());
         wide(text("This removes the TOTP from the active vault.\nPrevious versions remain in vault history."), 24);
         DesktopStyle.confirmDanger(primary);
+        primary.getAccessibleContext().setAccessibleDescription("Delete " + TokenPresentation.identity(original.descriptor()));
         finishTask(); cancel.requestFocusInWindow();
     }
     private void activate() {
@@ -349,15 +388,17 @@ public final class TokenManagementPanel extends JPanel {
         JTextArea error = errors.get(field);
         if (error != null) { error.setText(message); error.setVisible(true); } else { notice(message); }
         firstInvalid = inputs.get(field);
+        finishTask();
         if (firstInvalid != null) {
             firstInvalid.getAccessibleContext().setAccessibleDescription(message);
             firstInvalid.requestFocusInWindow();
-            revalidate();
+            JComponent invalidInput = firstInvalid;
             SwingUtilities.invokeLater(() -> {
-                if (!retired && firstInvalid != null) { body.scrollRectToVisible(SwingUtilities.convertRectangle(firstInvalid.getParent(), firstInvalid.getBounds(), body)); }
+                if (!retired && firstInvalid == invalidInput && SwingUtilities.isDescendingFrom(invalidInput, body)) {
+                    scrollToControl(invalidInput);
+                }
             });
         }
-        finishLayout();
     }
     JComponent firstInvalid() { return firstInvalid; }
     private void notice(String message) { notice.setText(message); notice.setVisible(!message.isBlank()); finishLayout(); }
@@ -378,8 +419,8 @@ public final class TokenManagementPanel extends JPanel {
     private void discardSetup() { if (setup != null) { setup.close(); setup = null; } }
     public void cancel() {
         Edt.require(); if (busy || retired) { return; }
-        // Secondary tasks cancel back to Edit; shell lock always calls retire directly.
-        if (original != null && stage != Stage.EDIT) { clearInputs(); discardSetup(); edit(); return; }
+        // Delete returns to its explicit origin; other secondary tasks return to Edit.
+        if (original != null && stage != Stage.EDIT && (stage != Stage.DELETE || deleteOrigin == DeleteOrigin.EDIT)) { clearInputs(); discardSetup(); edit(); return; }
         retire(); abandon.run();
     }
     public void retire() {

@@ -67,14 +67,109 @@ class TokenManagementPanelTest {
             var a = active("Service"); State state = new State(token(1, a));
             var panel = new TokenManagementPanel(state.value, a, "", () -> state.value,
                     (base, target, draft) -> fail("Layout must not publish"), () -> {});
-            JButton delete = button(panel, "Delete TOTP…"); Container row = delete.getParent();
+            JButton delete = button(panel, "Delete TOTP…"); Container row = delete.getParent().getParent();
             BorderLayout layout = assertInstanceOf(BorderLayout.class, row.getLayout());
-            assertSame(delete, layout.getLayoutComponent(BorderLayout.WEST));
+            assertSame(delete.getParent(), layout.getLayoutComponent(BorderLayout.WEST));
             assertSame(panel.cancel.getParent(), layout.getLayoutComponent(BorderLayout.EAST));
             assertSame(panel.cancel.getParent(), panel.primary.getParent());
             assertEquals(FlowLayout.TRAILING, ((FlowLayout) panel.primary.getParent().getLayout()).getAlignment());
             assertFalse(SwingUtilities.isDescendingFrom(delete, scroller(panel)));
             assertFalse(SwingUtilities.isDescendingFrom(panel.cancel, scroller(panel))); panel.retire();
+        });
+    }
+    @Test void editSetupRowAndFooterKeepNaturalAlignedGeometry() throws Exception {
+        edt(() -> {
+            Font previous = UIManager.getFont("Label.font");
+            try {
+                for (float size : new float[]{14, 28}) {
+                    UIManager.put("Label.font", previous.deriveFont(size));
+                    for (String explanation : List.of("", "You are editing this version only.")) {
+                        var a = active("Service"); State state = new State(token(1, a));
+                        var panel = new TokenManagementPanel(state.value, a, explanation, () -> state.value,
+                                (base, target, draft) -> fail("Layout must not publish"), () -> {});
+                        fitsAtDefaultSize(panel);
+                        JButton change = button(panel, "Change setup…"), delete = button(panel, "Delete TOTP…");
+                        JLabel heading = all(panel).stream().filter(JLabel.class::isInstance).map(JLabel.class::cast)
+                                .filter(t -> t.getText().equals("Authenticator setup")).findFirst().orElseThrow();
+                        JTextArea summary = all(panel).stream().filter(JTextArea.class::isInstance).map(JTextArea.class::cast)
+                                .filter(t -> t.getText().equals(SetupSummary.format(a.descriptor()))).findFirst().orElseThrow();
+                        assertSame(heading.getParent(), change.getParent());
+                        assertEquals(change.getPreferredSize(), change.getSize());
+                        assertEquals(change.getParent().getWidth(), change.getX() + change.getWidth());
+                        assertEquals(GridBagConstraints.NONE, ((GridBagLayout) change.getParent().getLayout()).getConstraints(change).fill);
+                        Rectangle headingRow = SwingUtilities.convertRectangle(change.getParent(), change.getBounds(), panel.body);
+                        assertTrue(summary.getY() >= headingRow.y + headingRow.height);
+                        assertEquals(panel.body.getWidth(), summary.getWidth());
+                        assertEquals(delete.getPreferredSize(), delete.getSize());
+                        assertTrue(delete.getHeight() < delete.getParent().getHeight());
+                        Rectangle left = SwingUtilities.convertRectangle(delete.getParent(), delete.getBounds(), panel);
+                        Rectangle right = SwingUtilities.convertRectangle(panel.primary.getParent(), panel.primary.getBounds(), panel);
+                        assertEquals(left.y + left.height / 2, right.y + right.height / 2);
+                        assertEquals(DesktopStyle.ActionRole.DestructiveAction, delete.getClientProperty("totipo.actionRole"));
+                        assertEquals(DesktopStyle.surfaceRaised(), delete.getBackground());
+                        assertEquals(DesktopStyle.ActionRole.PrimaryAction, panel.primary.getClientProperty("totipo.actionRole"));
+                        assertTrue(change.isFocusable()); assertEquals("Change setup…", change.getAccessibleContext().getAccessibleName());
+                        panel.retire();
+                    }
+                }
+            } finally { UIManager.put("Label.font", previous); }
+        });
+    }
+    @Test void deleteMeasuresCurrentBodyRegardlessOfOriginAndGrowsWithFont() throws Exception {
+        edt(() -> {
+            Font previous = UIManager.getFont("Label.font"); int normalHeight = 0;
+            try {
+                for (float size : new float[]{14, 28}) {
+                    UIManager.put("Label.font", previous.deriveFont(size));
+                    var a = active("Service"); State state = new State(token(1, a));
+                    var edit = new TokenManagementPanel(state.value, a, "", () -> state.value,
+                            (base, target, draft) -> fail("Sizing must not publish"), () -> {});
+                    fitsAtDefaultSize(edit); int editHeight = edit.taskSize().height;
+                    // Give the preceding viewport an exaggerated allocation/hint.
+                    scroller(edit).getViewport().setPreferredSize(new Dimension(600, 1000));
+                    edit.setPreferredSize(new Dimension(edit.getWidth(), 1100));
+                    edit.setSize(edit.getWidth(), 1100); layoutTree(edit); edit.requestDelete();
+                    assertFalse(edit.isPreferredSizeSet()); assertFalse(scroller(edit).getViewport().isPreferredSizeSet());
+                    var direct = new TokenManagementPanel(state.value, a, "", () -> state.value,
+                            (base, target, draft) -> fail("Sizing must not publish"), () -> {}, TokenManagementPanel.DeleteOrigin.DIRECT);
+                    fitsAtDefaultSize(edit); fitsAtDefaultSize(direct);
+                    assertEquals(direct.taskSize(), edit.taskSize(), "Delete height must not depend on the preceding Edit allocation");
+                    assertTrue(edit.taskSize().height < editHeight, "Short Delete content should shrink from Edit");
+                    assertEquals(edit.body.getPreferredSize().height, scroller(edit).getViewport().getPreferredSize().height);
+                    assertTrue(all(direct).stream().noneMatch(JTextField.class::isInstance));
+                    assertTrue(all(direct).stream().noneMatch(c -> c instanceof JButton b && b.getText().equals("Change setup…")));
+                    assertTrue(direct.primary.getAccessibleContext().getAccessibleDescription().contains("Service"));
+                    if (size == 14) { normalHeight = direct.taskSize().height; }
+                    else { assertTrue(direct.taskSize().height > normalHeight); }
+                    edit.retire(); direct.retire();
+                }
+            } finally { UIManager.put("Label.font", previous); }
+        });
+    }
+    @Test void deleteNeutralReturnUsesExplicitOriginAndPreservesTheSameIdentityDraft() throws Exception {
+        edt(() -> {
+            for (TokenManagementPanel.DeleteOrigin origin : TokenManagementPanel.DeleteOrigin.values()) {
+                for (String neutral : List.of("Cancel", "Escape", "Window close")) {
+                    var a = active("Service"); State state = new State(token(1, a)); AtomicInteger closed = new AtomicInteger();
+                    var panel = new TokenManagementPanel(state.value, a, "", () -> state.value,
+                            (base, target, draft) -> fail("Neutral return must not publish"), closed::incrementAndGet, origin);
+                    JRootPane root = new JRootPane(); root.setContentPane(panel); panel.installDialog(root, value -> {});
+                    if (origin == TokenManagementPanel.DeleteOrigin.EDIT) {
+                        panel.issuer.setText("Unsaved issuer"); panel.account.setText("Unsaved account"); panel.requestDelete();
+                    }
+                    if (neutral.equals("Cancel")) { panel.cancel.doClick(0); }
+                    else if (neutral.equals("Escape")) {
+                        Object binding = root.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).get(KeyStroke.getKeyStroke("ESCAPE"));
+                        root.getActionMap().get(binding).actionPerformed(new java.awt.event.ActionEvent(root, 0, "escape"));
+                    } else { panel.cancel(); } // Same callback used by the task window's closing listener.
+                    if (origin == TokenManagementPanel.DeleteOrigin.EDIT) {
+                        assertEquals("Edit TOTP", panel.title()); assertEquals(0, closed.get());
+                        assertEquals("Unsaved issuer", panel.issuer.getText()); assertEquals("Unsaved account", panel.account.getText());
+                        assertTrue(SwingUtilities.isDescendingFrom(panel.issuer, panel.body));
+                    } else { assertEquals(1, closed.get()); }
+                    assertTrue(state.calls.isEmpty()); panel.retire();
+                }
+            }
         });
     }
     @Test void naturalMeasurementReplacesStaleViewportHintsOnEveryModeSwitch() throws Exception {
@@ -100,6 +195,8 @@ class TokenManagementPanelTest {
     @Test void taskWindowCapPreservesShortTasksAndConstrainsLongContentToUsableScreen() {
         Dimension usable = new Dimension(1000, 800), shortTask = new Dimension(680, 300);
         assertEquals(shortTask, TaskDialogSizing.capped(shortTask, usable));
+        assertEquals(new Dimension(560, 210), TaskDialogSizing.tokenTaskMinimum(new Dimension(680, 210)));
+        assertEquals(new Dimension(560, 260), TaskDialogSizing.tokenTaskMinimum(new Dimension(680, 600)));
         Dimension capped = TaskDialogSizing.capped(new Dimension(1200, 2000), usable);
         assertTrue(capped.width <= usable.width); assertTrue(capped.height < usable.height); assertTrue(capped.height > 0);
     }

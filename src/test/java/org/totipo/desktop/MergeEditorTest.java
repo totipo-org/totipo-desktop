@@ -12,6 +12,49 @@ import static org.totipo.desktop.TokenWriteControllerTest.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class MergeEditorTest {
+    static void layout(java.awt.Container parent) {
+        parent.doLayout();
+        for (var c : parent.getComponents()) { if (c instanceof java.awt.Container child) { layout(child); } }
+    }
+    @Test void simpleResolverSpacingRolesAndCenteredFooterAtLargeFonts() throws Exception {
+        edt(() -> {
+            var original = UIManager.getFont("Label.font");
+            try {
+                for (float size : new float[]{14, 28}) {
+                    UIManager.put("Label.font", original.deriveFont(size));
+                    var panel = new MergeEditorPanel(new Recording().inputs(), draft -> fail("No selection must not submit"), () -> {});
+                    panel.setSize(900, 700); layout(panel); layout(panel);
+                    var radios = components(panel).stream().filter(JRadioButton.class::isInstance).map(JRadioButton.class::cast).toList();
+                    assertTrue(radios.stream().noneMatch(AbstractButton::isSelected));
+                    var intro = components(panel).stream().filter(JTextArea.class::isInstance).map(JTextArea.class::cast).filter(t -> t.getText().equals("Choose the version to keep.")).findFirst().orElseThrow();
+                    var body = (JPanel) intro.getParent();
+                    assertEquals(16, ((java.awt.GridBagLayout) body.getLayout()).getConstraints(intro).insets.bottom);
+                    var choices = (JPanel) radios.get(0).getParent().getParent();
+                    assertEquals(16, ((java.awt.GridLayout) choices.getLayout()).getVgap());
+                    for (var radio : radios) {
+                        var block = (JPanel) radio.getParent();
+                        assertEquals(8, ((java.awt.BorderLayout) block.getLayout()).getVgap());
+                        var summary = (JTextArea) ((java.awt.BorderLayout) block.getLayout()).getLayoutComponent(java.awt.BorderLayout.CENTER);
+                        assertEquals(radio.getInsets().left + radio.getIcon().getIconWidth() + radio.getIconTextGap(), summary.getInsets().left);
+                    }
+                    var cancel = button(panel, "Cancel"); var combine = button(panel, "Combine details…"); var resolve = button(panel, "Resolve");
+                    assertEquals("SecondaryAction", cancel.getClientProperty("totipo.actionRole").toString());
+                    assertEquals("SecondaryAction", combine.getClientProperty("totipo.actionRole").toString());
+                    assertEquals("PrimaryAction", resolve.getClientProperty("totipo.actionRole").toString());
+                    assertTrue(combine.getWidth() > cancel.getWidth());
+                    var row = (JPanel) resolve.getParent();
+                    var scroll = components(panel).stream().filter(JScrollPane.class::isInstance).map(JScrollPane.class::cast).findFirst().orElseThrow();
+                    assertFalse(SwingUtilities.isDescendingFrom(row, scroll));
+                    assertEquals(16, row.getInsets().top); assertEquals(16, row.getInsets().bottom);
+                    assertEquals(resolve.getPreferredSize().height + 32, row.getPreferredSize().height);
+                    assertEquals(16, resolve.getY()); assertEquals(16, row.getHeight() - resolve.getY() - resolve.getHeight());
+                    assertEquals(cancel.getY(), resolve.getY()); assertEquals(combine.getHeight(), resolve.getHeight());
+                    assertEquals(24, ((java.awt.BorderLayout) panel.getLayout()).getVgap() + row.getInsets().top);
+                    panel.retire();
+                }
+            } finally { UIManager.put("Label.font", original); }
+        });
+    }
     static AbstractButton option(java.awt.Container panel, String text) {
         return components(panel).stream().filter(AbstractButton.class::isInstance).map(AbstractButton.class::cast).filter(b -> text.equals(b.getText())).findFirst().orElseThrow();
     }

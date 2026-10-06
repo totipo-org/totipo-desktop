@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.*;
+import java.awt.BorderLayout;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.totipo.desktop.TestSupport.edt;
@@ -41,8 +42,8 @@ class CollectionCompositionTest {
                         assertEquals(16, header.y);
                         assertEquals(16, header.x);
                         assertEquals(size.width - 16, header.x + header.width);
-                        assertTrue(first.y - header.y - header.height >= 12);
-                        assertTrue(first.y - header.y - header.height <= 18); // Includes the scroll-pane border.
+                        assertTrue(first.y - header.y - header.height >= DesktopStyle.SECTION);
+                        assertTrue(first.y - header.y - header.height <= DesktopStyle.SECTION + 2); // Includes the scroll-pane border.
                         assertEquals(browser.search.getPreferredSize().height, search.height);
                         assertEquals(browser.add.getPreferredSize().height, browser.add.getHeight());
                         assertTrue(search.width >= 100);
@@ -51,7 +52,7 @@ class CollectionCompositionTest {
                         assertTrue(search.x + search.width < count.x);
                         assertTrue(count.x + count.width < add.x);
                         assertEquals(8, count.x - search.x - search.width);
-                        assertEquals(12, add.x - count.x - count.width);
+                        assertEquals(DesktopStyle.NORMAL, add.x - count.x - count.width);
                     }
                 }
             } finally { vault.closing(); }
@@ -140,20 +141,25 @@ class CollectionCompositionTest {
             var browser = browser(new MutableClock()); var state = new State(token(1, active("one"), active("two")));
             try {
                 browser.render(state.value); browser.list.setSize(600, 500); layout(browser.list);
-                var group = (JPanel) browser.list.getComponent(0); var header = (JPanel) group.getComponent(0);
+                var group = (JPanel) browser.list.getComponent(0);
+                var wrapper = (JPanel) group.getComponent(0);
+                var header = (JPanel) ((BorderLayout) wrapper.getLayout()).getLayoutComponent(BorderLayout.CENTER);
                 var heading = TokenBrowserTest.find(header, JLabel.class); var resolve = buttons(header).getFirst();
                 assertEquals(8, header.getInsets().top); assertEquals(8, header.getInsets().bottom);
                 assertEquals(heading.getBounds().getCenterY(), resolve.getBounds().getCenterY(), .5);
                 assertEquals("Resolve", resolve.getText()); assertEquals(2, browser.rows.size()); assertTrue(state.calls.isEmpty());
                 assertTrue(browser.rows.stream().allMatch(row -> row.token.hasConflict()));
-                var divider = (JPanel) group.getComponent(1);
+                var divider = (JPanel) ((BorderLayout) wrapper.getLayout()).getLayoutComponent(BorderLayout.SOUTH);
                 var first = SwingUtilities.convertRectangle(browser.rows.getFirst().getParent(),
                         browser.rows.getFirst().getBounds(), group);
                 assertEquals(1, divider.getHeight()); assertTrue(divider.getWidth() > 0);
+                assertSame(wrapper, divider.getParent()); assertNotSame(header, divider.getParent());
+                assertEquals(header.getPreferredSize().height + DesktopStyle.BORDER, wrapper.getPreferredSize().height);
+                assertEquals(resolve.getPreferredSize(), resolve.getSize());
                 assertEquals(header.getY() + header.getHeight(), divider.getY());
-                assertTrue(divider.getY() + divider.getHeight() <= first.y);
-                assertEquals(first.x, divider.getX() + divider.getInsets().left);
-                assertEquals(first.x + first.width, divider.getX() + divider.getWidth());
+                assertTrue(wrapper.getY() + divider.getY() + divider.getHeight() <= first.y);
+                assertEquals(first.x + DesktopStyle.NORMAL, wrapper.getX() + divider.getX() + divider.getInsets().left);
+                assertEquals(first.x + first.width, wrapper.getX() + divider.getX() + divider.getWidth());
                 var border = (javax.swing.border.CompoundBorder) divider.getBorder();
                 var line = (javax.swing.border.MatteBorder) border.getInsideBorder();
                 assertEquals(DesktopStyle.border(), line.getMatteColor());

@@ -106,7 +106,7 @@ class PendingGraceTest {
                 panel.render(state.value); var row = panel.row(id(1)); row.show.doClick(0); int height = row.getPreferredSize().height;
                 clock.now = Instant.ofEpochSecond(30); panel.owner(row).tick(); assertEquals(height, row.getPreferredSize().height); assertFalse(row.show.isVisible());
                 assertEquals(1, TotpCopyTest.buttons(row).size()); assertTrue(TotpCopyTest.buttons(row).stream().noneMatch(JButton::isEnabled));
-                assertTrue(row.getAccessibleContext().getAccessibleName().contains("conflicting versions")); assertSame(row.actionBottom, row.edit.getParent());
+                assertTrue(row.getAccessibleContext().getAccessibleName().contains("conflicting versions")); assertSame(row.contextMenu, row.edit.getParent());
                 callbacks.get(0).accept(next()); assertEquals(1, TotpCopyTest.buttons(row).size()); assertFalse(row.show.isVisible()); assertTrue(TotpCopyTest.buttons(row).stream().allMatch(JButton::isEnabled));
             } finally { panel.closing(); }
         });

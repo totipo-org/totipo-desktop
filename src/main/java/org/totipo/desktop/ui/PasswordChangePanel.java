@@ -28,8 +28,8 @@ public final class PasswordChangePanel extends JPanel {
     public PasswordChangePanel(Consumer<PasswordChangeSubmission> submit, Runnable cancelled,
                                BooleanSupplier confirmEmpty) {
         Edt.require();
-        setLayout(new BorderLayout(0, DesktopStyle.SECTION));
-        setBorder(BorderFactory.createEmptyBorder(24, 24, 24, 24));
+        setLayout(new BorderLayout(0, DesktopStyle.TIGHT));
+        setBorder(BorderFactory.createEmptyBorder(24, 24, 8, 24));
         body.setOpaque(false); scroll.setBorder(null);
         scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
         DesktopStyle.action(change, DesktopStyle.ActionRole.PrimaryAction, false);
@@ -108,7 +108,7 @@ public final class PasswordChangePanel extends JPanel {
         JTextArea area = new JTextArea(value); area.setEditable(false); area.setLineWrap(true); area.setWrapStyleWord(true);
         area.setOpaque(false); area.setFont(DesktopStyle.font(DesktopStyle.Typography.Body)); area.setForeground(DesktopStyle.text()); return area;
     }
-    Dimension taskSize(int width) { return TaskDialogSizing.contentSize(body, scroll, footer, getInsets(), DesktopStyle.SECTION, width); }
+    Dimension taskSize(int width) { return TaskDialogSizing.contentSize(body, scroll, footer, getInsets(), DesktopStyle.TIGHT, width); }
     int preferredTaskWidth() { return Math.max(560, current.getPreferredSize().width + new JLabel("Current password").getPreferredSize().width + 88); }
     void installDialog(JRootPane root) { SwingUsability.dialog(root, change, this::cancel); }
     void focusInitialField() { current.requestFocusInWindow(); }

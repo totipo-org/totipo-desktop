@@ -53,7 +53,7 @@ public final class ShellPanel extends JPanel {
         DesktopStyle.action(details, DesktopStyle.ActionRole.QuietAction, false);
         detailsRow.setOpaque(false); detailsRow.add(details);
         DesktopStyle.action(primary, DesktopStyle.ActionRole.PrimaryAction, false);
-        DesktopStyle.action(secondary, DesktopStyle.ActionRole.QuietAction, false);
+        DesktopStyle.action(secondary, DesktopStyle.ActionRole.SecondaryAction, false);
         for (JComponent field : new JComponent[] {identity, path, status, passwordLabel, password, error}) {
             field.setMinimumSize(new Dimension(0, field.getPreferredSize().height));
         }
@@ -146,6 +146,15 @@ public final class ShellPanel extends JPanel {
         error.setToolTipText(notice.isEmpty() ? null : notice);
         primary.setText(next == ShellState.NO_VAULT ? "Select Vault" : next == ShellState.BLOCKING_VAULT_STATE ? "Try Again" : "Open");
         secondary.setText(next == ShellState.NO_VAULT ? "Create New Vault…" : "Change Vault…");
+        DesktopStyle.action(primary, DesktopStyle.ActionRole.PrimaryAction, false);
+        DesktopStyle.action(secondary, DesktopStyle.ActionRole.SecondaryAction, false);
+        if (next == ShellState.NO_VAULT || next == ShellState.LOCKED) {
+            int width = Math.max(primary.getPreferredSize().width, secondary.getPreferredSize().width);
+            primary.setPreferredSize(new Dimension(width, primary.getPreferredSize().height));
+            secondary.setPreferredSize(new Dimension(width, secondary.getPreferredSize().height));
+            primary.setMinimumSize(primary.getPreferredSize());
+            secondary.setMinimumSize(secondary.getPreferredSize());
+        }
         primary.setEnabled(!busy); secondary.setEnabled(!busy); password.setEnabled(!busy);
         layoutTask();
         if (getRootPane() != null) { getRootPane().setDefaultButton(primary); }

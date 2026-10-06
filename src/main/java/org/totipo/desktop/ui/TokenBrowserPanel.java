@@ -22,6 +22,8 @@ public final class TokenBrowserPanel extends JPanel {
     private final transient List<JButton> resolveButtons = new ArrayList<>();
     private final transient Clock clock;
     private transient VaultView.TotpAction generator;
+    private final Timer presentationTimer = new Timer(250, event -> refreshPresentation());
+    private boolean refreshingPresentation;
     final JTextField search = new JTextField(24);
     final JLabel resultCount = new JLabel("Waiting for observation");
     final JLabel empty = TokenRowPanel.literal("No TOTPs yet. Use Add to add your first TOTP.");
@@ -34,10 +36,12 @@ public final class TokenBrowserPanel extends JPanel {
     final JPanel headerActions = new JPanel();
     final JPanel results = new JPanel(new CardLayout());
     final JMenuItem editMenu = new JMenuItem("Edit…");
+    final JMenuItem deleteMenu = new JMenuItem("Delete…");
     final JMenuItem diagnosticsMenu = new JMenuItem("View Diagnostics…");
     final CopyNotification copyNotification;
     private transient TotpClipboard.Copy copyAction = (code, from, until, now) -> TotpClipboard.UNAVAILABLE;
     private transient VaultView.EditAction editAction;
+    private transient VaultView.EditAction deleteAction;
     private transient VaultView.MergeAction mergeAction;
     private boolean writeAvailable = true;
     private transient SaveResult.Saved changed;
@@ -48,15 +52,18 @@ public final class TokenBrowserPanel extends JPanel {
     transient Consumer<TokenDiagnosticsPanel> diagnosticsAction = panel -> openDialog("Token Diagnostics", panel);
 
     public TokenBrowserPanel(Clock clock) {
-        Edt.require(); setLayout(new BorderLayout(DesktopStyle.TIGHT, DesktopStyle.NORMAL));
+        Edt.require(); setLayout(new BorderLayout(DesktopStyle.TIGHT, DesktopStyle.SECTION));
         this.clock = clock;
         copyNotification = new CopyNotification(clock);
         totp = new TotpDisplay(clock, this::display,
-                id -> copyNotification.showMessage("Code unavailable. Try Show Code again."));
+                id -> copyNotification.showMessage("Code unavailable. Try Show Code again."), false);
         searchBar.add(SwingUsability.label("Search", search), BorderLayout.WEST);
         DesktopStyle.input(search);
         search.setMinimumSize(new Dimension(0, search.getPreferredSize().height));
         DesktopStyle.action(add, DesktopStyle.ActionRole.PrimaryAction, false);
+        Dimension addSize = add.getPreferredSize();
+        add.setPreferredSize(new Dimension(Math.max(DesktopStyle.COLLECTION_ADD_WIDTH, addSize.width), addSize.height));
+        add.setMinimumSize(add.getPreferredSize());
         add.setMaximumSize(add.getPreferredSize());
         DesktopStyle.action(emptyAdd, DesktopStyle.ActionRole.PrimaryAction, false);
         DesktopStyle.action(clearSearch, DesktopStyle.ActionRole.QuietAction, false);
@@ -66,7 +73,7 @@ public final class TokenBrowserPanel extends JPanel {
         resultCount.setForeground(DesktopStyle.textSecondary());
         headerActions.setLayout(new BoxLayout(headerActions, BoxLayout.X_AXIS));
         resultCount.setAlignmentY(CENTER_ALIGNMENT); add.setAlignmentY(CENTER_ALIGNMENT);
-        headerActions.add(resultCount); headerActions.add(Box.createHorizontalStrut(DesktopStyle.COMPACT)); headerActions.add(add);
+        headerActions.add(resultCount); headerActions.add(Box.createHorizontalStrut(DesktopStyle.NORMAL)); headerActions.add(add);
         searchBar.add(search, BorderLayout.CENTER); searchBar.add(headerActions, BorderLayout.EAST);
         search.getAccessibleContext().setAccessibleDescription("Filter by issuer or account. Escape clears search.");
         add(searchBar, BorderLayout.NORTH);
@@ -88,6 +95,7 @@ public final class TokenBrowserPanel extends JPanel {
         clearChangedSearch.addActionListener(event -> search.setText("")); changedNotice.add(clearChangedSearch);
         add(changedNotice, BorderLayout.SOUTH);
         list.setLayout(new BoxLayout(list, BoxLayout.Y_AXIS)); list.setBackground(DesktopStyle.surface());
+        list.setBorder(BorderFactory.createEmptyBorder(0, 0, DesktopStyle.COMPACT, 0));
         list.getAccessibleContext().setAccessibleName("TOTPs");
         JScrollPane scroll = new JScrollPane(list, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         scroll.getVerticalScrollBar().setUnitIncrement(24);
@@ -106,6 +114,7 @@ public final class TokenBrowserPanel extends JPanel {
         overlay.add(results, JLayeredPane.DEFAULT_LAYER);
         overlay.add(copyNotification, JLayeredPane.POPUP_LAYER); add(overlay, BorderLayout.CENTER);
         editMenu.addActionListener(e -> editSelected());
+        deleteMenu.addActionListener(e -> { if (selectedRow != null) { manageRow(selectedRow, deleteAction); } });
         diagnosticsMenu.addActionListener(e -> {
             TokenState token = selectedToken();
             if (token != null) { diagnosticsAction.accept(new TokenDiagnosticsPanel(token)); }
@@ -141,17 +150,18 @@ public final class TokenBrowserPanel extends JPanel {
                     @Override public Dimension getMaximumSize() { return new Dimension(Integer.MAX_VALUE, getPreferredSize().height); }
                 }; group.setLayout(new BoxLayout(group, BoxLayout.Y_AXIS));
                 group.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0, DesktopStyle.SEMANTIC_EDGE, 0, 0, conflictAccent()),
-                        BorderFactory.createEmptyBorder(DesktopStyle.TIGHT, DesktopStyle.TIGHT, DesktopStyle.TIGHT, DesktopStyle.TIGHT)));
+                        BorderFactory.createEmptyBorder(DesktopStyle.TIGHT, 0, DesktopStyle.TIGHT, 0)));
                 group.setBackground(DesktopStyle.surface());
                 group.getAccessibleContext().setAccessibleName("This token has conflicting versions");
-                JPanel header = new JPanel(new BorderLayout(DesktopStyle.TIGHT, 0)); header.setOpaque(false); header.setFocusable(false);
-                header.setBorder(BorderFactory.createEmptyBorder(DesktopStyle.TIGHT, 0, DesktopStyle.TIGHT, 0));
+                JPanel header = new JPanel(new GridBagLayout()); header.setOpaque(false); header.setFocusable(false);
+                header.setBorder(BorderFactory.createEmptyBorder(DesktopStyle.TIGHT, DesktopStyle.COMPACT - DesktopStyle.SEMANTIC_EDGE, DesktopStyle.TIGHT, DesktopStyle.COMPACT));
                 JLabel warning = TokenRowPanel.literal("Conflict"); warning.setToolTipText("This token has conflicting versions");
                 warning.setForeground(DesktopStyle.warning());
-                warning.setFont(DesktopStyle.font(DesktopStyle.Typography.SectionTitle));
+                // Adjacent compact text shares metrics, as well as the outer centerline.
+                warning.setFont(DesktopStyle.font(DesktopStyle.Typography.Body));
                 warning.getAccessibleContext().setAccessibleName("This token has conflicting versions");
                 JButton resolve = new JButton("Resolve"); resolveButtons.add(resolve);
-                DesktopStyle.action(resolve, DesktopStyle.ActionRole.SecondaryAction, true);
+                DesktopStyle.rowAction(resolve, true);
                 resolve.addActionListener(e -> {
                     if (!closed && writeAvailable && mergeAction != null && latest.token(token.id()).orElse(null) == token) {
                         if (token.alternatives().size() < 2 || !token.unresolvedReferences().isEmpty()) {
@@ -159,7 +169,12 @@ public final class TokenBrowserPanel extends JPanel {
                         } else { mergeAction.open(latest, token); }
                     }
                 });
-                header.add(warning); header.add(resolve, BorderLayout.EAST); group.add(header);
+                GridBagConstraints headerCell = new GridBagConstraints();
+                headerCell.gridx = 0; headerCell.weightx = 1; headerCell.anchor = GridBagConstraints.WEST;
+                header.add(warning, headerCell);
+                headerCell.gridx = 1; headerCell.weightx = 0; headerCell.anchor = GridBagConstraints.EAST;
+                headerCell.insets = new Insets(0, DesktopStyle.TIGHT, 0, 0);
+                header.add(resolve, headerCell);
                 JPanel divider = new JPanel();
                 divider.setOpaque(false);
                 divider.setBorder(BorderFactory.createCompoundBorder(
@@ -168,18 +183,20 @@ public final class TokenBrowserPanel extends JPanel {
                 divider.setMinimumSize(new Dimension(0, DesktopStyle.BORDER));
                 divider.setPreferredSize(new Dimension(0, DesktopStyle.BORDER));
                 divider.setMaximumSize(new Dimension(Integer.MAX_VALUE, DesktopStyle.BORDER));
-                group.add(divider); list.add(group);
+                JPanel headerWrapper = new JPanel(new BorderLayout()); headerWrapper.setOpaque(false); headerWrapper.setFocusable(false);
+                headerWrapper.add(header, BorderLayout.CENTER); headerWrapper.add(divider, BorderLayout.SOUTH);
+                group.add(headerWrapper); list.add(group);
             }
             List<TokenAlternative> alternatives = TokenPresentation.ordered(token);
             if (alternatives.isEmpty()) {
                 TokenRowPanel unavailable = new TokenRowPanel(token, () -> select(token.id()), () -> {}, () -> {}, index -> {});
                 unavailable.primary.setText("Incomplete version"); unavailable.edit.setEnabled(false);
-                rows.add(unavailable); if (group == null) { list.add(unavailable); } else { group.add(unavailable); }
+                rows.add(unavailable); contextActions(unavailable); if (group == null) { list.add(unavailable); } else { group.add(unavailable); }
             }
             for (TokenAlternative alternative : alternatives) {
                 TotpDisplay owner = token.hasConflict() ? childDisplays.computeIfAbsent(alternative, key -> {
                     TotpDisplay display = new TotpDisplay(clock, (id, values) -> displayChild(key, values),
-                            id -> copyNotification.showMessage("Code unavailable. Try Show Code again."));
+                            id -> copyNotification.showMessage("Code unavailable. Try Show Code again."), false);
                     if (generator != null) { display.generator(generator); } return display;
                 }) : totp;
                 TokenRowPanel[] holder = new TokenRowPanel[1];
@@ -193,9 +210,10 @@ public final class TokenBrowserPanel extends JPanel {
                             }
                         }, clock);
                 holder[0] = row; rows.add(row);
+                contextActions(row);
                 if (group != null) {
-                    JPanel indent = new JPanel(new BorderLayout()); indent.setOpaque(false);
-                    indent.setBorder(BorderFactory.createEmptyBorder(DesktopStyle.MICRO, DesktopStyle.NORMAL, 0, 0)); indent.add(row); group.add(indent);
+                    row.indentIdentity(DesktopStyle.NORMAL - DesktopStyle.SEMANTIC_EDGE);
+                    group.add(row);
                     long duplicates = alternatives.stream().filter(a -> TokenPresentation.identity(a.descriptor()).equals(TokenPresentation.identity(alternative.descriptor()))).count();
                     if (duplicates > 1) {
                         var d = alternative.descriptor();
@@ -206,9 +224,7 @@ public final class TokenBrowserPanel extends JPanel {
                         row.account.setToolTipText(row.account.getText());
                     }
                 } else { list.add(row); }
-                row.display(owner.presentation(token.id()));
-                if (owner.pending(token.id()) && owner.graceLabels(token.id()).isEmpty()) { row.pending(); }
-                else if (!owner.graceLabels(token.id()).isEmpty()) { row.gracePending(owner.graceLabels(token.id())); }
+                // Initialize all mounted rows together after composition.
                 SwingUsability.bind(row, WHEN_ANCESTOR_OF_FOCUSED_COMPONENT, KeyStroke.getKeyStroke("UP"), "previous-token",
                         SwingUsability.action("Previous token", () -> moveSelection(-1)));
                 SwingUsability.bind(row, WHEN_ANCESTOR_OF_FOCUSED_COMPONENT, KeyStroke.getKeyStroke("DOWN"), "next-token",
@@ -232,6 +248,7 @@ public final class TokenBrowserPanel extends JPanel {
         ((CardLayout) results.getLayout()).show(results, matched == 0 ? "empty" : "list");
         searchBar.setVisible(total != 0);
         resultCount.setText(search.getText().isEmpty() ? total + " TOTPs" : matched + " of " + total);
+        refreshPresentation();
         updateActions(); list.revalidate(); list.repaint();
         showChanged();
     }
@@ -259,19 +276,32 @@ public final class TokenBrowserPanel extends JPanel {
         return token.hasConflict() || token.alternatives().isEmpty()
                 || token.alternatives().stream().anyMatch(a -> a.descriptor().status() == TokenStatus.ACTIVE);
     }
-    private void display(TokenId id, List<TotpDisplay.Display> displays) {
-        TokenRowPanel row = row(id);
-        if (row == null || row.token.hasConflict()) { return; }
-        List<String> pending = totp.graceLabels(id);
-        if (!pending.isEmpty()) { row.gracePending(pending); }
-        else { row.display(displays); }
-    }
-    private void displayChild(TokenAlternative alternative, List<TotpDisplay.Display> values) {
-        rows.stream().filter(r -> r.alternative == alternative).findFirst().ifPresent(row -> {
-            TotpDisplay owner = childDisplays.get(alternative);
-            if (owner != null && !owner.graceLabels(row.token.id()).isEmpty()) { row.gracePending(owner.graceLabels(row.token.id())); }
-            else { row.display(values); }
-        });
+    private void display(TokenId id, List<TotpDisplay.Display> displays) { refreshPresentation(); }
+    private void displayChild(TokenAlternative alternative, List<TotpDisplay.Display> values) { refreshPresentation(); }
+
+    /** One EDT pass, including hidden authorization owners, uses one clock snapshot. */
+    void refreshPresentation() {
+        Edt.require();
+        if (closed || refreshingPresentation) { return; }
+        refreshingPresentation = true;
+        try {
+            java.time.Instant now = clock.instant();
+            totp.tick(now);
+            childDisplays.values().forEach(owner -> owner.tick(now));
+            for (TokenRowPanel row : rows) {
+                TotpDisplay owner = row.token.hasConflict() ? childDisplays.get(row.alternative) : totp;
+                if (owner == null) { continue; }
+                var values = owner.presentation(row.token.id(), now);
+                var pending = owner.graceLabels(row.token.id(), now);
+                if (!pending.isEmpty()) { row.gracePending(pending); }
+                else {
+                    row.display(values);
+                    if (owner.pending(row.token.id(), now)) { row.pending(); }
+                }
+            }
+            if (totp.running() || childDisplays.values().stream().anyMatch(TotpDisplay::running)) { presentationTimer.start(); }
+            else { presentationTimer.stop(); }
+        } finally { refreshingPresentation = false; }
     }
     private void moveSelection(int offset) {
         int index = rows.indexOf(selectedRow);
@@ -308,6 +338,7 @@ public final class TokenBrowserPanel extends JPanel {
     }
     public void focusSearch() { Edt.require(); if (!closed) { focus(search); search.selectAll(); } }
     public void onEdit(VaultView.EditAction action) { Edt.require(); editAction = action; }
+    public void onDelete(VaultView.EditAction action) { Edt.require(); deleteAction = action; }
     public void onMerge(VaultView.MergeAction action) { Edt.require(); mergeAction = action; }
     public void totpAction(VaultView.TotpAction action) {
         generator = action; childDisplays.values().forEach(display -> display.generator(action));
@@ -324,13 +355,26 @@ public final class TokenBrowserPanel extends JPanel {
     private void updateActions() {
         TokenState token = selectedToken();
         editMenu.setEnabled(writeAvailable && token != null && !token.alternatives().isEmpty());
+        deleteMenu.setEnabled(editMenu.isEnabled());
         diagnosticsMenu.setEnabled(token != null);
+        String identity = selectedRow == null ? "No TOTP selected" : selectedRow.primary.getText() + " " + selectedRow.account.getText();
+        for (JMenuItem item : List.of(editMenu, deleteMenu, diagnosticsMenu)) {
+            item.getAccessibleContext().setAccessibleDescription(identity + ". " + (writeAvailable || item == diagnosticsMenu
+                    ? item.getText() : "Changes are unavailable while another change is in progress or the vault session is closing."));
+        }
         for (TokenRowPanel row : rows) {
             row.selected(row == selectedRow);
             row.edit.setEnabled(!closed && writeAvailable && !row.token.alternatives().isEmpty());
             row.edit.setToolTipText(writeAvailable ? "Edit TOTP" : "Changes are unavailable while another change is in progress or the vault session is closing.");
-            row.edit.getAccessibleContext().setAccessibleDescription((row.alternative == null ? TokenPresentation.primary(row.token) : TokenPresentation.identity(row.alternative.descriptor()))
+            row.edit.getAccessibleContext().setAccessibleDescription((row.primary.getText() + " " + row.account.getText())
                     + ". " + row.edit.getToolTipText());
+            if (row.contextMenu.getComponentCount() == 3) {
+                JMenuItem delete = (JMenuItem) row.contextMenu.getComponent(1);
+                JMenuItem diagnostics = (JMenuItem) row.contextMenu.getComponent(2);
+                delete.setEnabled(row.edit.isEnabled()); diagnostics.setEnabled(!closed);
+                delete.getAccessibleContext().setAccessibleDescription(row.edit.getAccessibleContext().getAccessibleDescription());
+                diagnostics.getAccessibleContext().setAccessibleDescription(row.primary.getText() + " " + row.account.getText());
+            }
         }
         resolveButtons.forEach(button -> {
             button.setEnabled(!closed && writeAvailable);
@@ -339,21 +383,41 @@ public final class TokenBrowserPanel extends JPanel {
             button.setToolTipText(explanation); button.getAccessibleContext().setAccessibleDescription(explanation);
         });
     }
+    private void contextActions(TokenRowPanel row) {
+        JMenuItem delete = new JMenuItem(deleteMenu.getText());
+        JMenuItem diagnostics = new JMenuItem(diagnosticsMenu.getText());
+        row.contextMenu.add(delete); row.contextMenu.add(diagnostics);
+        delete.addActionListener(e -> manageRow(row, deleteAction));
+        diagnostics.addActionListener(e -> {
+            if (!closed && rows.contains(row)) {
+                selectRow(row); diagnosticsMenu.doClick(0);
+            }
+        });
+        row.contextMenu.addPopupMenuListener(new javax.swing.event.PopupMenuListener() {
+            public void popupMenuWillBecomeVisible(javax.swing.event.PopupMenuEvent e) { if (!closed && rows.contains(row)) { selectRow(row); } }
+            public void popupMenuWillBecomeInvisible(javax.swing.event.PopupMenuEvent e) { }
+            public void popupMenuCanceled(javax.swing.event.PopupMenuEvent e) { }
+        });
+    }
     private void editSelected() { if (selectedRow != null) { editRow(selectedRow); } }
     private void editRow(TokenRowPanel row) {
-        if (closed || !writeAvailable || editAction == null || !rows.contains(row)) { return; }
+        manageRow(row, editAction);
+    }
+    private void manageRow(TokenRowPanel row, VaultView.EditAction action) {
+        if (closed || !writeAvailable || action == null || !rows.contains(row) || row.alternative == null) { return; }
+        selectRow(row);
         TotpDisplay owner = childDisplays.get(row.alternative);
         if (owner != null) { owner.clear(row.token.id()); } else { totp.clear(row.token.id()); }
-        openEdit(latest, row.token, row.token.alternatives().indexOf(row.alternative));
+        openEdit(latest, row.token, row.token.alternatives().indexOf(row.alternative), action);
     }
-    private void openEdit(VaultState base, TokenState token, int index) {
+    private void openEdit(VaultState base, TokenState token, int index, VaultView.EditAction action) {
         if (closed || !writeAvailable || latest != base) { return; }
         closeDialogs(); totp.clear(token.id());
         String explanation = "This edit is based on the token value observed when the editor was opened. Later concurrent changes are not automatically included.";
         if (token.hasConflict()) {
             explanation = "You are editing this version only. Saving does not resolve the other conflicting versions. " + explanation;
         }
-        editAction.open(base, token.alternatives().get(index), explanation);
+        action.open(base, token.alternatives().get(index), explanation);
     }
     private void openDialog(String title, JPanel content) {
         JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(this), title, Dialog.ModalityType.MODELESS);
@@ -374,7 +438,7 @@ public final class TokenBrowserPanel extends JPanel {
     private void closeDialogs() { for (JDialog dialog : List.copyOf(dialogs)) { dialog.dispose(); } dialogs.clear(); }
     public void closing() {
         Edt.require(); if (closed) { return; }
-        closed = true; totp.clear(); copyNotification.dismiss(); rows.forEach(TokenRowPanel::retire); rows.clear();
+        closed = true; presentationTimer.stop(); totp.clear(); copyNotification.dismiss(); rows.forEach(TokenRowPanel::retire); rows.clear();
         childDisplays.values().forEach(TotpDisplay::clear); childDisplays.clear(); selectedRow = null;
         closeDialogs(); latest = null; selected = null; list.removeAll(); list.setEnabled(false);
         search.setText(""); search.setEnabled(false); updateActions();

@@ -39,9 +39,9 @@ class DesktopStyleTest {
                 }
                 assertEquals(size, control.getPreferredSize()); assertEquals(insets, control.getInsets());
             }
-            assertEquals(new Insets(6, 12, 6, 12), primary.getInsets());
-            assertEquals(primary.getInsets(), secondary.getInsets());
-            assertEquals(new Insets(6, 8, 6, 8), search.getInsets());
+            assertEquals(new Insets(12, 16, 12, 16), primary.getInsets());
+            assertEquals(new Insets(8, 12, 8, 12), secondary.getInsets());
+            assertEquals(new Insets(12, 8, 12, 8), search.getInsets());
             assertTrue(primary.getPreferredSize().height >= 36); assertTrue(secondary.getPreferredSize().height >= 32);
         });
     }
@@ -107,7 +107,7 @@ class DesktopStyleTest {
                     assertSame(delegate, menu.getUI()); assertEquals(mnemonic, menu.getMnemonic());
                     assertSame(itemDelegate, item.getUI()); assertEquals(accelerator, item.getAccelerator());
                     for (int j = 0; j < menu.getItemCount(); j++) {
-                        assertEquals(new Insets(6, 16, 6, 16), menu.getItem(j).getInsets());
+                        assertEquals(new Insets(8, 16, 8, 16), menu.getItem(j).getInsets());
                         assertNotNull(menu.getItem(j).getAccessibleContext());
                     }
                 }
@@ -189,8 +189,7 @@ class DesktopStyleTest {
                 for (var row : browser.rows) {
                     assertEquals(DesktopStyle.ActionRole.SecondaryAction, row.show.getClientProperty("totipo.actionRole"));
                     assertEquals(DesktopStyle.ActionRole.SecondaryAction, TotpCopyTest.buttons(row).get(0).getClientProperty("totipo.actionRole"));
-                    assertEquals(DesktopStyle.ActionRole.QuietAction, row.edit.getClientProperty("totipo.actionRole"));
-                    assertFalse(row.edit.isContentAreaFilled());
+                    assertSame(row.contextMenu, row.edit.getParent());
                 }
                 for (var button : allButtons(browser.list)) {
                     assertNotEquals(DesktopStyle.ActionRole.PrimaryAction, button.getClientProperty("totipo.actionRole"));

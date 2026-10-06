@@ -26,10 +26,11 @@ class U4ConflictGroupTest {
                 panel.render(new State(conflict, token(2, active("Gamma"))).value);
                 assertEquals(2, panel.list.getComponentCount()); assertEquals(3, panel.rows.size());
                 var group = (JPanel) panel.list.getComponent(0);
-                var header = (JPanel) group.getComponent(0);
+                var wrapper = (JPanel) group.getComponent(0);
+                var header = (JPanel) ((java.awt.BorderLayout) wrapper.getLayout()).getLayoutComponent(java.awt.BorderLayout.CENTER);
                 var first = panel.rows.get(0); var second = panel.rows.get(1); var ordinary = panel.rows.get(2);
-                assertSame(group, first.getParent().getParent()); assertSame(group, second.getParent().getParent());
-                assertEquals(4, group.getComponentCount()); // header, divider, one child per Alternative despite two Heads
+                assertSame(group, first.getParent()); assertSame(group, second.getParent());
+                assertEquals(3, group.getComponentCount()); // header/divider wrapper, one child per Alternative despite two Heads
                 assertEquals(1, buttons(header, "Resolve").size());
                 assertTrue(buttons(header, "Show Code").isEmpty()); assertTrue(buttons(header, "Edit").isEmpty());
                 assertFalse(header.isFocusable()); assertFalse(header.isOpaque());
@@ -162,7 +163,7 @@ class U4ConflictGroupTest {
                 panel.render(state.value); assertEquals(3, panel.rows.size()); assertEquals("2 TOTPs", panel.resultCount.getText());
                 assertEquals(1, buttons(panel.list, "Resolve").size()); assertEquals(3, buttons(panel.list, "Show Code").size()); assertTrue(state.calls.isEmpty());
                 var first = panel.rows.get(0); var second = panel.rows.get(1);
-                assertNotSame(first.getParent(), panel.list); assertEquals(2, buttons(first.getParent().getParent(), "Edit").size());
+                assertNotSame(first.getParent(), panel.list); assertTrue(buttons(first.getParent(), "Edit").isEmpty());
                 first.show.doClick(0); assertEquals(List.of(a), state.calls.stream().map(Call::alternative).toList()); assertTrue(second.show.isVisible());
                 second.show.doClick(0); assertFalse(first.show.isVisible()); assertFalse(second.show.isVisible());
                 TotpCopyTest.buttons(first).get(0).doClick(0); TotpCopyTest.buttons(second).get(0).doClick(0); assertEquals(List.of("001234", "005678"), copied);

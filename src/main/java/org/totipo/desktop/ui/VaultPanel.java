@@ -92,7 +92,7 @@ public final class VaultPanel extends JPanel {
         vault.add(changeVault); vault.add(lock); vault.add(refresh); vault.add(changePassword); vault.add(about); bar.add(vault);
         JMenu token = new JMenu("Token"); token.setMnemonic('T');
         JMenuItem add = new JMenuItem(createAction); add.setText("Add…"); add.setAccelerator(javax.swing.KeyStroke.getKeyStroke("control N")); token.add(add);
-        token.add(browser.editMenu); token.add(browser.diagnosticsMenu); bar.add(token);
+        token.add(browser.editMenu); token.add(browser.deleteMenu); token.add(browser.diagnosticsMenu); bar.add(token);
         DesktopStyle.menus(bar); return bar;
     }
     public void exitAction(Runnable action) {
@@ -122,6 +122,7 @@ public final class VaultPanel extends JPanel {
     public void tokenActions(Runnable action, VaultView.EditAction edit) {
         Edt.require(); createCallback = action; browser.onEdit(edit);
     }
+    public void deleteAction(VaultView.EditAction delete) { browser.onDelete(delete); }
     public void writeAvailability(boolean available) {
         Edt.require(); writeAvailable = available;
         changePassword.setEnabled(available && observed);

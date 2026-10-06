@@ -41,10 +41,10 @@ final class DirectoryPicker extends JPanel implements AutoCloseable {
         this(initial, accepted, cancelled, executor, false);
     }
     private DirectoryPicker(Path initial, Consumer<Path> accepted, Runnable cancelled, Executor executor, boolean own) {
-        super(new BorderLayout(12, 12)); Edt.require();
+        super(new BorderLayout(12, 0)); Edt.require();
         this.accepted = accepted; this.cancelled = cancelled; this.executor = executor;
         ownedExecutor = own ? (ExecutorService) executor : null;
-        setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
+        setBorder(BorderFactory.createEmptyBorder(16, 16, 0, 16));
         setPreferredSize(new Dimension(720, 520));
         location.putClientProperty("html.disable", Boolean.TRUE);
         location.setFont(DesktopStyle.font(DesktopStyle.Typography.Secondary));

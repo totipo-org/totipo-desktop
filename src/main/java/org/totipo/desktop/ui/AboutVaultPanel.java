@@ -13,7 +13,7 @@ public final class AboutVaultPanel extends JPanel {
     private final JPanel footer = SwingUsability.taskActions(close);
     public AboutVaultPanel(Path location, String availability, String diagnostics, Runnable closed) {
         Edt.require();
-        setLayout(new BorderLayout(0, 24)); setBorder(BorderFactory.createEmptyBorder(24, 24, 24, 24));
+        setLayout(new BorderLayout(0, 8)); setBorder(BorderFactory.createEmptyBorder(24, 24, 8, 24));
         body.setOpaque(false); scroll.setBorder(null);
         scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
         Path path = location.toAbsolutePath().normalize();
@@ -42,5 +42,5 @@ public final class AboutVaultPanel extends JPanel {
     }
     void installDialog(JRootPane root) { SwingUsability.dialog(root, close, () -> close.doClick()); }
     int preferredTaskWidth() { return Math.max(560, DesktopStyle.font(DesktopStyle.Typography.Body).getSize() * 32); }
-    Dimension taskSize(int width) { return TaskDialogSizing.contentSize(body, scroll, footer, getInsets(), 24, width); }
+    Dimension taskSize(int width) { return TaskDialogSizing.contentSize(body, scroll, footer, getInsets(), DesktopStyle.TIGHT, width); }
 }

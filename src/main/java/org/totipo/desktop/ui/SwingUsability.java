@@ -26,9 +26,18 @@ final class SwingUsability {
     }
     /** Task/dialog actions only: quiet/secondary actions precede the trailing primary. */
     static JPanel taskActions(JButton primary, JButton... secondary) {
-        JPanel row = new JPanel(new FlowLayout(FlowLayout.TRAILING, 8, 0));
+        JPanel row = taskActionRow();
         for (JButton button : secondary) { row.add(button); }
         row.add(primary);
+        return row;
+    }
+    /** Symmetric footer inset; natural minimum follows the current button/font height. */
+    static JPanel taskActionRow() {
+        FlowLayout flow = new FlowLayout(FlowLayout.TRAILING, DesktopStyle.TIGHT, 0);
+        flow.setAlignOnBaseline(true);
+        JPanel row = new JPanel(flow);
+        row.setOpaque(false);
+        row.setBorder(BorderFactory.createEmptyBorder(DesktopStyle.NORMAL, 0, DesktopStyle.NORMAL, 0));
         return row;
     }
     static void dialog(JRootPane root, JButton normal, Runnable cancel) {

@@ -36,10 +36,18 @@ public class S4SwingSmoke extends S3SwingSmoke {
         }
         ready(initial, created.tokenId(), 2); return created.tokenId();
     }
+    static Container conflictGroup(Component component) {
+        Container parent = component.getParent();
+        while (parent != null) {
+            if (parent instanceof JPanel panel && "This token has conflicting versions".equals(panel.getAccessibleContext().getAccessibleName())) { return parent; }
+            parent = parent.getParent();
+        }
+        throw new AssertionError("Resolve has no semantic conflict group");
+    }
     static void open(boolean same) throws Exception {
         JButton resolve = edt(() -> all(frame).stream().filter(JButton.class::isInstance).map(JButton.class::cast)
-                .filter(b -> b.getText().equals("Resolve") && all(b.getParent().getParent()).stream().anyMatch(c -> c instanceof JButton edit
-                        && edit.getText().equals("Edit") && edit.getAccessibleContext().getAccessibleDescription().contains(same ? "Same Service" : "Slie")))
+                .filter(b -> b.getText().equals("Resolve") && all(conflictGroup(b)).stream().anyMatch(c -> c instanceof JComponent row
+                        && "divider".equals(row.getClientProperty("totipo.rowPresentation")) && row.getAccessibleContext().getAccessibleName().contains(same ? "Same Service" : "Slie")))
                 .findFirst().orElseThrow());
         click(resolve); waitFor(() -> Arrays.stream(frame.getOwnedWindows()).anyMatch(w -> w instanceof JDialog && w.isVisible()));
     }
@@ -129,8 +137,8 @@ public class S4SwingSmoke extends S3SwingSmoke {
         click("Cancel"); closed();
         // Publish the deliberately composed custom setup through the actual controller/library.
         JButton distinctResolve = edt(() -> all(frame).stream().filter(JButton.class::isInstance).map(JButton.class::cast)
-                .filter(b -> b.getText().equals("Resolve") && all(b.getParent().getParent()).stream().anyMatch(c -> c instanceof JButton edit
-                        && edit.getText().equals("Edit") && !edit.getAccessibleContext().getAccessibleDescription().contains("Same Service"))).findFirst().orElseThrow());
+                .filter(b -> b.getText().equals("Resolve") && all(conflictGroup(b)).stream().anyMatch(c -> c instanceof JComponent row
+                        && "divider".equals(row.getClientProperty("totipo.rowPresentation")) && !row.getAccessibleContext().getAccessibleName().contains("Same Service"))).findFirst().orElseThrow());
         click(distinctResolve); click("Combine details…");
         for (String field : List.of("Issuer choice:", "Account choice:")) {
             JTextField chosen = edt(() -> all(uncheckedDialog()).stream().filter(JTextField.class::isInstance).map(JTextField.class::cast)

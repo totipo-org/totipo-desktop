@@ -8,11 +8,12 @@ import javax.swing.border.AbstractBorder;
 /** Small Swing styling vocabulary. Values derive from the active platform palette and font. */
 final class DesktopStyle {
     static final int MICRO = 4, TIGHT = 8, COMPACT = 12, NORMAL = 16, SECTION = 24, MAJOR = 32;
-    static final int CONTROL = 36, INLINE = 32, MINIMUM_CONTROL = 30;
+    static final int CONTROL = 44, INLINE = 36, MINIMUM_CONTROL = 30;
+    static final int TASK_ACTION_WIDTH = 80, COLLECTION_ADD_WIDTH = 96;
     static final int BORDER = 1, FOCUS = 2, SEMANTIC_EDGE = 3, WINDOW_PADDING = NORMAL;
     // Swing coordinates are logical units; the platform graphics transform supplies HiDPI scaling.
     static final int CONTROL_RADIUS = 6;
-    static final int BUTTON_PADDING_Y = MICRO + BORDER * 2, BUTTON_PADDING_X = COMPACT;
+    static final int CONTROL_PADDING_Y = COMPACT, BUTTON_PADDING_X = NORMAL, ROW_BUTTON_PADDING_X = COMPACT;
     enum ActionRole { PrimaryAction, SecondaryAction, QuietAction, DestructiveAction }
     enum Typography { Body, Secondary, SectionTitle, ScreenTitle, Code }
     private DesktopStyle() { }
@@ -76,7 +77,9 @@ final class DesktopStyle {
             }
         });
         button.setFont(font(Typography.Body));
-        button.setMargin(new Insets(BUTTON_PADDING_Y, BUTTON_PADDING_X, BUTTON_PADDING_Y, BUTTON_PADDING_X));
+        int paddingY = compact ? TIGHT : CONTROL_PADDING_Y;
+        int paddingX = compact ? ROW_BUTTON_PADDING_X : BUTTON_PADDING_X;
+        button.setMargin(new Insets(paddingY, paddingX, paddingY, paddingX));
         button.setRolloverEnabled(true);
         button.setOpaque(false);
         button.setContentAreaFilled(role != ActionRole.QuietAction);
@@ -84,11 +87,69 @@ final class DesktopStyle {
         button.setBackground(background);
         button.setForeground(role == ActionRole.PrimaryAction ? onAccent()
                 : role == ActionRole.DestructiveAction ? danger() : readable(text(), background, 4.5));
-        button.setBorder(new ControlBorder(role, new Insets(BUTTON_PADDING_Y, BUTTON_PADDING_X, BUTTON_PADDING_Y, BUTTON_PADDING_X)));
+        button.setBorder(new ControlBorder(role, new Insets(paddingY, paddingX, paddingY, paddingX)));
         Dimension size = button.getPreferredSize();
-        int height = Math.max(compact ? INLINE : CONTROL, size.height);
-        button.setPreferredSize(new Dimension(size.width, height));
-        button.setMinimumSize(new Dimension(size.width, Math.max(MINIMUM_CONTROL, height)));
+        // A compact floor must add equal whole-unit space above and below the natural text box.
+        int height = compact ? size.height + 2 * (int) Math.ceil(Math.max(0, INLINE - size.height) / 2.0)
+                : Math.max(CONTROL, size.height);
+        int width = compact || role == ActionRole.QuietAction ? size.width : Math.max(TASK_ACTION_WIDTH, size.width);
+        button.setPreferredSize(new Dimension(width, height));
+        button.setMinimumSize(new Dimension(width, Math.max(MINIMUM_CONTROL, height)));
+    }
+    /** One natural compact action column, including the transient copy-feedback label. */
+    static void rowAction(JButton button, boolean conflict) {
+        action(button, ActionRole.SecondaryAction, true);
+        int width = 0;
+        for (String label : new String[]{"Show Code", "Copy", "Copied", "Resolve"}) {
+            width = Math.max(width, button.getFontMetrics(button.getFont()).stringWidth(label) + 2 * ROW_BUTTON_PADDING_X);
+        }
+        Dimension size = button.getPreferredSize();
+        button.setPreferredSize(new Dimension(width, size.height));
+        button.setMinimumSize(button.getPreferredSize());
+        if (conflict) {
+            button.setForeground(readable(warning(), button.getBackground(), 4.5));
+            button.putClientProperty("totipo.conflictAction", Boolean.TRUE);
+        }
+    }
+    /** Connected segments retain Swing's toggle/group semantics and a non-color selected marker. */
+    static void exclusiveChoice(AbstractButton button, int index, int count) {
+        button.putClientProperty("totipo.choiceRole", "ExclusiveChoice");
+        button.setUI(new javax.swing.plaf.basic.BasicToggleButtonUI() {
+            @Override public void update(Graphics graphics, JComponent component) {
+                Graphics2D g = (Graphics2D) graphics.create();
+                try {
+                    g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                    g.clip(controlShape(-index * button.getWidth(), 0, count * button.getWidth(), button.getHeight(), 0));
+                    g.setColor(button.isSelected() ? surfaceSelected() : surfaceRaised());
+                    g.fillRect(0, 0, button.getWidth(), button.getHeight());
+                    if (button.isSelected()) {
+                        g.setColor(text());
+                        g.fillRect(TIGHT, button.getHeight() - MICRO - FOCUS, Math.max(0, button.getWidth() - 2 * TIGHT), FOCUS);
+                    }
+                    paint(g, component);
+                } finally { g.dispose(); }
+            }
+            @Override protected void paintButtonPressed(Graphics g, AbstractButton b) { }
+            @Override protected void paintFocus(Graphics g, AbstractButton b, Rectangle view, Rectangle text, Rectangle icon) {
+                g.setColor(focus()); g.drawRect(FOCUS, FOCUS, b.getWidth() - 2 * FOCUS - 1, b.getHeight() - 2 * FOCUS - 1);
+            }
+            @Override protected void paintText(Graphics g, AbstractButton b, Rectangle bounds, String text) {
+                if (b.isEnabled()) { super.paintText(g, b, bounds, text); }
+                else { disabledText(g, b, bounds); }
+            }
+        });
+        button.setOpaque(false); button.setForeground(text()); button.setBackground(surfaceRaised());
+        button.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, index == 0 ? 0 : BORDER, 0, 0, borderStrong()),
+                BorderFactory.createEmptyBorder(CONTROL_PADDING_Y, TIGHT, CONTROL_PADDING_Y, TIGHT)));
+        // Reserve the seam on the first segment too, keeping equal internal label space.
+        if (index == 0) { button.setBorder(BorderFactory.createEmptyBorder(CONTROL_PADDING_Y, TIGHT + BORDER, CONTROL_PADDING_Y, TIGHT)); }
+        button.setFont(font(Typography.Body).deriveFont(Font.BOLD));
+        Dimension natural = button.getPreferredSize();
+        button.setPreferredSize(new Dimension(natural.width, Math.max(CONTROL, natural.height)));
+        button.setMinimumSize(button.getPreferredSize());
+        button.setFont(font(Typography.Body).deriveFont(button.isSelected() ? Font.BOLD : Font.PLAIN));
+        button.addItemListener(e -> button.setFont(font(Typography.Body).deriveFont(button.isSelected() ? Font.BOLD : Font.PLAIN)));
     }
     /** Keep ordinary Swing radio/group semantics; replace only the unreliable native glyph. */
     static void radio(AbstractButton button) {
@@ -151,19 +212,30 @@ final class DesktopStyle {
         field.setFont(font(Typography.Body)); field.setBackground(surfaceInput());
         field.setForeground(readable(text(), surfaceInput(), 4.5));
         field.setCaretColor(field.getForeground());
-        field.setBorder(new ControlBorder(null, new Insets(CONTROL_RADIUS, TIGHT, CONTROL_RADIUS, TIGHT)));
+        field.setBorder(new ControlBorder(null, new Insets(CONTROL_PADDING_Y, TIGHT, CONTROL_PADDING_Y, TIGHT)));
         Dimension size = field.getPreferredSize();
-        field.setPreferredSize(new Dimension(size.width, Math.max(CONTROL, size.height)));
+        int height = Math.max(CONTROL, size.height);
+        field.setPreferredSize(new Dimension(size.width, height));
+        field.setMinimumSize(new Dimension(field.getMinimumSize().width, height));
     }
     static void password(JPasswordField field) {
         // Keep the password delegate and protected echo/accessibility contract.
         field.setFont(font(Typography.Body)); field.setBackground(surfaceInput());
         field.setForeground(readable(text(), surfaceInput(), 4.5)); field.setCaretColor(field.getForeground());
-        field.setBorder(new ControlBorder(null, new Insets(CONTROL_RADIUS, TIGHT, CONTROL_RADIUS, TIGHT)));
+        field.setBorder(new ControlBorder(null, new Insets(CONTROL_PADDING_Y, TIGHT, CONTROL_PADDING_Y, TIGHT)));
+        Dimension natural = field.getPreferredSize();
+        int height = Math.max(CONTROL, natural.height);
+        field.setPreferredSize(new Dimension(natural.width, height));
+        field.setMinimumSize(new Dimension(field.getMinimumSize().width, height));
         field.addFocusListener(new java.awt.event.FocusAdapter() {
             @Override public void focusGained(java.awt.event.FocusEvent e) { field.repaint(); }
             @Override public void focusLost(java.awt.event.FocusEvent e) { field.repaint(); }
         });
+    }
+    /** Align a leading form label with the first control, including natural large-font heights. */
+    static void formLabel(JLabel label, JComponent control) {
+        int top = Math.max(0, (control.getPreferredSize().height - label.getPreferredSize().height) / 2);
+        label.setBorder(BorderFactory.createEmptyBorder(top, 0, 0, 0));
     }
     static void menus(JMenuBar bar) {
         UIManager.put("MenuItem.disabledForeground", textDisabled());
@@ -173,13 +245,13 @@ final class DesktopStyle {
         }
     }
     private static void menuSpacing(JMenu menu, boolean topLevel) {
-        menu.setBorder(BorderFactory.createEmptyBorder(topLevel ? MICRO : BUTTON_PADDING_Y,
-                topLevel ? TIGHT + BORDER * 2 : NORMAL, topLevel ? MICRO : BUTTON_PADDING_Y,
+        menu.setBorder(BorderFactory.createEmptyBorder(topLevel ? MICRO : TIGHT,
+                topLevel ? TIGHT + BORDER * 2 : NORMAL, topLevel ? MICRO : TIGHT,
                 topLevel ? TIGHT + BORDER * 2 : NORMAL));
         for (Component child : menu.getMenuComponents()) {
             if (child instanceof JMenu nested) { menuSpacing(nested, false); }
             else if (child instanceof JMenuItem item) {
-                item.setBorder(BorderFactory.createEmptyBorder(BUTTON_PADDING_Y, NORMAL, BUTTON_PADDING_Y, NORMAL));
+                item.setBorder(BorderFactory.createEmptyBorder(TIGHT, NORMAL, TIGHT, NORMAL));
             } else if (child instanceof JSeparator separator) {
                 Dimension size = separator.getPreferredSize();
                 separator.setPreferredSize(new Dimension(size.width, TIGHT + BORDER * 2));
@@ -237,7 +309,9 @@ final class DesktopStyle {
                 for (int i = 0; i < thickness; i++) {
                     g2.setColor(focused && role == ActionRole.PrimaryAction ? (i == 0 ? focus() : onAccent())
                             : focused ? readable(focus(), background, 3)
-                            : role == ActionRole.DestructiveAction ? danger() : readable(borderStrong(), c.getBackground(), 3));
+                            : role == ActionRole.DestructiveAction ? danger()
+                            : c instanceof JComponent component && Boolean.TRUE.equals(component.getClientProperty("totipo.conflictAction"))
+                                    ? readable(warning(), c.getBackground(), 3) : readable(borderStrong(), c.getBackground(), 3));
                     g2.draw(controlShape(x, y, w, h, i + .5));
                 }
             } finally { g2.dispose(); }

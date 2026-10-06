@@ -23,6 +23,7 @@ final class PasswordPrompt {
             Edt.require();
             path = new javax.swing.JTextField(directory.toAbsolutePath().normalize().toString(), 36);
             path.setEditable(false);
+            DesktopStyle.input(path); DesktopStyle.password(primary); DesktopStyle.password(confirmation);
             String introduction = create ? "Create a vault in:"
                     : context == PasswordPromptContext.REMEMBERED_STARTUP
                             ? "Welcome back. Enter the password for:" : "Enter the password for:";
@@ -42,7 +43,7 @@ final class PasswordPrompt {
         final javax.swing.JButton submit;
         final javax.swing.JButton dismiss;
         final javax.swing.JButton changeVault;
-        final JPanel buttons = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.TRAILING, 8, 0));
+        final JPanel buttons = SwingUsability.taskActionRow();
         private final transient Runnable dispose;
         private final Action dismissal;
         Action decision;
@@ -53,7 +54,7 @@ final class PasswordPrompt {
         };
 
         Form(java.nio.file.Path directory, boolean create, PasswordPromptContext context, Runnable dispose) {
-            super(new java.awt.BorderLayout(0, 16));
+            super(new java.awt.BorderLayout(0, 0));
             Edt.require();
             this.dispose = dispose;
             dismissal = create ? Action.CANCEL : Action.EXIT;
@@ -62,11 +63,14 @@ final class PasswordPrompt {
             submit = new javax.swing.JButton(create ? "Create" : "Open");
             dismiss = new javax.swing.JButton(create ? "Cancel" : "Exit");
             changeVault = create ? null : new javax.swing.JButton("Change Vault…");
+            DesktopStyle.action(submit, DesktopStyle.ActionRole.PrimaryAction, false);
+            DesktopStyle.action(dismiss, DesktopStyle.ActionRole.SecondaryAction, false);
+            if (changeVault != null) { DesktopStyle.action(changeVault, DesktopStyle.ActionRole.SecondaryAction, false); }
             submit.addActionListener(event -> finish(Action.SUBMIT));
             fields.primary.addActionListener(event -> finish(Action.SUBMIT));
             fields.confirmation.addActionListener(event -> finish(Action.SUBMIT));
             dismiss.addActionListener(event -> finish(dismissal));
-            setBorder(javax.swing.BorderFactory.createEmptyBorder(16, 16, 16, 16));
+            setBorder(javax.swing.BorderFactory.createEmptyBorder(16, 16, 0, 16));
             add(fields, java.awt.BorderLayout.CENTER);
             buttons.add(dismiss);
             if (changeVault != null) {

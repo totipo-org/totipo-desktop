@@ -23,6 +23,7 @@ class TokenWriteControllerTest {
         void passwordBlocked() { passwordAction.run(); assertEquals(0, passwordForms); }
         Runnable create;
         EditAction edit;
+        EditAction delete;
         TokenManagementPanel editor;
         Runnable retry;
         Runnable stop;
@@ -31,9 +32,10 @@ class TokenWriteControllerTest {
         String message;
         final BlockingQueue<String> events = new LinkedBlockingQueue<>();
         @Override public void tokenActions(Runnable create, EditAction edit) { this.create = create; this.edit = edit; }
+        @Override public void deleteAction(EditAction delete) { this.delete = delete; }
         @Override public void manageToken(TokenManagementPanel editor) {
             Edt.require(); this.editor = editor; events.add("editor");
-            button(editor, editor.title().equals("Add TOTP") ? "Review" : "Save").addPropertyChangeListener("enabled", event -> {
+            button(editor, editor.title().equals("Add TOTP") ? "Review" : editor.title().equals("Delete TOTP?") ? "Delete TOTP" : "Save").addPropertyChangeListener("enabled", event -> {
                 if (Boolean.TRUE.equals(event.getNewValue())) { events.add("editable"); }
             });
         }
@@ -264,6 +266,71 @@ class TokenWriteControllerTest {
             });
             h.event("finished"); assertEquals("update", h.recording.calls.get(0));
             assertEquals(TokenStatus.TOMBSTONED, h.recording.values.get("status")); assertFalse(h.recording.calls.contains("secret"));
+        }
+    }
+    @Test void contextualDeleteOpensExistingConfirmationWithoutPublishingAndRespectsGate() throws Exception {
+        try (Harness h = new Harness()) {
+            var fields = new TokenDescriptor(TokenStatus.ACTIVE, "selected", "account", TotpAlgorithm.SHA1, 6, java.time.Duration.ofSeconds(30));
+            TokenAlternative selected = (TokenAlternative) Proxy.newProxyInstance(TokenAlternative.class.getClassLoader(),
+                    new Class<?>[]{TokenAlternative.class}, (p, m, a) -> fields);
+            edt(() -> h.view.delete.open(h.recording.state, selected, "Selected version"));
+            h.event("editor");
+            edt(() -> {
+                assertEquals("Delete TOTP?", h.view.editor.title());
+                assertNotNull(button(h.view.editor, "Delete TOTP"));
+                assertTrue(h.recording.calls.isEmpty());
+                TokenManagementPanel original = h.view.editor;
+                h.view.delete.open(h.recording.state, selected, "Blocked stale callback");
+                assertSame(original, h.view.editor);
+                h.view.passwordBlocked();
+                button(h.view.editor, "Cancel").doClick(0);
+                assertNull(h.view.editor);
+            });
+            h.event("finished");
+            assertTrue(h.recording.calls.isEmpty());
+            h.open();
+            edt(() -> {
+                TokenManagementPanel add = h.view.editor;
+                h.view.delete.open(h.recording.state, selected, "Gate unavailable");
+                assertSame(add, h.view.editor); assertEquals("Add TOTP", add.title());
+            });
+        }
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void confirmedDeleteFromEitherOriginFinishesAtMainView(boolean fromEdit) throws Exception {
+        try (Harness h = new Harness()) {
+            var fields = new TokenDescriptor(TokenStatus.ACTIVE, "selected", "account", TotpAlgorithm.SHA1, 6, java.time.Duration.ofSeconds(30));
+            TokenAlternative selected = (TokenAlternative) Proxy.newProxyInstance(TokenAlternative.class.getClassLoader(),
+                    new Class<?>[]{TokenAlternative.class}, (p, m, a) -> fields);
+            h.recording.expected = selected; h.recording.results.add(saved());
+            edt(() -> {
+                if (fromEdit) { h.view.edit.open(h.recording.state, selected, ""); h.view.editor.requestDelete(); }
+                else { h.view.delete.open(h.recording.state, selected, ""); }
+            });
+            h.event("editor");
+            edt(() -> { assertTrue(h.recording.calls.isEmpty()); button(h.view.editor, "Delete TOTP").doClick(0); });
+            h.event("finished");
+            edt(() -> assertNull(h.view.editor));
+            assertEquals("update", h.recording.calls.getFirst());
+            assertEquals(TokenStatus.TOMBSTONED, h.recording.values.get("status"));
+            assertFalse(h.recording.calls.contains("secret"));
+        }
+    }
+    @Test void directDeleteEscapeFinishesWithoutOpeningEditOrPublishing() throws Exception {
+        try (Harness h = new Harness()) {
+            var fields = new TokenDescriptor(TokenStatus.ACTIVE, "selected", "account", TotpAlgorithm.SHA1, 6, java.time.Duration.ofSeconds(30));
+            TokenAlternative selected = (TokenAlternative) Proxy.newProxyInstance(TokenAlternative.class.getClassLoader(),
+                    new Class<?>[]{TokenAlternative.class}, (p, m, a) -> fields);
+            edt(() -> h.view.delete.open(h.recording.state, selected, "")); h.event("editor");
+            edt(() -> {
+                JRootPane root = new JRootPane(); root.setContentPane(h.view.editor);
+                List<String> titles = new ArrayList<>(); h.view.editor.installDialog(root, titles::add);
+                var key = root.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).get(KeyStroke.getKeyStroke("ESCAPE"));
+                root.getActionMap().get(key).actionPerformed(new java.awt.event.ActionEvent(root, 0, "escape"));
+                assertEquals(List.of("Delete TOTP?"), titles); assertNull(h.view.editor);
+            });
+            h.event("finished"); assertTrue(h.recording.calls.isEmpty());
         }
     }
     @Test void unsavedCloseClearsFieldsWithoutBuilder() throws Exception {

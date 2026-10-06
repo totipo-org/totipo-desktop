@@ -21,7 +21,8 @@ public final class MergeEditorPanel extends JPanel {
     private final JButton combine = new JButton("Combine details…"), back = new JButton("Back");
     private final JPanel body = new JPanel(new GridBagLayout());
     private final JPanel footer = new JPanel(new BorderLayout(16, 0));
-    private final JPanel actions = new JPanel(new FlowLayout(FlowLayout.TRAILING, 8, 0));
+    private final JPanel backRow = SwingUsability.taskActionRow();
+    private final JPanel actions = SwingUsability.taskActionRow();
     private final JScrollPane scroll;
     private final JTextArea notice = message("");
     private final transient List<JRadioButton> versions = new ArrayList<>();
@@ -44,7 +45,7 @@ public final class MergeEditorPanel extends JPanel {
     public MergeEditorPanel(MergeInputs captured, Consumer<MergeDraft> submit, Runnable abandon) {
         Edt.require(); inputs = captured.select(captured.captured()); this.submit = submit; this.abandon = abandon;
         presented = TokenPresentation.ordered(inputs.token());
-        setLayout(new BorderLayout(0, 24)); setBorder(BorderFactory.createEmptyBorder(24, 24, 24, 24));
+        setLayout(new BorderLayout(0, 8)); setBorder(BorderFactory.createEmptyBorder(24, 24, 8, 24));
         setBackground(DesktopStyle.surface()); body.setOpaque(false); footer.setOpaque(false); actions.setOpaque(false);
         TokenEditorPanel.FormBody wrapper = new TokenEditorPanel.FormBody(); wrapper.setOpaque(false); wrapper.add(body, BorderLayout.NORTH);
         scroll = new JScrollPane(wrapper, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
@@ -52,7 +53,7 @@ public final class MergeEditorPanel extends JPanel {
         scroll.getVerticalScrollBar().setUnitIncrement(16); add(scroll, BorderLayout.CENTER);
         footer.add(actions, BorderLayout.EAST); add(footer, BorderLayout.SOUTH);
         DesktopStyle.action(cancel, DesktopStyle.ActionRole.SecondaryAction, false);
-        DesktopStyle.action(combine, DesktopStyle.ActionRole.QuietAction, false);
+        DesktopStyle.action(combine, DesktopStyle.ActionRole.SecondaryAction, false);
         DesktopStyle.action(back, DesktopStyle.ActionRole.SecondaryAction, false);
         save.addActionListener(e -> activate()); cancel.addActionListener(e -> cancel());
         combine.addActionListener(e -> details()); back.addActionListener(e -> simple());
@@ -67,10 +68,10 @@ public final class MergeEditorPanel extends JPanel {
         return area;
     }
     private void reset(String action) {
-        row = 0; body.removeAll(); actions.removeAll(); footer.remove(back); notice.setText("");
+        row = 0; body.removeAll(); actions.removeAll(); footer.remove(backRow); notice.setText("");
         save.setText(action); DesktopStyle.action(save, DesktopStyle.ActionRole.PrimaryAction, false);
         actions.add(cancel); if (!detailed) { actions.add(combine); } actions.add(save);
-        if (detailed) { footer.add(back, BorderLayout.WEST); }
+        if (detailed) { backRow.removeAll(); backRow.add(back); footer.add(backRow, BorderLayout.WEST); }
     }
     private void wide(JComponent control, int gap) {
         GridBagConstraints c = new GridBagConstraints(); c.gridx = 0; c.gridy = row++; c.weightx = 1;
@@ -95,10 +96,12 @@ public final class MergeEditorPanel extends JPanel {
             }
         }
         for (int i = 0; i < versions.size(); i++) {
-            JPanel option = new JPanel(new BorderLayout(0, 4)); option.setOpaque(false);
+            JPanel option = new JPanel(new BorderLayout(0, DesktopStyle.TIGHT)); option.setOpaque(false);
             option.add(versions.get(i), BorderLayout.NORTH);
             JTextArea detail = message(summary(presented.get(i).descriptor()));
-            detail.setBorder(BorderFactory.createEmptyBorder(0, 24, 0, 0)); option.add(detail); choices.add(option);
+            JRadioButton radio = versions.get(i);
+            int indent = radio.getInsets().left + radio.getIcon().getIconWidth() + radio.getIconTextGap();
+            detail.setBorder(BorderFactory.createEmptyBorder(0, indent, 0, 0)); option.add(detail); choices.add(option);
         }
         versionDecision = new Decision("Version", choices, versions.get(0), false); wide(versionDecision.panel, 0);
         finishLayout();
@@ -141,7 +144,7 @@ public final class MergeEditorPanel extends JPanel {
             JRadioButton button = radio(title, title + ". " + SetupSummary.format(a.descriptor()));
             setupGroup.add(button); setupButtons.add(button);
             button.addActionListener(e -> { clearSecret(); if (setupDecision != null) { setupDecision.clear(); } });
-            JPanel choice = new JPanel(new BorderLayout(0, 4)); choice.setOpaque(false); choice.add(button, BorderLayout.NORTH);
+            JPanel choice = new JPanel(new BorderLayout(0, DesktopStyle.TIGHT)); choice.setOpaque(false); choice.add(button, BorderLayout.NORTH);
             JTextArea description = message(SetupSummary.format(a.descriptor())); description.setBorder(BorderFactory.createEmptyBorder(0, 24, 0, 0));
             choice.add(description); setupChoices.add(choice);
         }
@@ -172,9 +175,7 @@ public final class MergeEditorPanel extends JPanel {
         DesktopStyle.input(((JSpinner.DefaultEditor) custom.period.getEditor()).getTextField());
         custom.period.setOpaque(false);
         custom.secret.setUI(new javax.swing.plaf.basic.BasicPasswordFieldUI());
-        custom.secret.setBackground(DesktopStyle.surfaceInput()); custom.secret.setForeground(DesktopStyle.text());
-        custom.secret.setCaretColor(DesktopStyle.text()); custom.secret.setFont(DesktopStyle.font(DesktopStyle.Typography.Body));
-        custom.secret.setBorder(new DesktopStyle.ControlBorder(null, new Insets(6, 8, 6, 8)));
+        DesktopStyle.password(custom.secret);
         JPanel setup = new JPanel(new BorderLayout(0, 8)); setup.setOpaque(false); setup.add(setupChoices, BorderLayout.NORTH); setup.add(fields);
         setupDecision = new Decision("Authenticator Setup", setup, setupButtons.get(0), true); wide(setupDecision.panel, 0);
         finishLayout();
@@ -315,7 +316,7 @@ public final class MergeEditorPanel extends JPanel {
     }
     public void changed(String explanation, Runnable review) {
         Edt.require(); if (retired || stale) { return; } clearSecret(); stale = true; busy = false;
-        body.removeAll(); row = 0; actions.removeAll(); footer.remove(back);
+        body.removeAll(); row = 0; actions.removeAll(); footer.remove(backRow);
         wide(message(explanation), 16);
         JButton updated = new JButton("Review Updated Conflict"); DesktopStyle.action(updated, DesktopStyle.ActionRole.PrimaryAction, false);
         updated.addActionListener(e -> review.run()); actions.add(cancel); actions.add(updated); cancel.setEnabled(true);
@@ -327,7 +328,7 @@ public final class MergeEditorPanel extends JPanel {
     public void cancel() { if (canCancel()) { retire(); abandon.run(); } }
     public void retire() { Edt.require(); retired = true; clearSecret(); custom.retire(); versionGroup.clearSelection(); enable(this, false); }
     int preferredTaskWidth() { return Math.max(680, Math.max(body.getPreferredSize().width, footer.getPreferredSize().width) + 48); }
-    Dimension taskSize(int width) { return TaskDialogSizing.contentSize(body, scroll, footer, getInsets(), 24, width); }
+    Dimension taskSize(int width) { return TaskDialogSizing.contentSize(body, scroll, footer, getInsets(), DesktopStyle.TIGHT, width); }
     void installDialog(JRootPane root, Runnable resized) { this.root = root; this.resized = resized; SwingUsability.dialog(root, save, this::cancel); resized.run(); }
     private static DocumentListener listener(Runnable action) { return new DocumentListener() {
         public void insertUpdate(DocumentEvent e) { action.run(); } public void removeUpdate(DocumentEvent e) { action.run(); } public void changedUpdate(DocumentEvent e) { action.run(); }

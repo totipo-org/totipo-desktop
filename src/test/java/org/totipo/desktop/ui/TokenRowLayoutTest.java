@@ -24,9 +24,8 @@ class TokenRowLayoutTest {
             cell(row, row.identityTop, 0, 0); cell(row, row.identityBottom, 0, 1);
             cell(row, row.statusTop, 1, 0); cell(row, row.statusBottom, 1, 1);
             assertEquals(2, ((GridBagLayout) row.grid.getLayout()).getConstraints(row.actionTop.getParent()).gridheight);
-            assertEquals(2, ((GridBagLayout) row.grid.getLayout()).getConstraints(row.actionBottom.getParent()).gridheight);
             assertSame(row.identityTop, row.primary.getParent()); assertSame(row.identityBottom, row.account.getParent());
-            assertSame(row.actionTop, row.show.getParent()); assertSame(row.actionBottom, row.edit.getParent());
+            assertSame(row.actionTop, row.show.getParent()); assertSame(row.contextMenu, row.edit.getParent());
             assertEquals(0, row.statusTop.getComponentCount()); assertEquals(0, row.statusBottom.getComponentCount());
             assertNull(find(row, CountdownRing.class));
             Dimension preferred = row.getPreferredSize(), minimum = row.getMinimumSize();
@@ -41,7 +40,7 @@ class TokenRowLayoutTest {
             assertSame(ring.getParent(), ((BorderLayout) row.statusBottom.getLayout()).getLayoutComponent(BorderLayout.EAST));
             assertEquals(FlowLayout.TRAILING, ((FlowLayout) ring.getParent().getLayout()).getAlignment());
             JButton copy = TotpCopyTest.buttons(row).get(0); assertSame(row.actionTop, copy.getParent());
-            assertSame(row.actionBottom, row.edit.getParent()); assertFalse(row.show.isVisible());
+            assertSame(row.contextMenu, row.edit.getParent()); assertFalse(row.show.isVisible());
             assertEquals(preferred.height, row.getPreferredSize().height); assertEquals(minimum.height, row.getMinimumSize().height);
             for (long left : new long[]{29, 11, 9, 1}) {
                 row.display(List.of(new TotpDisplay.Display("GitHub", "001234", 100, left, left < 10)));
@@ -68,7 +67,7 @@ class TokenRowLayoutTest {
             var row = new TokenRowPanel(token(1, active("Long identity ".repeat(100))), () -> { }, () -> { }, () -> { }, i -> { });
             row.display(List.of(new TotpDisplay.Display("identity", "00123456", 500, 15, false)));
             row.setSize(360, row.getPreferredSize().height); row.doLayout(); row.grid.doLayout();
-            row.actionTop.getParent().doLayout(); row.actionBottom.getParent().doLayout();
+            row.actionTop.getParent().doLayout();
             assertTrue(row.statusTop.getX() >= row.identityTop.getX() + row.identityTop.getWidth());
             assertTrue(SwingUtilities.convertPoint(row.actionTop, 0, 0, row.grid).x >= row.statusTop.getX() + row.statusTop.getWidth());
             assertEquals(row.statusTop.getPreferredSize().width, row.statusTop.getWidth());

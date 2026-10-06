@@ -39,6 +39,27 @@ final class TokenChoice<T> extends JPanel {
     }
     void clearSelection() { group.clearSelection(); }
 
+    void segmented() {
+        setLayout(new GridLayout(1, 0, 0, 0)); setOpaque(false);
+        setBorder(new DesktopStyle.ControlBorder(null, new java.awt.Insets(DesktopStyle.BORDER, DesktopStyle.BORDER,
+                DesktopStyle.BORDER, DesktopStyle.BORDER)));
+        int index = 0;
+        var values = List.copyOf(options.keySet());
+        for (var entry : options.entrySet()) {
+            AbstractButton button = entry.getValue();
+            DesktopStyle.exclusiveChoice(button, index, values.size());
+            int position = index++;
+            for (String key : List.of("LEFT", "UP", "RIGHT", "DOWN")) {
+                int direction = key.equals("LEFT") || key.equals("UP") ? -1 : 1;
+                SwingUsability.bind(button, WHEN_FOCUSED, KeyStroke.getKeyStroke(key), "choose-" + key,
+                        SwingUsability.action("Choose acquisition method", () -> {
+                            AbstractButton next = options.get(values.get(Math.floorMod(position + direction, values.size())));
+                            if (next.isEnabled()) { next.doClick(0); next.requestFocusInWindow(); }
+                        }));
+            }
+        }
+    }
+
     @Override public void setEnabled(boolean enabled) {
         super.setEnabled(enabled);
         if (options != null) { options.values().forEach(button -> button.setEnabled(enabled)); }

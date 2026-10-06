@@ -16,7 +16,8 @@ final class TokenRowPanel extends JPanel {
     final transient TokenState token;
     final transient TokenAlternative alternative;
     final JButton show = new JButton("Show Code");
-    final JButton edit = new JButton("Edit");
+    final JMenuItem edit = new JMenuItem("Edit…");
+    final JPopupMenu contextMenu = new JPopupMenu();
     final JLabel primary;
     final JLabel account;
     final JPanel grid = transparent(new GridBagLayout());
@@ -25,7 +26,6 @@ final class TokenRowPanel extends JPanel {
     final JPanel statusTop = transparent(new BorderLayout());
     final JPanel statusBottom = transparent(new BorderLayout());
     final JPanel actionTop = transparent(new BorderLayout());
-    final JPanel actionBottom = transparent(new BorderLayout());
     private final JPanel expanded = transparent(null);
     private final transient List<Outcome> outcomes = new ArrayList<>();
     private final transient IntConsumer copy;
@@ -54,6 +54,18 @@ final class TokenRowPanel extends JPanel {
         this.clock = clock; feedbackTimer.setRepeats(false);
         this.alternative = alternative;
         setLayout(new BorderLayout(0, DesktopStyle.MICRO)); setFocusable(true);
+        setFocusTraversalPolicyProvider(true);
+        setFocusTraversalPolicy(new LayoutFocusTraversalPolicy() {
+            private static final long serialVersionUID = 1L;
+            @Override public Component getComponentAfter(Container root, Component current) {
+                // A temporarily disabled/replaced action falls back to its own
+                // semantic row. Normal Tab traversal still leaves the provider.
+                if (current != TokenRowPanel.this && (!current.isEnabled() || !current.isVisible())) {
+                    return TokenRowPanel.this;
+                }
+                return super.getComponentAfter(root, current);
+            }
+        });
         putClientProperty("totipo.rowPresentation", "divider");
         primary = literal(TokenPresentation.primary(token)); account = literal(TokenPresentation.account(token));
         if (alternative != null) {
@@ -67,11 +79,16 @@ final class TokenRowPanel extends JPanel {
         primary.setMinimumSize(new Dimension(0, primary.getPreferredSize().height));
         account.setMinimumSize(new Dimension(0, account.getPreferredSize().height));
         identityTop.add(primary); identityBottom.add(account);
-        DesktopStyle.action(show, DesktopStyle.ActionRole.SecondaryAction, true);
-        DesktopStyle.action(edit, DesktopStyle.ActionRole.QuietAction, true);
+        DesktopStyle.rowAction(show, false);
         show.getAccessibleContext().setAccessibleDescription("Show code for " + primary.getText() + " " + account.getText());
         edit.getAccessibleContext().setAccessibleDescription("Edit " + primary.getText() + " " + account.getText());
-        actionTop.add(show, BorderLayout.EAST); actionBottom.add(edit, BorderLayout.EAST);
+        actionTop.add(show, BorderLayout.EAST); contextMenu.add(edit);
+        setComponentPopupMenu(contextMenu);
+        contextMenu.addPopupMenuListener(new javax.swing.event.PopupMenuListener() {
+            public void popupMenuWillBecomeVisible(javax.swing.event.PopupMenuEvent e) { if (!retired) { select.run(); } }
+            public void popupMenuWillBecomeInvisible(javax.swing.event.PopupMenuEvent e) { }
+            public void popupMenuCanceled(javax.swing.event.PopupMenuEvent e) { }
+        });
         JLabel sample = codeLabel();
         int middleWidth = Math.max(sample.getFontMetrics(sample.getFont()).stringWidth("8888 8888"),
                 sample.getFontMetrics(sample.getFont()).stringWidth("Updating…"));
@@ -80,31 +97,48 @@ final class TokenRowPanel extends JPanel {
                 + new CountdownRing().getPreferredSize().width + DesktopStyle.NORMAL);
         int lineHeight = Math.max(primary.getPreferredSize().height,
                 Math.max(sample.getPreferredSize().height, new CountdownRing().getPreferredSize().height));
-        JButton copySample = new JButton("Copied"); DesktopStyle.action(copySample, DesktopStyle.ActionRole.SecondaryAction, true);
-        int actionWidth = Math.max(copySample.getPreferredSize().width, Math.max(show.getPreferredSize().width, edit.getPreferredSize().width));
+        int actionWidth = show.getPreferredSize().width;
         addCell(identityTop, 0, 0, 1, 0, lineHeight);
         addCell(identityBottom, 0, 1, 1, 0, lineHeight);
         addCell(statusTop, 1, 0, 0, middleWidth, lineHeight);
         addCell(statusBottom, 1, 1, 0, middleWidth, lineHeight);
         addActionCell(actionTop, 2, actionWidth);
-        addActionCell(actionBottom, 3, edit.getPreferredSize().width);
         add(grid, BorderLayout.NORTH);
         expanded.setLayout(new BoxLayout(expanded, BoxLayout.Y_AXIS)); expanded.setVisible(false); add(expanded, BorderLayout.CENTER);
         show.addActionListener(e -> { if (!retired) { select.run(); reveal.run(); } });
         edit.addActionListener(e -> { if (!retired) { select.run(); editAction.run(); } });
         show.setEnabled(codeEligible()); show.setVisible(codeEligible());
         MouseAdapter selectionListener = new MouseAdapter() {
-            @Override public void mousePressed(MouseEvent e) { select.run(); requestFocusInWindow(); }
+            @Override public void mousePressed(MouseEvent e) { if (!retired) { select.run(); requestFocusInWindow(); } }
         };
         addMouseListener(selectionListener); grid.addMouseListener(selectionListener);
         for (Component cell : grid.getComponents()) { cell.addMouseListener(selectionListener); }
         primary.addMouseListener(selectionListener); account.addMouseListener(selectionListener);
-        selectOnFocus(this); selectOnFocus(show); selectOnFocus(edit);
+        inheritContext(grid);
+        selectOnFocus(this); selectOnFocus(show);
+        SwingUsability.bind(this, WHEN_ANCESTOR_OF_FOCUSED_COMPONENT, KeyStroke.getKeyStroke("shift F10"), "context-menu",
+                SwingUsability.action("TOTP management", this::showContextMenu));
+        SwingUsability.bind(this, WHEN_ANCESTOR_OF_FOCUSED_COMPONENT, KeyStroke.getKeyStroke(KeyEvent.VK_CONTEXT_MENU, 0), "context-menu",
+                getActionMap().get("context-menu"));
         SwingUsability.bind(this, WHEN_FOCUSED, KeyStroke.getKeyStroke("ENTER"), "primary-action",
                 SwingUsability.action("Show or copy code", this::primaryAction));
         SwingUsability.bind(this, WHEN_FOCUSED, KeyStroke.getKeyStroke("SPACE"), "primary-action",
                 getActionMap().get("primary-action"));
         selected(false); updateAccessible(List.of());
+    }
+    private static void inheritContext(JComponent parent) {
+        parent.setInheritsPopupMenu(true);
+        for (Component child : parent.getComponents()) { if (child instanceof JComponent component) { inheritContext(component); } }
+    }
+    void showContextMenu() {
+        if (retired) { return; }
+        select.run();
+        if (isShowing()) { contextMenu.show(this, getInsets().left, getHeight() / 2); }
+    }
+    void indentIdentity(int amount) {
+        for (JPanel cell : List.of(identityTop, identityBottom)) {
+            cell.setBorder(BorderFactory.createEmptyBorder(0, amount, 0, 0));
+        }
     }
     private void addCell(JPanel cell, int column, int line, double weight, int width, int height) {
         Dimension preferred = cell.getPreferredSize();
@@ -169,8 +203,8 @@ final class TokenRowPanel extends JPanel {
                         : selection ? BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(DesktopStyle.accent(), DesktopStyle.BORDER),
                                 BorderFactory.createEmptyBorder(DesktopStyle.BORDER, DesktopStyle.BORDER, DesktopStyle.BORDER, DesktopStyle.BORDER))
                         : BorderFactory.createEmptyBorder(DesktopStyle.FOCUS, DesktopStyle.FOCUS, DesktopStyle.FOCUS, DesktopStyle.FOCUS),
-                        BorderFactory.createEmptyBorder(DesktopStyle.TIGHT - DesktopStyle.FOCUS, DesktopStyle.COMPACT - DesktopStyle.FOCUS,
-                                DesktopStyle.TIGHT - DesktopStyle.FOCUS, DesktopStyle.COMPACT - DesktopStyle.FOCUS))));
+                        BorderFactory.createEmptyBorder(DesktopStyle.COMPACT - DesktopStyle.FOCUS, DesktopStyle.COMPACT - DesktopStyle.FOCUS,
+                                DesktopStyle.COMPACT - DesktopStyle.FOCUS, DesktopStyle.COMPACT - DesktopStyle.FOCUS))));
     }
     void copied() {
         if (retired) { return; }
@@ -226,11 +260,12 @@ final class TokenRowPanel extends JPanel {
         final JButton button = new JButton("Copy");
         Outcome(int index, String label) {
             countdown.add(seconds); countdown.add(ring);
-            button.setText("Copied"); DesktopStyle.action(button, DesktopStyle.ActionRole.SecondaryAction, true); button.setText("Copy");
+            DesktopStyle.rowAction(button, false);
             button.getAccessibleContext().setAccessibleName("Copy TOTP code" + (outcomeCount > 1 ? " for " + label : ""));
             Object generation = presentation;
             button.addActionListener(e -> { if (!retired && !updating && presentation == generation && button.isEnabled()) { select.run(); copy.accept(index); } });
             selectOnFocus(button);
+            inheritContext(button); inheritContext(countdown); inheritContext(code);
         }
         void erase() {
             code.setText(""); seconds.setText(""); button.setEnabled(false);
@@ -275,10 +310,11 @@ final class TokenRowPanel extends JPanel {
         prepare(displays.stream().map(TotpDisplay.Display::label).toList(), false);
         show.setVisible(displays.isEmpty() && codeEligible()); show.setText("Show Code");
         show.setEnabled(!retired && codeEligible());
-        if (displays.isEmpty()) { actionTop.add(show, BorderLayout.EAST); }
+        if (displays.isEmpty() && show.getParent() != actionTop) { actionTop.add(show, BorderLayout.EAST); }
         for (int i = 0; i < displays.size(); i++) {
             var d = displays.get(i); Outcome outcome = outcomes.get(i);
-            outcome.button.setEnabled(false);
+            // All presentation updates are atomic on the EDT. A live countdown
+            // refresh must not briefly disable Copy and transfer keyboard focus.
             outcome.ring.update(d); outcome.seconds.setText(d.seconds() + " sec");
             if (copiedUntil != null && !outcome.code.getText().equals(TokenPresentation.formattedCode(d.code()))) {
                 copiedUntil = null; feedbackTimer.stop();
@@ -309,6 +345,6 @@ final class TokenRowPanel extends JPanel {
         presentation = new Object(); outcomes.forEach(Outcome::erase); outcomes.clear();
         statusTop.removeAll(); statusBottom.removeAll(); actionTop.removeAll(); expanded.removeAll();
     }
-    void retire() { feedbackTimer.stop(); copiedUntil = null; display(List.of()); retired = true; show.setEnabled(false); edit.setEnabled(false); }
+    void retire() { feedbackTimer.stop(); copiedUntil = null; display(List.of()); retired = true; show.setEnabled(false); edit.setEnabled(false); setComponentPopupMenu(null); contextMenu.setVisible(false); }
     @Override public Dimension getMaximumSize() { return new Dimension(Integer.MAX_VALUE, getPreferredSize().height); }
 }

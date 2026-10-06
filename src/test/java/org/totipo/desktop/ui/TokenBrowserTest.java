@@ -89,7 +89,7 @@ class TokenBrowserTest {
                 assertEquals(1, panel.rows.size()); var row = panel.rows.get(0);
                 assertEquals("<html>issuer", row.primary.getText()); assertEquals("<html>account", row.account.getText());
                 assertNull(row.primary.getClientProperty("html")); assertEquals(Boolean.TRUE, row.primary.getClientProperty("html.disable"));
-                assertEquals("Show Code", row.show.getText()); assertEquals("Edit", row.edit.getText());
+                assertEquals("Show Code", row.show.getText()); assertEquals("Edit…", row.edit.getText());
                 assertTrue(row.show.isVisible()); assertNull(find(row, CountdownRing.class));
                 assertTrue(row.isFocusable()); assertTrue(row.getAccessibleContext().getAccessibleName().contains("<html>account"));
                 JScrollPane scroll = find(panel, JScrollPane.class);
@@ -134,7 +134,7 @@ class TokenBrowserTest {
                 assertTrue(browser.empty.getText().contains("No TOTPs yet")); assertNotNull(browser.empty.getParent());
                 assertFalse(browser.editMenu.isEnabled()); assertFalse(browser.diagnosticsMenu.isEnabled());
                 var menus = panel.menuBar(); assertEquals(3, menus.getMenuCount()); assertEquals("Token", menus.getMenu(2).getText());
-                assertEquals(3, menus.getMenu(2).getItemCount()); assertSame(browser.editMenu, menus.getMenu(2).getItem(1));
+                assertEquals(4, menus.getMenu(2).getItemCount()); assertSame(browser.editMenu, menus.getMenu(2).getItem(1));
                 assertEquals(new Dimension(640, 520), panel.getMinimumSize()); assertEquals(new Dimension(760, 820), VaultPanel.INITIAL_SIZE);
                 assertNull(find(panel, JSplitPane.class));
             } finally { panel.closing(); }
@@ -195,4 +195,109 @@ class TokenBrowserTest {
             } finally { panel.closing(); }
         });
     }
+    private static final class BoundaryClock extends java.time.Clock {
+        java.time.Instant now = java.time.Instant.parse("2026-01-01T00:00:11.999Z");
+        boolean stepping;
+        int reads;
+        public java.time.ZoneId getZone() { return java.time.ZoneOffset.UTC; }
+        public java.time.Clock withZone(java.time.ZoneId zone) { return this; }
+        public java.time.Instant instant() {
+            reads++;
+            var result = now;
+            if (stepping) { now = now.plusMillis(2); }
+            return result;
+        }
+    }
+    private static List<JLabel> labels(Container root) {
+        var result = new java.util.ArrayList<JLabel>();
+        for (Component child : root.getComponents()) {
+            if (child instanceof JLabel label) { result.add(label); }
+            if (child instanceof Container container) { result.addAll(labels(container)); }
+        }
+        return result;
+    }
+    private static String countdown(TokenRowPanel row) {
+        return labels(row).stream().map(JLabel::getText)
+                .filter(text -> text.matches("[0-9]+ sec")).findFirst().orElseThrow();
+    }
+    @Test void oneBoundarySnapshotSynchronizesOrdinaryAndConflictTextAndRings() throws Exception {
+        edt(() -> {
+            var clock = new BoundaryClock(); var panel = new TokenBrowserPanel(clock);
+            panel.totpAction(TokenFixtures::generate);
+            var state = new State(token(1, active("A")), token(2, active("B")),
+                    token(3, active("C"), active("D")));
+            try {
+                panel.render(state.value); panel.rows.forEach(row -> row.show.doClick(0));
+                for (String instant : List.of("2026-01-01T00:00:11.999Z", "2026-01-01T00:00:12.001Z")) {
+                    clock.now = java.time.Instant.parse(instant); clock.reads = 0; clock.stepping = true;
+                    panel.refreshPresentation();
+                    assertEquals(1, clock.reads, "One capture for all owners and visible rows");
+                    String expected = instant.contains("11.999") ? "19 sec" : "18 sec";
+                    int fraction = instant.contains("11.999") ? 600 : 599;
+                    for (var row : panel.rows) {
+                        assertEquals(expected, countdown(row));
+                        assertEquals(fraction, find(row, CountdownRing.class).remaining());
+                    }
+                }
+                assertEquals(4, state.calls.size(), "Presentation never derives codes");
+            } finally { panel.closing(); }
+        });
+    }
+    @Test void differentPeriodsUseTheSameSnapshotWithoutForcingEqualCountdowns() throws Exception {
+        edt(() -> {
+            var clock = new BoundaryClock(); var panel = new TokenBrowserPanel(clock);
+            panel.totpAction(TokenFixtures::generate);
+            try {
+                panel.render(new State(token(1, active("A")), token(2,
+                        alternative(TokenStatus.ACTIVE, "B", "account", TotpAlgorithm.SHA1, 6, 45))).value);
+                panel.rows.forEach(row -> row.show.doClick(0));
+                clock.reads = 0; clock.stepping = true; panel.refreshPresentation();
+                assertEquals(1, clock.reads);
+                assertEquals("19 sec", countdown(panel.row(id(1))));
+                assertEquals("34 sec", countdown(panel.row(id(2))));
+                assertEquals(600, find(panel.row(id(1)), CountdownRing.class).remaining());
+                assertEquals(733, find(panel.row(id(2)), CountdownRing.class).remaining());
+            } finally { panel.closing(); }
+        });
+    }
+    @Test void filteringReintroducesAllRowsUsingOneFreshSnapshot() throws Exception {
+        edt(() -> {
+            var clock = new BoundaryClock(); var panel = new TokenBrowserPanel(clock);
+            panel.totpAction(TokenFixtures::generate);
+            var state = new State(token(1, active("A")), token(2, active("B")), token(3, active("C"), active("D")));
+            try {
+                panel.render(state.value); panel.rows.forEach(row -> row.show.doClick(0));
+                panel.search.setText("A");
+                clock.now = java.time.Instant.parse("2026-01-01T00:00:12.001Z");
+                clock.reads = 0; clock.stepping = true; panel.search.setText("");
+                assertEquals(1, clock.reads); assertEquals(4, panel.rows.size());
+                for (var row : panel.rows) {
+                    assertEquals("18 sec", countdown(row));
+                    assertEquals(599, find(row, CountdownRing.class).remaining());
+                }
+                assertEquals(4, state.calls.size());
+            } finally { panel.closing(); }
+        });
+    }
+    @Test void sharedPresentationPreservesIndependentRevealAndGraceLifetimes() throws Exception {
+        edt(() -> {
+            var clock = new MutableClock(); var panel = browser(clock);
+            var state = new State(token(1, active("A")), token(2, active("B")));
+            try {
+                clock.now = java.time.Instant.ofEpochSecond(11);
+                panel.render(state.value); panel.row(id(1)).show.doClick(0);
+                clock.now = java.time.Instant.ofEpochSecond(21); panel.row(id(2)).show.doClick(0);
+                panel.refreshPresentation();
+                assertEquals("9 sec", countdown(panel.row(id(1))));
+                assertEquals("9 sec", countdown(panel.row(id(2))));
+                clock.now = java.time.Instant.ofEpochSecond(30); panel.refreshPresentation();
+                assertTrue(panel.row(id(1)).show.isVisible());
+                assertEquals("30 sec", countdown(panel.row(id(2))));
+                clock.now = java.time.Instant.ofEpochSecond(60); panel.refreshPresentation();
+                assertTrue(panel.rows.stream().allMatch(row -> row.show.isVisible()));
+                assertEquals(3, state.calls.size());
+            } finally { panel.closing(); }
+        });
+    }
+
 }

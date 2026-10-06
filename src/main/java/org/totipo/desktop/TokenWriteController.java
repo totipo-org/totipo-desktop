@@ -33,6 +33,9 @@ final class TokenWriteController {
     }
 
     void open(VaultState base, TokenAlternative alternative, String explanation) {
+        open(base, alternative, explanation, TokenManagementPanel.DeleteOrigin.EDIT);
+    }
+    private void open(VaultState base, TokenAlternative alternative, String explanation, TokenManagementPanel.DeleteOrigin origin) {
         Edt.require();
         if (closing || active || base == null || !gate.acquire(this)) { return; }
         active = true;
@@ -40,7 +43,7 @@ final class TokenWriteController {
         create = alternative == null;
         if (current == null) { current = base; }
         editor = new TokenManagementPanel(base, alternative, explanation, () -> current,
-                this::submit, this::cancel);
+                this::submit, this::cancel, origin);
         view.manageToken(editor);
     }
 
@@ -51,6 +54,10 @@ final class TokenWriteController {
             if (abandonedDraft != null) { abandonedDraft.close(); pending = false; }
             if (!pending) { changedConflict(); }
         }
+    }
+    void openDelete(VaultState base, TokenAlternative alternative, String explanation) {
+        if (closing || active || alternative == null) { return; }
+        open(base, alternative, explanation, TokenManagementPanel.DeleteOrigin.DIRECT);
     }
     private boolean sameConflict(VaultState state) {
         MergeInputs captured = mergeInputs;

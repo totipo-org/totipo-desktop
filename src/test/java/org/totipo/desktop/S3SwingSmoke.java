@@ -86,11 +86,18 @@ public class S3SwingSmoke {
         long until=System.nanoTime()+10_000_000_000L;while(!edt(condition)) {if(System.nanoTime()>until)throw new AssertionError("Timed out");Thread.sleep(50);}robot.waitForIdle();
     }
     static void closed() throws Exception { waitFor(() -> Arrays.stream(frame.getOwnedWindows()).noneMatch(w -> w instanceof JDialog && w.isVisible())); edt(() -> { frame.toFront(); frame.requestFocus(); }); Thread.sleep(150); }
-    static void editGithub() throws Exception {
-        JButton edit = edt(() -> all(frame).stream().filter(JButton.class::isInstance).map(JButton.class::cast)
-            .filter(b -> b.getText().equals("Edit") && b.getAccessibleContext().getAccessibleDescription().contains("GitHub")).findFirst().orElseThrow());
-        edt(() -> edit.doClick(0)); waitFor(() -> Arrays.stream(frame.getOwnedWindows()).anyMatch(w -> w instanceof JDialog && w.isVisible()));
+    static JComponent tokenRow(String identity) {
+        return all(frame).stream().filter(JComponent.class::isInstance).map(JComponent.class::cast)
+                .filter(c -> "divider".equals(c.getClientProperty("totipo.rowPresentation"))
+                        && c.getAccessibleContext().getAccessibleName().contains(identity)).findFirst().orElseThrow();
     }
+    static void editIdentity(String identity) throws Exception {
+        edt(() -> tokenRow(identity).dispatchEvent(new MouseEvent(tokenRow(identity), MouseEvent.MOUSE_PRESSED,
+                System.currentTimeMillis(), 0, 5, 5, 1, false, MouseEvent.BUTTON1)));
+        S5SwingSmoke.menu("Edit…");
+        waitFor(() -> Arrays.stream(frame.getOwnedWindows()).anyMatch(w -> w instanceof JDialog && w.isVisible()));
+    }
+    static void editGithub() throws Exception { editIdentity("GitHub"); }
     public static void main(String[] args) throws Exception {
         Thread.setDefaultUncaughtExceptionHandler((thread, error) -> { error.printStackTrace(); System.exit(1); });
         theme=args.length==0?"light":args[0];vault=Files.createTempDirectory("totipo-s3-review-");
@@ -126,7 +133,7 @@ public class S3SwingSmoke {
             };
             app=new DesktopApplication(access,frame,path -> new VaultContent(frame));app.show();app.begin(vault,"review".toCharArray(),false);
         });
-        waitFor(() -> app.state()==ShellState.UNLOCKED && all(frame).stream().anyMatch(c -> c instanceof JButton b && b.getText().equals("Edit")));
+        waitFor(() -> app.state()==ShellState.UNLOCKED && all(frame).stream().anyMatch(c -> c instanceof JButton b && b.getText().equals("Show Code")));
         TokenId github=session.state().tokens().get(0).id();
         shortcut(KeyEvent.VK_N);snapshot("add-acquisition");
         Component method=edt(() -> all(uncheckedDialog()).stream().filter(AbstractButton.class::isInstance).map(AbstractButton.class::cast).filter(b -> b.getText().equals("Manual entry")).findFirst().orElseThrow());click(method);
@@ -173,12 +180,8 @@ public class S3SwingSmoke {
             }
         }
         waitFor(() -> session.state().token(example.id()).orElseThrow().hasConflict());
-        waitFor(() -> all(frame).stream().anyMatch(c -> c instanceof JButton b && b.getText().equals("Edit")
-                && b.getAccessibleContext().getAccessibleDescription().contains("Example Service")));
-        edt(() -> all(frame).stream().filter(JButton.class::isInstance).map(JButton.class::cast)
-                .filter(b -> b.getText().equals("Edit") && b.getAccessibleContext().getAccessibleDescription().contains("Example Service"))
-                .findFirst().orElseThrow().doClick(0));
-        waitFor(() -> Arrays.stream(frame.getOwnedWindows()).anyMatch(w -> w instanceof JDialog && w.isVisible()));
+        waitFor(() -> all(frame).stream().anyMatch(c -> c instanceof JButton b && b.getText().equals("Resolve")));
+        editIdentity("Example Service");
         snapshot("conflict-edit"); key(KeyEvent.VK_ESCAPE); closed();
         edt(app::shutdown);waitFor(() -> !frame.isDisplayable());
         try(var paths=Files.walk(vault)){for(Path path:paths.sorted(Comparator.reverseOrder()).toList())Files.delete(path);}

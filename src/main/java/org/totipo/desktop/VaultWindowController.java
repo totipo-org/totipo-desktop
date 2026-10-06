@@ -81,6 +81,7 @@ final class VaultWindowController {
             }
             view.tokenActions(() -> writes.open(latest, null,
                     "A new Create makes a distinct token; it is not a retry of an earlier uncertain publication."), writes::open);
+            view.deleteAction(writes::openDelete);
             view.mergeAction(writes::openMerge);
             view.passwordAction(passwords::open);
             view.showWindow();

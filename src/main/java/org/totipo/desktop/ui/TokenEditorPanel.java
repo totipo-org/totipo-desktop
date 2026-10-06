@@ -38,7 +38,7 @@ public final class TokenEditorPanel extends JPanel {
     final JTextArea message = wrappedText("");
     final JPanel fields = new JPanel(new GridBagLayout());
     final JScrollPane scroll;
-    final JPanel actions = new JPanel(new FlowLayout(FlowLayout.TRAILING, 8, 0));
+    final JPanel actions = SwingUsability.taskActionRow();
     private final boolean create;
     private boolean busy;
     private boolean retired;
@@ -51,8 +51,8 @@ public final class TokenEditorPanel extends JPanel {
         // JTextField otherwise replaces stored newlines with spaces during prefill.
         issuer.getDocument().putProperty("filterNewlines", Boolean.FALSE);
         account.getDocument().putProperty("filterNewlines", Boolean.FALSE);
-        setLayout(new BorderLayout(0, 16));
-        setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        setLayout(new BorderLayout(0, 0));
+        setBorder(BorderFactory.createEmptyBorder(20, 20, 4, 20));
         setPreferredSize(PREFERRED_SIZE);
         setMinimumSize(MINIMUM_SIZE);
         if (!create && explanation != null && explanation.startsWith("You are editing this version only.")) {

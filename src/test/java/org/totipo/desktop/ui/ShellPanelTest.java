@@ -31,14 +31,19 @@ class ShellPanelTest {
             panel.render(ShellState.NO_VAULT, null, "", false); assertTrue(panel.primary.isEnabled()); assertTrue(panel.secondary.isEnabled());
         });
     }
-    @Test void noVaultHasOnePrimaryActionAndQuietCreate() throws Exception {
+    @Test void noVaultHasOnePrimaryActionAndBorderedSecondaryCreate() throws Exception {
         edt(() -> {
             ShellPanel panel = new ShellPanel(); panel.render(ShellState.NO_VAULT, null, "", false);
             assertEquals("Select Vault", panel.primary.getText()); assertEquals("Create New Vault…", panel.secondary.getText());
             assertFalse(panel.password.isVisible()); assertFalse(panel.path.isVisible());
             assertEquals("Choose a vault to continue", panel.identity.getText()); assertFalse(panel.status.isVisible());
             assertEquals(DesktopStyle.ActionRole.PrimaryAction, panel.primary.getClientProperty("totipo.actionRole"));
-            assertEquals(DesktopStyle.ActionRole.QuietAction, panel.secondary.getClientProperty("totipo.actionRole"));
+            assertEquals(DesktopStyle.ActionRole.SecondaryAction, panel.secondary.getClientProperty("totipo.actionRole"));
+            assertTrue(panel.secondary.isContentAreaFilled());
+            assertInstanceOf(DesktopStyle.ControlBorder.class, panel.secondary.getBorder());
+            assertEquals(panel.primary.getPreferredSize(), panel.secondary.getPreferredSize());
+            assertEquals("Select Vault", panel.primary.getAccessibleContext().getAccessibleName());
+            assertEquals("Create New Vault…", panel.secondary.getAccessibleContext().getAccessibleName());
         });
     }
     @Test void noVaultStackHasVisibleNonOverlappingBoundsEvenWithLargeHeading() throws Exception {

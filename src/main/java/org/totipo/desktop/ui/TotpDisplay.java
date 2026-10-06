@@ -30,6 +30,7 @@ final class TotpDisplay {
     private final BiConsumer<TokenId, List<Display>> render;
     private final Consumer<TokenId> unavailable;
     private final Timer timer;
+    private final boolean automatic;
     private final Map<TokenId, Reveal> entries = new LinkedHashMap<>();
     private final Map<TokenId, Request> requests = new HashMap<>();
     private final Map<TokenId, Reveal> staged = new HashMap<>();
@@ -39,6 +40,11 @@ final class TotpDisplay {
         this(clock, render, id -> { });
     }
     TotpDisplay(Clock clock, BiConsumer<TokenId, List<Display>> render, Consumer<TokenId> unavailable) {
+        this(clock, render, unavailable, true);
+    }
+    /** Browser-owned displays disable the local cadence; authorization remains local. */
+    TotpDisplay(Clock clock, BiConsumer<TokenId, List<Display>> render, Consumer<TokenId> unavailable, boolean automatic) {
+        this.automatic = automatic;
         this.clock = clock; this.render = render;
         this.unavailable = unavailable;
         timer = new Timer(250, event -> tick()); timer.setCoalesce(true);
@@ -87,7 +93,7 @@ final class TotpDisplay {
                 Grace grace = Duration.between(accepted, earliest.validUntil()).compareTo(Duration.ofSeconds(10)) < 0
                         ? Grace.AUTHORIZED : Grace.NONE;
                 Reveal reveal = new Reveal(base, token, List.copyOf(revealed), grace);
-                entries.put(token.id(), reveal); timer.start();
+                entries.put(token.id(), reveal); if (automatic) { timer.start(); }
                 render.accept(token.id(), presentation(revealed, accepted));
                 if (grace == Grace.AUTHORIZED && entries.get(token.id()) == reveal) { stage(reveal, outcomes); }
                 return;
@@ -175,11 +181,13 @@ final class TotpDisplay {
         return List.copyOf(result);
     }
     void tick() {
+        tick(clock.instant());
+    }
+    void tick(Instant now) {
         Edt.require();
-        Instant now = clock.instant();
         Set<TokenId> ids = new LinkedHashSet<>(entries.keySet()); ids.addAll(staged.keySet());
         requests.forEach((id, request) -> { if (request.window() != null) { ids.add(id); } });
-        for (TokenId id : ids) { advance(id, now); render.accept(id, presentation(id)); }
+        for (TokenId id : ids) { advance(id, now); render.accept(id, presentation(id, now)); }
         for (TokenId id : List.copyOf(requests.keySet())) {
             Request pending = requests.get(id);
             if (pending.window() != null && !now.isBefore(pending.window().until())) {
@@ -190,22 +198,31 @@ final class TotpDisplay {
     }
     /** Reconstruct a visible row without deriving, extending, or changing its authorization. */
     List<Display> presentation(TokenId id) {
-        Edt.require(); Instant now = clock.instant(); advance(id, now); Reveal reveal = entries.get(id);
+        return presentation(id, clock.instant());
+    }
+    List<Display> presentation(TokenId id, Instant now) {
+        Edt.require(); advance(id, now); Reveal reveal = entries.get(id);
         return reveal == null || reveal.entries().stream().anyMatch(e -> !valid(e.code(), now))
                 ? List.of() : presentation(reveal.entries(), now);
     }
     boolean pending(TokenId id) {
-        Edt.require(); Request request = requests.get(id);
-        return request != null && (request.window() == null || inWindow(request.window()));
+        return pending(id, clock.instant());
     }
-    private boolean inWindow(GraceWindow window) {
-        Instant now = clock.instant(); return !now.isBefore(window.from()) && now.isBefore(window.until());
+    boolean pending(TokenId id, Instant now) {
+        Edt.require(); Request request = requests.get(id);
+        return request != null && (request.window() == null || inWindow(request.window(), now));
+    }
+    private boolean inWindow(GraceWindow window, Instant now) {
+        return !now.isBefore(window.from()) && now.isBefore(window.until());
     }
     /** Non-secret pending geometry, including expiry observed just before the timer tick. */
     List<String> graceLabels(TokenId id) {
+        return graceLabels(id, clock.instant());
+    }
+    List<String> graceLabels(TokenId id, Instant now) {
         Edt.require();
         Request request = requests.get(id);
-        if (request != null && request.window() != null && inWindow(request.window())) { return request.labels(); }
+        if (request != null && request.window() != null && inWindow(request.window(), now)) { return request.labels(); }
         return List.of();
     }
     private static List<Display> presentation(List<Entry> revealed, Instant now) {
@@ -242,5 +259,5 @@ final class TotpDisplay {
         for (TokenId id : ids) { clear(id); }
         timer.stop();
     }
-    boolean running() { return timer.isRunning(); }
+    boolean running() { return automatic ? timer.isRunning() : !entries.isEmpty() || requests.values().stream().anyMatch(r -> r.window() != null); }
 }
