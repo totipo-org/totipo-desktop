@@ -208,6 +208,19 @@ val verifyDistribution = tasks.register("verifyDistribution") {
         expectedJars.forEach { name ->
             ZipFile(root.resolve("lib/$name")).use { jar ->
                 val entries = jar.entries().asSequence().toList()
+                if (name.startsWith("totipo-desktop-")) {
+                    listOf(16, 32, 48, 64, 128, 256).forEach { size ->
+                        val path = "org/totipo/desktop/icons/totipo-$size.png"
+                        val entry = jar.getEntry(path)
+                        check(entry != null) { "Missing packaged application icon: $path" }
+                        jar.getInputStream(entry).use { input ->
+                            val image = javax.imageio.ImageIO.read(input)
+                            check(image != null && image.width == size && image.height == size) {
+                                "Invalid packaged application icon: $path"
+                            }
+                        }
+                    }
+                }
                 check(entries.none { it.name.endsWith(".java") || it.name.startsWith("vendor/") || it.name.startsWith(".gradle/") }) {
                     "Source/cache embedded in $name"
                 }

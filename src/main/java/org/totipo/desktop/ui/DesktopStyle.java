@@ -5,7 +5,7 @@ import java.awt.geom.RoundRectangle2D;
 import javax.swing.*;
 import javax.swing.border.AbstractBorder;
 
-/** Small Swing styling vocabulary. Values derive from the active platform palette and font. */
+/** Small Swing styling vocabulary with canonical brand accents and separate semantic colors. */
 final class DesktopStyle {
     static final int MICRO = 4, TIGHT = 8, COMPACT = 12, NORMAL = 16, SECTION = 24, MAJOR = 32;
     static final int CONTROL = 44, INLINE = 36, MINIMUM_CONTROL = 30;
@@ -31,13 +31,16 @@ final class DesktopStyle {
     static Color border() { return mix(text(), surface(), .8); }
     static Color borderStrong() { return readable(border(), surface(), 3); }
     static Color accent() {
+        // Use exact artwork stops; keep the darker stop readable on light surfaces.
+        return luminance(surface()) < .18 ? BrandPalette.GREEN : BrandPalette.GREEN_DARK;
+    }
+    static Color info() {
         Color nativeAccent = color("List.selectionBackground", new Color(45, 105, 175));
         Color mutedBlue = new Color(65, 100, 145);
         return readable(mix(nativeAccent, mutedBlue, luminance(surface()) < .18 ? .85 : .35), surface(), 3);
     }
     static Color focus() { return readable(readable(accent(), surfaceSelected(), 3), surfaceRaised(), 3); }
     static Color onAccent() { return readable(color("List.selectionForeground", Color.WHITE), accent(), 4.5); }
-    static Color info() { return accent(); }
     static Color warning() {
         Color nativeWarning = color("OptionPane.warningDialog.titlePane.background", color("nimbusOrange", new Color(180, 115, 0)));
         // Dialog title colors can be nearly neutral; keep amber semantics while borrowing native tone.

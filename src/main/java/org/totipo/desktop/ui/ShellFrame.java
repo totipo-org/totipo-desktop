@@ -21,6 +21,7 @@ public final class ShellFrame extends JFrame implements ShellView {
     private VaultPanel mounted;
     public ShellFrame() {
         super("Totipo"); Edt.require();
+        setIconImages(ApplicationIcons.windowImages());
         landing.detailsAction(() -> aboutVault("Cannot safely open", landing.error.getText()));
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
         setContentPane(landing);

@@ -33,6 +33,7 @@ let
     "src"
     "gradle"
     "packaging/licenses"
+    "packaging/icons"
   ];
   files = [
     "build.gradle.kts"
@@ -98,12 +99,15 @@ stdenv.mkDerivation (finalAttrs: {
     makeWrapper "$out/lib/totipo-desktop/bin/totipo-desktop-unwrapped" "$out/bin/totipo-desktop" \
       --set JAVA_HOME ${jdk} \
       --prefix PATH : ${lib.makeBinPath [ coreutils findutils gnused ]}
+    mkdir -p "$out/share/icons"
+    cp -r packaging/icons/hicolor "$out/share/icons/"
     runHook postInstall
   '';
   desktopItems = [
     (makeDesktopItem {
       name = "totipo-desktop";
       desktopName = "Totipo";
+      icon = "totipo";
       exec = "totipo-desktop";
       categories = [ "Utility" ];
       terminal = false;
@@ -125,6 +129,10 @@ stdenv.mkDerivation (finalAttrs: {
       cmp "$jar" "$out/lib/totipo-desktop/lib/$(basename "$jar")"
     done
     desktop="$out/share/applications/totipo-desktop.desktop"
+    grep -x 'Icon=totipo' "$desktop"
+    for icon in packaging/icons/hicolor/*/apps/totipo.*; do
+      cmp "$icon" "$out/share/icons/hicolor/''${icon#packaging/icons/hicolor/}"
+    done
     grep -x 'Name=Totipo' "$desktop"
     grep -x 'Exec=totipo-desktop' "$desktop"
     # makeDesktopItem joins lists without a trailing separator; both forms are valid.
