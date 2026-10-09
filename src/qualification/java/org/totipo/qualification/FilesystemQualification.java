@@ -53,18 +53,15 @@ public final class FilesystemQualification {
 
     private static void workflow(Path directory) throws Exception {
         char[] oldPassword = {'q', 'u', 'a', 'l', '-', 'o', 'l', 'd'};
-        char[] newPassword = {'q', 'u', 'a', 'l', '-', 'n', 'e', 'w'};
         byte[] input = {1, 2, 3, 4};
         Instant time = Instant.parse("2026-01-01T00:00:07Z");
         try {
-            VaultFingerprint fingerprint;
             try (var session = expect(CreateVaultResult.Created.class, NioTotipo.create(directory, oldPassword)).session()) {
-                fingerprint = session.fingerprint();
+                require(session.state() != null, "Created session has no state");
             }
             TokenId id;
             String code;
             try (var session = open(directory, oldPassword)) {
-                require(fingerprint.equals(session.fingerprint()), "Root changed after creation");
                 try (var secret = NewSecret.copyOf(input); var builder = session.state().createToken()) {
                     id = expect(SaveResult.Saved.class, builder.status(TokenStatus.ACTIVE).issuer("Qualification")
                             .account("created").algorithm(TotpAlgorithm.SHA1).digits(6)
@@ -95,22 +92,9 @@ public final class FilesystemQualification {
                 require(merged.tokens().size() == 1 && merged.token(id).orElseThrow().alternatives().size() == 1,
                         "Merged token state did not survive reopen");
                 require(code.equals(merged.generateTotp(alternative(merged, id), time).code()), "Merged TOTP changed on reopen");
-                require(fingerprint.equals(session.fingerprint()), "Root changed before password change");
-                require(session.changePassword(oldPassword, newPassword) == PasswordChangeResult.CHANGED, "Password change failed");
-                require(fingerprint.equals(session.fingerprint()), "Password change altered root");
-            }
-            var rejected = NioTotipo.open(directory, oldPassword);
-            if (rejected instanceof OpenResult.Opened opened) { opened.session().close(); }
-            expect(OpenResult.AuthenticationFailed.class, rejected);
-            try (var session = open(directory, newPassword)) {
-                require(fingerprint.equals(session.fingerprint()), "Rewrap changed root");
-                var state = observe(session, s -> hasAccount(s, id, "merged"));
-                require(state.tokens().size() == 1 && state.token(id).orElseThrow().alternatives().size() == 1,
-                        "Rewrap changed token state");
-                require(code.equals(state.generateTotp(alternative(state, id), time).code()), "Rewrap changed TOTP");
             }
         } finally {
-            Arrays.fill(oldPassword, '\0'); Arrays.fill(newPassword, '\0'); Arrays.fill(input, (byte) 0);
+            Arrays.fill(oldPassword, '\0'); Arrays.fill(input, (byte) 0);
         }
     }
 

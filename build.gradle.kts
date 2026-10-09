@@ -39,7 +39,7 @@ tasks.withType<Test>().configureEach {
     systemProperty("java.awt.headless", "true")
 }
 
-val totipoJavaVersion = "0.1.3"
+val totipoJavaVersion = "0.2.0"
 dependencies {
     implementation("org.totipo:totipo-storage-nio:$totipoJavaVersion")
     testImplementation(platform("org.junit:junit-bom:6.1.3"))
@@ -80,6 +80,12 @@ val verifyMavenBoundary = tasks.register("verifyMavenBoundary") {
             val modules = dependencies.map { component ->
                 check(component.id is ModuleComponentIdentifier) { "Non-Maven component: ${component.id}" }
                 component.id as ModuleComponentIdentifier
+            }
+            val expectedModules = setOf(
+                "org.totipo:totipo-storage-nio:$expectedVersion", "org.totipo:totipo-core:$expectedVersion"
+            ) + if (index == 1) setOf("org.bouncycastle:bcprov-jdk18on:1.86") else emptySet()
+            check(modules.map { "${it.group}:${it.module}:${it.version}" }.toSet() == expectedModules) {
+                "Unexpected compile/runtime modules: $modules"
             }
             val obsoleteGroup = listOf("dev", "totipo").joinToString(".")
             check(modules.none { it.group == obsoleteGroup || it.group.startsWith("$obsoleteGroup.") }) {

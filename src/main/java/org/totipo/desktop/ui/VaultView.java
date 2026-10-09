@@ -17,9 +17,6 @@ public interface VaultView {
     default void quitAction(Runnable action) { }
     default void changeVaultAction(Runnable action) { }
     default void copyAction(TotpClipboard.Copy action) { }
-    default void passwordAction(Runnable action) { }
-    default void editPassword(PasswordChangePanel panel) { }
-    default void retirePassword() { }
     default void retirementMessage(String message) { }
     @FunctionalInterface
     interface EditAction { void open(VaultState base, TokenAlternative alternative, String explanation); }

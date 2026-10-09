@@ -12,7 +12,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-/** Actual Swing/Robot surfaces, real NIO password replacement and Design v0.8 qualification. */
+/** Actual Swing/Robot surfaces and ordinary NIO open/lock qualification. */
 public class S5SwingSmoke extends S4SwingSmoke {
     static void captureSurface(String name) throws Exception {
         robot.waitForIdle(); Thread.sleep(150);
@@ -20,7 +20,7 @@ public class S5SwingSmoke extends S4SwingSmoke {
                 .reduce((a, b) -> b).orElse(frame));
         edt(() -> {
             for (Component c : all(task)) {
-                if (c.isShowing() && c instanceof JButton b && List.of("Change Password", "Cancel", "Close", "Try Again", "Open").contains(b.getText())) {
+                if (c.isShowing() && c instanceof JButton b && List.of("Cancel", "Close", "Try Again", "Open").contains(b.getText())) {
                     Rectangle r = SwingUtilities.convertRectangle(c.getParent(), c.getBounds(), task);
                     if (!new Rectangle(task.getSize()).contains(r)) { throw new AssertionError("Clipped action: " + b.getText()); }
                 }
@@ -109,26 +109,6 @@ public class S5SwingSmoke extends S4SwingSmoke {
         waitFor(() -> all(frame).stream().anyMatch(c -> c instanceof JButton b && b.getText().equals("Copy")));
         key(KeyEvent.VK_ENTER); shortcut(KeyEvent.VK_R);
         menu("About This Vault…"); captureSurface("about"); key(KeyEvent.VK_ESCAPE); closed();
-        menu("Change Vault Password…"); captureSurface("password");
-        text("Current password", "review"); text("New password", "one"); text("Confirm new password", "two"); click("Change Password");
-        waitFor(() -> KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner() instanceof JPasswordField p && "Confirm new password".equals(p.getAccessibleContext().getAccessibleName())); captureSurface("password-mismatch");
-        text("Current password", "review");
-        JButton submit = button(dialog(), "Change Password");
-        edt(() -> SwingUtilities.invokeLater(() -> submit.doClick(0)));
-        waitFor(() -> Arrays.stream(Window.getWindows()).anyMatch(w -> w instanceof JDialog d && d.isVisible() && d.getTitle().equals("Change to Empty Password?")));
-        captureSurface("empty-password-confirmation");
-        JDialog confirmation = edt(() -> Arrays.stream(Window.getWindows()).filter(w -> w instanceof JDialog d && d.isVisible() && d.getTitle().equals("Change to Empty Password?")).map(JDialog.class::cast).findFirst().orElseThrow());
-        click(button(confirmation, "Cancel"));
-        text("Current password", "review"); text("New password", "replacement"); text("Confirm new password", "replacement"); click("Change Password"); closed();
-        try (VaultSession check = ((OpenResult.Opened) NioTotipo.open(vault, "replacement".toCharArray())).session()) {
-            if (!check.fingerprint().equals(session.fingerprint())) { throw new AssertionError("Password change changed vault identity"); }
-        }
-        menu("Change Vault Password…"); text("New password", "abandoned");
-        JPasswordField abandoned = edt(() -> all(uncheckedDialog()).stream().filter(JPasswordField.class::isInstance).map(JPasswordField.class::cast)
-                .filter(p -> "New password".equals(p.getAccessibleContext().getAccessibleName())).findFirst().orElseThrow());
-        shortcut(KeyEvent.VK_L); waitFor(() -> app.state() == ShellState.LOCKED); closed();
-        if (edt(() -> abandoned.getPassword().length) != 0) { throw new AssertionError("Lock retained password"); }
-        edt(() -> app.open("replacement".toCharArray())); waitFor(() -> app.state() == ShellState.UNLOCKED && all(frame).stream().anyMatch(c -> c instanceof JButton b && b.getText().equals("Resolve")));
         open(false); captureSurface("simple-resolver");
         if (edt(() -> all(uncheckedDialog()).stream().filter(JRadioButton.class::isInstance).map(JRadioButton.class::cast).anyMatch(AbstractButton::isSelected))) { throw new AssertionError("Focus preselected version"); }
         key(KeyEvent.VK_DOWN);

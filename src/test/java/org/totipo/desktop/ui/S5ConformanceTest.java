@@ -22,10 +22,10 @@ class S5ConformanceTest {
             state.result = c -> new org.totipo.TotpCode("001234", c.now(), c.now().plusSeconds(30));
             try {
                 panel.render(state.value); browser.select(id(1)); panel.writeAvailability(false);
-                assertFalse(panel.createAction.isEnabled()); assertFalse(browser.editMenu.isEnabled()); assertFalse(panel.changePassword.isEnabled());
+                assertFalse(panel.createAction.isEnabled()); assertFalse(browser.editMenu.isEnabled());
                 assertFalse(browser.row(id(1)).edit.isEnabled());
                 assertNotNull(panel.createAction.getValue(Action.SHORT_DESCRIPTION));
-                for (JMenuItem item : List.of(browser.editMenu, panel.changePassword)) {
+                for (JMenuItem item : List.of(browser.editMenu)) {
                     assertTrue(item.getAccessibleContext().getAccessibleDescription().contains("unavailable"));
                 }
                 assertTrue(browser.row(id(1)).edit.getAccessibleContext().getAccessibleDescription().contains("Other"));
@@ -69,45 +69,6 @@ class S5ConformanceTest {
             assertTrue(values.stream().noneMatch(v -> v.getAccessibleContext().getAccessibleName().matches("Password|Secret|Code|Heads|Root")));
             assertTrue(values.stream().anyMatch(v -> v.getText().contains("not reported")));
             panel.close.doClick(0); assertEquals(1, closes.get());
-        });
-    }
-    @Test void emptyPasswordDecisionAndRetirementClearInputsAndPreventSubmission() throws Exception {
-        edt(() -> {
-            for (boolean confirm : List.of(false, true)) {
-                var submissions = new AtomicInteger(); var decisions = new AtomicInteger();
-                var panel = new PasswordChangePanel(s -> { submissions.incrementAndGet(); s.close(); }, () -> {}, () -> { decisions.incrementAndGet(); return confirm; });
-                panel.current.setText("fixture-current"); panel.change.doClick(0);
-                assertEquals(1, decisions.get()); assertEquals(confirm ? 1 : 0, submissions.get());
-                for (JPasswordField field : List.of(panel.current, panel.next, panel.confirmation)) { assertEquals(0, field.getPassword().length); }
-                panel.retire(); panel.change.doClick(0); assertEquals(confirm ? 1 : 0, submissions.get());
-            }
-            PasswordChangePanel[] owner = new PasswordChangePanel[1]; var calls = new AtomicInteger();
-            owner[0] = new PasswordChangePanel(s -> { calls.incrementAndGet(); s.close(); }, () -> {}, () -> { owner[0].retire(); return true; });
-            owner[0].change.doClick(0); assertEquals(0, calls.get());
-        });
-    }
-    @Test void passwordFormUsesConsequenceWarningAndActivatableMismatchValidation() throws Exception {
-        edt(() -> {
-            var panel = new PasswordChangePanel(s -> fail("Invalid form submitted"), () -> {});
-            assertTrue(panel.change.isEnabled()); assertEquals("Change Password", panel.change.getText());
-            assertEquals("Current password", panel.current.getAccessibleContext().getAccessibleName());
-            assertEquals("New password", panel.next.getAccessibleContext().getAccessibleName());
-            assertEquals("Confirm new password", panel.confirmation.getAccessibleContext().getAccessibleName());
-            for (JPasswordField field : List.of(panel.current, panel.next, panel.confirmation)) {
-                assertEquals(0, field.getDocument().getLength()); // Opening an unlocked session never prefills credentials.
-            }
-            for (JPasswordField field : List.of(panel.current, panel.next, panel.confirmation)) {
-                field.setText("fixture-input"); assertNotEquals(0, field.getEchoChar());
-                var accessible = field.getAccessibleContext().getAccessibleText();
-                assertNotEquals("f", accessible.getAtIndex(javax.accessibility.AccessibleText.CHARACTER, 0));
-            }
-            panel.next.setText("fixture-new"); panel.confirmation.setText("different"); panel.change.doClick(0);
-            assertTrue(panel.change.isEnabled()); assertTrue(panel.message.getText().contains("do not match"));
-            assertTrue(TestSupportComponents.all(panel).stream().anyMatch(c -> c instanceof JTextArea a && a.getText().contains("Old backups or retained copies")));
-            for (JPasswordField field : List.of(panel.current, panel.next, panel.confirmation)) {
-                assertFalse(field.getAccessibleContext().getAccessibleName().contains("fixture")); assertEquals(0, field.getPassword().length);
-            }
-            panel.retire();
         });
     }
     @Test void radioAndExclusiveChoicesHaveShapeWeightAndIndependentFocusAcrossThemes() throws Exception {

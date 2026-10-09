@@ -11,7 +11,6 @@ public final class VaultContent implements VaultView {
     private final ShellFrame owner;
     private final VaultPanel panel = new VaultPanel();
     private javax.swing.JDialog editor;
-    private PasswordChangeDialog passwordDialog;
 
     public VaultContent(ShellFrame owner) {
         Edt.require();
@@ -28,15 +27,6 @@ public final class VaultContent implements VaultView {
     }
     @Override public void changeVaultAction(Runnable action) { panel.changeVaultAction(action); }
     @Override public void copyAction(TotpClipboard.Copy action) { panel.copyAction(action); }
-    @Override public void passwordAction(Runnable action) { panel.passwordAction(action); }
-    @Override public void editPassword(PasswordChangePanel content) {
-        passwordDialog = new PasswordChangeDialog(owner, content); passwordDialog.setVisible(true);
-    }
-    @Override public void retirePassword() {
-        if (passwordDialog != null) {
-            PasswordChangeDialog owned = passwordDialog; passwordDialog = null; owned.dispose();
-        }
-    }
     @Override public void mergeAction(MergeAction action) { panel.mergeAction(action); }
     @Override public void editMerge(MergeEditorPanel content) {
         editor = new javax.swing.JDialog(owner, "Resolve Conflict", false);

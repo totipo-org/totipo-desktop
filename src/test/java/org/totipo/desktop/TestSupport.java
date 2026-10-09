@@ -98,9 +98,8 @@ public final class TestSupport {
                 subscriber.onComplete();
             }
         }
-        @Override public VaultFingerprint fingerprint() { throw new AssertionError(); }
+        @Override public VaultId vaultId() { throw new AssertionError(); }
         @Override public VaultState state() { throw new AssertionError(); }
-        @Override public PasswordChangeResult changePassword(char[] old, char[] next) { throw new AssertionError(); }
     }
 
     static class Shell implements ShellView {

@@ -67,15 +67,12 @@ when its exact per-copy marker is still present. It cannot delete copies retaine
 elsewhere and does not provide secure clipboard erasure. Clipboard unavailability
 requires another deliberate Copy click; Totipo never restores previous clipboard data.
 
-Each vault window allows one write workflow at a time.
-**Change Password…** accepts current/new/confirmation passwords and shares that
-workflow slot with token editors and publication decisions. An acknowledged change
-keeps the existing session open and preserves its root and tokens. Authentication
-or definite observation/staging failure keeps the session usable and requires fresh
-entry for another attempt. STALE and UNCERTAIN retire the session and require
-explicit Open Vault. Password-change UNCERTAIN has no retry capability, automatic
-retry, rollback, or preferred recovery password. Earlier unresolved token-publication
-warnings remain independent.
+Each vault window allows one write workflow at a time for Add, Edit, Delete,
+Resolve and publication retry decisions.
+
+VAULT is immutable and create-once. Desktop provides no in-place password change.
+Password, KDF or root changes require creating a new vault and a future migration
+workflow; migration and cross-vault copy are not implemented.
 
 **Add** / `Ctrl+N` opens Add TOTP: explicitly paste an `otpauth://totp` setup URI
 and Review its identity and non-secret setup before publication, or choose Manual
@@ -112,19 +109,15 @@ unselected resolver. Uncertain publication uses the frozen retry capability rath
 than creating another resolution. Lock retires either screen immediately.
 
 Deleted (TOMBSTONED) is logical deletion: tombstones and immutable history retain
-secrets, and storage/synchronization provider copies are not erased. Password
-change rewraps the same root key; it does not rotate the root, revoke old bootstrap copies,
-provide rollback protection, or recover from root compromise.
+secrets, and storage/synchronization provider copies are not erased.
 
 Creating or opening with an empty password requires a separate explicit confirmation.
 Existing empty-password vaults remain readable. Possession of the vault bootstrap
 permits offline password guessing; Argon2id raises its cost, not its possibility.
-Before creating in a location with object-looking files but a missing `vault`,
-check synchronization/provider state and look for the missing bootstrap. Such
-unauthenticated names cannot prove identity or recoverability and do not veto
-creation. Desktop's high-level NIO create path currently provides no orphan
-context; an observation-triggered warning/confirmation remains a deferred r18
-application safeguard, detailed in the M4b report.
+Creation refuses a location with observed plausible Totipo object data and no
+usable vault bootstrap. Check synchronization/recovery or choose another folder.
+Observed names do not prove authenticity, vault identity or recoverability; there
+is no confirmation bypass.
 
 Issuer/account/client text is rendered literally; control/direction characters
 and backslashes use visible escapes in browsing and merge choices. Original model
@@ -135,7 +128,7 @@ Stopping releases the retry capability and leaves a persistent warning for that
 open session: publication may already have occurred. Starting Create again makes
 a distinct token, not a retry. Acknowledged publication and finished local
 observation do not mean synchronization, freshness or complete history.
-Protocol target: Totipo Vault Format **v1/r18**, through released Totipo Java 0.1.3.
+Protocol target: Totipo Vault Format **v1/r19**, through released Totipo Java 0.2.0.
 Local configured-store acknowledgement is not remote synchronization or rollback
 protection. Provider qualification remains limited; local NIO integration tests do
 not establish guarantees for arbitrary filesystems or remote providers.
@@ -147,8 +140,8 @@ git clone https://github.com/totipo-org/totipo-desktop.git
 cd totipo-desktop
 ```
 
-Gradle resolves `org.totipo:totipo-storage-nio:0.1.3` and its transitive
-`org.totipo:totipo-core:0.1.3` from Maven Central. Internet access is needed
+Gradle resolves `org.totipo:totipo-storage-nio:0.2.0` and its transitive
+`org.totipo:totipo-core:0.2.0` from Maven Central. Internet access is needed
 for first resolution unless dependencies are already cached or Nix-provided.
 
 Build with **JDK 25** in `JAVA_HOME` (toolchain auto-download is disabled).
@@ -180,13 +173,13 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for threading, state, and ownership polic
 See also the [M1b report](review/M1B_READ_ONLY_TOKEN_REPORT.md) and
 [M2a review report](review/M2A_CREATE_UPDATE_PUBLICATION_REPORT.md) and
 [M2b review report](review/M2B_MERGE_RESOLUTION_REPORT.md).
-See the [S5 final conformance report](review/S5_FINAL_CONFORMANCE_REPORT.md) for
-current vault states, safe About details, password UX, accessibility and qualification.
-Committed Design v0.8 requires current-password reauthentication for password
-changes, supported by Java 0.1.3. It defines no inferred global Read-only mode.
-Desktop preserves operation-specific failures and uncertainty; it does not probe
-storage permissions or fabricate unavailable vault-format metadata.
-The [M3a password-change report](review/M3A_PASSWORD_CHANGE_REPORT.md) records historical evidence.
+The [S5 conformance report](review/S5_FINAL_CONFORMANCE_REPORT.md) records earlier
+vault-state, accessibility and qualification evidence. The current create-only
+credential policy above supersedes its password-change guidance and the older
+Design v0.8 requirement. Desktop preserves operation-specific failures and
+uncertainty; it does not probe storage permissions or fabricate vault-format metadata.
+See [the r19 reconciliation report](review/JAVA_0_2_0_R19_DESKTOP_RECONCILIATION_REPORT.md)
+for current dependency and automated validation evidence.
 
 ## Packaging and qualification (M4a)
 
@@ -226,10 +219,10 @@ The source is an ordinary repository checkout. Java arrives as released Maven
 artifacts through the dependency cache. After regenerating that cache:
 
 ```sh
-nix flake check
-nix build .
-nix run .
-# Native qualification must also use the installed command:
+nix flake check path:.
+nix build path:.
+nix build --rebuild path:.
+# Separate native qualification uses the installed command:
 ./result/bin/totipo-desktop
 ```
 
@@ -239,13 +232,12 @@ Java configuration. The desktop entry is Totipo / Utility / Terminal=false, with
 no handlers, autostart or placeholder icon. Vaults remain user-selected paths;
 installation directories are never vault storage.
 
-**S4 dependency pin:** The desktop consumes Java 0.1.3 directly after 0.1.1.
-Gradle locks, verification hashes and Nix download pins track the published artifacts;
-BC 1.86 is unchanged. Current build, API and graphical evidence is in
-[the S4 report](review/S4_CONFLICT_RESOLUTION_REPORT.md). The operator confirmed
-`nix build path:.`, `nix build --rebuild path:.` and `nix flake check path:.`
-pass for S4. Native qualification remains UNQUALIFIED. Dependency hashes must
-be derived from the actual published artifacts and reviewed.
+The current dependency pin is Java 0.2.0 / v1/r19; BC 1.86 is unchanged.
+Gradle locks and verification hashes track reviewed Maven Central artifacts.
+Human cache regeneration and review passed. The operator reports that
+`nix flake check path:.`, `nix build path:.` and `nix build --rebuild path:.`
+all passed for this pin. Native qualification remains UNQUALIFIED; application
+release status remains NOT QUALIFIED. See [dependency provenance](TOTIPO_JAVA_DEPENDENCY.md).
 
 From the repository root, generate/refresh using the flake app, which runs the
 official Gradle dependency-cache update script for the current system:
@@ -272,7 +264,7 @@ nix build --rebuild path:.
 ```
 
 Substitute `aarch64-linux` only when qualifying that system. For this uncommitted
-review, `path:.` includes uncommitted/untracked migration files that Git-based
+review, `path:.` includes uncommitted/untracked reconciliation files that Git-based
 flake sources can omit. Do not update `flake.lock` or Gradle verification hashes
 just to make the build pass. Review `package-deps.json`: it should match the locked
 released Totipo artifacts, retain BC 1.86, and leave unrelated dependencies unchanged.

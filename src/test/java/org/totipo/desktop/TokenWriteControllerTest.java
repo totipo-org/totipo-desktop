@@ -16,11 +16,6 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class TokenWriteControllerTest {
     static final class View extends Window {
-        Runnable passwordAction;
-        int passwordForms;
-        @Override public void passwordAction(Runnable action) { passwordAction = action; }
-        @Override public void editPassword(PasswordChangePanel panel) { passwordForms++; }
-        void passwordBlocked() { passwordAction.run(); assertEquals(0, passwordForms); }
         Runnable create;
         EditAction edit;
         EditAction delete;
@@ -44,7 +39,6 @@ class TokenWriteControllerTest {
             Edt.require(); available = value; if (value) { events.add("finished"); }
         }
         @Override public void publicationUncertain(boolean create, boolean busy, Runnable retry, Runnable stop) {
-            passwordBlocked();
             Edt.require(); this.retry = retry; this.stop = stop;
             if (!busy) { events.add("uncertain"); }
         }
@@ -88,11 +82,10 @@ class TokenWriteControllerTest {
         }
         void open() throws Exception { edt(view.create); event("editor"); }
         void save() throws Exception {
-            edt(() -> { acquireAndAdd(view.editor); view.passwordBlocked(); });
+            edt(() -> { acquireAndAdd(view.editor); });
         }
         void event(String expected) throws Exception {
             assertEquals(expected, view.events.poll(10, TimeUnit.SECONDS));
-            if (!expected.equals("finished")) { edt(view::passwordBlocked); }
         }
         @Override public void close() {
             try {
@@ -282,7 +275,6 @@ class TokenWriteControllerTest {
                 TokenManagementPanel original = h.view.editor;
                 h.view.delete.open(h.recording.state, selected, "Blocked stale callback");
                 assertSame(original, h.view.editor);
-                h.view.passwordBlocked();
                 button(h.view.editor, "Cancel").doClick(0);
                 assertNull(h.view.editor);
             });

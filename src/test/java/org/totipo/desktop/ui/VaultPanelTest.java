@@ -53,18 +53,19 @@ class VaultPanelTest {
             var menu = bar.getMenu(1);
             assertEquals("Vault", menu.getText()); assertNotEquals(0, menu.getMnemonic());
             assertEquals("Change Vault…", menu.getItem(0).getText());
-            assertEquals("Change Vault Password…", menu.getItem(3).getText());
-            int[] called = {0, 0};
-            panel.changeVaultAction(() -> called[0]++); panel.passwordAction(() -> called[1]++);
-            menu.getItem(0).doClick(); menu.getItem(3).doClick();
-            assertArrayEquals(new int[] {1, 1}, called);
+            assertEquals(4, menu.getItemCount());
+            assertEquals("About This Vault…", menu.getItem(3).getText());
+            int[] called = {0};
+            panel.changeVaultAction(() -> called[0]++);
+            menu.getItem(0).doClick();
+            assertEquals(1, called[0]);
             assertEquals("Refresh", menu.getItem(2).getText());
             assertEquals(javax.swing.KeyStroke.getKeyStroke("control R"), menu.getItem(2).getAccelerator());
             int[] refreshes = {0}; panel.onRefresh(() -> refreshes[0]++); menu.getItem(2).doClick(0);
             assertEquals(1, refreshes[0]);
-            assertNull(javax.swing.SwingUtilities.getAncestorOfClass(VaultPanel.class, panel.changePassword));
+            assertNull(javax.swing.SwingUtilities.getAncestorOfClass(VaultPanel.class, panel.about));
             assertEquals(640, panel.getMinimumSize().width); assertEquals(520, panel.getMinimumSize().height);
-            panel.closing(); assertFalse(menu.getItem(0).isEnabled()); assertFalse(menu.getItem(3).isEnabled());
+            panel.closing(); assertFalse(menu.getItem(0).isEnabled());
         });
     }
 

@@ -84,6 +84,22 @@ class DesktopApplicationTest {
             } finally { edt(app::shutdown); await(shell.disposed); }
         }
     }
+    @Test void observedObjectDataBlocksCreationWithRecoveryGuidanceAndNoRetry() throws Exception {
+        Access access = new Access(); Shell shell = new Shell(); char[] password = {'s'};
+        access.create = received -> new CreateVaultResult.Failed(CreateVaultResult.FailureReason.OBJECT_DATA_OBSERVED);
+        var app = onEdt(() -> new DesktopApplication(access, shell, path -> { throw new AssertionError(); }));
+        try {
+            edt(() -> app.begin(DIRECTORY, password, true)); await(shell.ready);
+            edt(() -> {
+                assertEquals(List.of("Cannot create vault here"), shell.titles);
+                assertEquals(List.of("This folder contains Totipo object data but no usable vault bootstrap. "
+                        + "Totipo will not create a new vault here. Check synchronization or recovery, or choose another folder."), shell.messages);
+                assertFalse(shell.busy);
+            });
+            assertEquals(1, access.creates.get()); assertEquals(0, access.opens.get());
+            assertArrayEquals(new char[1], password);
+        } finally { edt(app::shutdown); await(shell.disposed); }
+    }
     @Test void runtimeFailureWipesPasswordAndShowsBlockingState() throws Exception {
         Access access = new Access(); access.open = password -> { throw new IllegalStateException(); };
         Shell shell = new Shell(); var app = onEdt(() -> new DesktopApplication(access, shell, path -> new Window())); char[] password = {'p'};

@@ -14,10 +14,6 @@ import static org.junit.jupiter.api.Assertions.*;
 /** S4 controller semantics replace the legacy optional partial-publication workflow. */
 class MergeControllerTest {
     static final class View extends Window {
-        Runnable passwordAction; int passwordForms;
-        @Override public void passwordAction(Runnable action) { passwordAction = action; }
-        @Override public void editPassword(PasswordChangePanel panel) { passwordForms++; }
-        void passwordBlocked() { passwordAction.run(); assertEquals(0, passwordForms); }
         MergeAction merge; MergeEditorPanel editor;
         Runnable retry, stop; String message; boolean available;
         SaveResult.Saved acknowledged;

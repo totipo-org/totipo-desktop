@@ -4,7 +4,7 @@ Record the native environment and package as for GUI_SMOKE.md. This is a modest
 manual check, not certification. If a screen reader is exercised, record its
 name/version; otherwise screen-reader behavior remains UNQUALIFIED.
 
-- [ ] Keyboard-only create/open/search/select/create/edit/merge/password/close workflows work.
+- [ ] Keyboard-only create/open/search/select/create/edit/merge/lock/close workflows work.
 - [ ] Focus is visible, including in scrolled dialogs and after cancellation.
 - [ ] Labels and accessible names identify controls; status/conflict text is understandable.
 - [ ] Tab order is usable; keyboard navigation is not trapped.

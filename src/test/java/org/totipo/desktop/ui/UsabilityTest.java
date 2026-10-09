@@ -111,20 +111,6 @@ class UsabilityTest {
             assertEquals(0, cancelled.get());
             editor.busy(false, ""); invoke(root, JComponent.WHEN_IN_FOCUSED_WINDOW, KeyStroke.getKeyStroke("ESCAPE"));
             assertEquals(1, cancelled.get()); assertEquals(0, editor.secret.getPassword().length);
-            PasswordChangePanel password = new PasswordChangePanel(s -> fail(), cancelled::incrementAndGet);
-            root.setContentPane(password); password.installDialog(root);
-            assertSame(password.change, root.getDefaultButton()); assertLabels(password);
-            password.current.setText("private-password"); password.next.setText("private-password");
-            password.confirmation.setText("private-password");
-            for (JPasswordField field : List.of(password.current, password.next, password.confirmation)) {
-                assertFalse(field.getAccessibleContext().getAccessibleName().contains("private-password"));
-                assertNull(field.getAccessibleContext().getAccessibleDescription());
-            }
-            password.busy(true, "Changing…"); invoke(root, JComponent.WHEN_IN_FOCUSED_WINDOW, KeyStroke.getKeyStroke("ESCAPE"));
-            assertEquals(1, cancelled.get()); password.busy(false, "");
-            invoke(root, JComponent.WHEN_IN_FOCUSED_WINDOW, KeyStroke.getKeyStroke("ESCAPE"));
-            assertEquals(2, cancelled.get());
-            for (JPasswordField field : List.of(password.current, password.next, password.confirmation)) { assertEquals(0, field.getPassword().length); }
         });
     }
     private static void assertLabels(Container parent) {

@@ -70,6 +70,6 @@ class S4NioTest {
     @Test void publishedApiContainsWholeAlternativeSelector() throws Exception {
         assertEquals(MergeToken.class, MergeToken.class.getMethod("keep", TokenAlternative.class).getReturnType());
         String location = MergeToken.class.getProtectionDomain().getCodeSource().getLocation().toString();
-        assertTrue(location.endsWith("totipo-core-0.1.3.jar"), location);
+        assertTrue(location.endsWith("totipo-core-0.2.0.jar"), location);
     }
 }

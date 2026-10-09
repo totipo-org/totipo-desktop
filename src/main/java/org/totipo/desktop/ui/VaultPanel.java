@@ -32,7 +32,6 @@ public final class VaultPanel extends JPanel {
     private final JPanel heading = new JPanel(new BorderLayout(0, DesktopStyle.COMPACT));
     final JMenuItem changeVault = new JMenuItem("Change Vault…");
     final JMenuItem about = new JMenuItem("About This Vault…");
-    final JMenuItem changePassword = new JMenuItem("Change Vault Password…");
     final JMenuItem lock = new JMenuItem("Lock");
     final JMenuItem exit = new JMenuItem("Exit");
     static final java.awt.Dimension MINIMUM_SIZE = new java.awt.Dimension(640, 520);
@@ -57,7 +56,7 @@ public final class VaultPanel extends JPanel {
         SwingUsability.bind(this, WHEN_IN_FOCUSED_WINDOW, javax.swing.KeyStroke.getKeyStroke("control R"), "refresh-control", refreshAction);
         SwingUsability.bind(this, WHEN_IN_FOCUSED_WINDOW, javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_N, SwingUsability.menuMask()), "create", createAction);
         SwingUsability.bind(this, WHEN_IN_FOCUSED_WINDOW, javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_F, java.awt.event.InputEvent.CTRL_DOWN_MASK), "find", SwingUsability.action("Find", browser::focusSearch));
-        create.setMnemonic('N'); changePassword.setMnemonic('P');
+        create.setMnemonic('N');
         create.setToolTipText("Add TOTP (menu shortcut + N)");
         status.getAccessibleContext().setAccessibleDescription("Vault reading status");
         progress.getAccessibleContext().setAccessibleName("Vault reading progress");
@@ -89,7 +88,7 @@ public final class VaultPanel extends JPanel {
         JMenu vault = new JMenu("Vault"); vault.setMnemonic('V');
         changeVault.setMnemonic('V');
         JMenuItem refresh = new JMenuItem(refreshAction); refresh.setAccelerator(javax.swing.KeyStroke.getKeyStroke("control R"));
-        vault.add(changeVault); vault.add(lock); vault.add(refresh); vault.add(changePassword); vault.add(about); bar.add(vault);
+        vault.add(changeVault); vault.add(lock); vault.add(refresh); vault.add(about); bar.add(vault);
         JMenu token = new JMenu("Token"); token.setMnemonic('T');
         JMenuItem add = new JMenuItem(createAction); add.setText("Add…"); add.setAccelerator(javax.swing.KeyStroke.getKeyStroke("control N")); token.add(add);
         token.add(browser.editMenu); token.add(browser.deleteMenu); token.add(browser.diagnosticsMenu); bar.add(token);
@@ -115,9 +114,6 @@ public final class VaultPanel extends JPanel {
     public boolean changesAvailable() { return writeAvailable && observed; }
     public String diagnosticSummary() { return observationWarning.isEmpty() ? "No observation problems reported" : observationWarning; }
 
-    public void passwordAction(Runnable action) {
-        Edt.require(); changePassword.addActionListener(event -> action.run());
-    }
     public void mergeAction(VaultView.MergeAction action) { browser.onMerge(action); }
     public void tokenActions(Runnable action, VaultView.EditAction edit) {
         Edt.require(); createCallback = action; browser.onEdit(edit);
@@ -125,11 +121,6 @@ public final class VaultPanel extends JPanel {
     public void deleteAction(VaultView.EditAction delete) { browser.onDelete(delete); }
     public void writeAvailability(boolean available) {
         Edt.require(); writeAvailable = available;
-        changePassword.setEnabled(available && observed);
-        String explanation = available ? "Change the password protecting this vault."
-                : "Changes are unavailable while another change is in progress or the vault session is closing.";
-        changePassword.setToolTipText(explanation);
-        changePassword.getAccessibleContext().setAccessibleDescription(explanation);
         createAction.putValue(javax.swing.Action.SHORT_DESCRIPTION, available ? "Add TOTP (menu shortcut + N)"
                 : "Changes are unavailable while another change is in progress or the vault session is closing.");
         create.getAccessibleContext().setAccessibleDescription((String) createAction.getValue(javax.swing.Action.SHORT_DESCRIPTION));
@@ -140,7 +131,6 @@ public final class VaultPanel extends JPanel {
         operationWarning = ""; updateNotification();
         String statusText = switch (text) {
             case "Publishing original merge resolution…" -> "Saving…";
-            case "Vault password change acknowledged." -> "Vault password changed.";
             case "Original merge resolution publication acknowledged.", "Merge publication acknowledged.",
                     "Token publication acknowledged.", "Token update publication acknowledged." -> "Saved.";
             default -> "";
@@ -209,7 +199,7 @@ public final class VaultPanel extends JPanel {
     public void render(VaultState state) {
         Edt.require();
         observed = true;
-        createAction.setEnabled(writeAvailable); changePassword.setEnabled(writeAvailable);
+        createAction.setEnabled(writeAvailable);
         ObservationProgress observation = state.observation();
         if (observation instanceof ObservationProgress.Enumerating) {
             status.setText("Reading vault…");

@@ -19,20 +19,15 @@ import static org.totipo.desktop.TokenWriteControllerTest.*;
 class OwnedFlowLockTest {
     private static final class View extends Window {
         Runnable add;
-        Runnable password;
         EditAction edit;
         MergeAction resolve;
         TokenManagementPanel token;
         MergeEditorPanel merge;
-        PasswordChangePanel passwords;
         @Override public void tokenActions(Runnable add, EditAction edit) { this.add = add; this.edit = edit; }
         @Override public void mergeAction(MergeAction action) { resolve = action; }
-        @Override public void passwordAction(Runnable action) { password = action; }
         @Override public void manageToken(TokenManagementPanel panel) { token = panel; }
         @Override public void editMerge(MergeEditorPanel panel) { merge = panel; }
-        @Override public void editPassword(PasswordChangePanel panel) { passwords = panel; }
         @Override public void retireEditor() { token = null; merge = null; }
-        @Override public void retirePassword() { passwords = null; }
     }
     private void retire(String kind, boolean shortcut) throws Exception {
         Shell shell = new Shell(); View view = new View(); Session session = new Session();
@@ -50,7 +45,6 @@ class OwnedFlowLockTest {
                     case "add", "manual", "manual-duplicate", "manual-replacement" -> view.add.run();
                     case "edit", "setup", "delete" -> view.edit.open(fixture.state, fixture.token.alternatives().getFirst(), "Edit");
                     case "resolve", "resolve-details" -> view.resolve.open(fixture.state, fixture.token);
-                    case "password" -> view.password.run();
                     default -> throw new AssertionError();
                 }
                 if (kind.startsWith("manual")) {
@@ -80,7 +74,7 @@ class OwnedFlowLockTest {
                 }
                 if (kind.equals("delete")) { button(view.token, "Delete TOTP…").doClick(0); }
                 if (kind.equals("resolve-details")) { button(view.merge, "Combine details…").doClick(0); }
-                JPanel form = view.token != null ? view.token : view.merge != null ? view.merge : view.passwords;
+                JPanel form = view.token != null ? view.token : view.merge;
                 assertNotNull(form);
                 var secrets = components(form).stream().filter(JPasswordField.class::isInstance).map(JPasswordField.class::cast).toList();
                 secrets.forEach(field -> field.setText("temporary secret"));
@@ -88,7 +82,7 @@ class OwnedFlowLockTest {
                     app.userEvent(new KeyEvent(form, KeyEvent.KEY_PRESSED, 0, InputEvent.CTRL_DOWN_MASK, KeyEvent.VK_L, 'l'));
                 } else { shell.lock.run(); }
                 assertEquals(ShellState.LOCKED, app.state());
-                assertNull(view.token); assertNull(view.merge); assertNull(view.passwords);
+                assertNull(view.token); assertNull(view.merge);
                 secrets.forEach(field -> assertEquals(0, field.getDocument().getLength()));
                 assertTrue(view.closing);
             });
@@ -110,8 +104,6 @@ class OwnedFlowLockTest {
     @Test void lockRetiresDetailedResolver() throws Exception { retire("resolve-details", false); }
     @Test void ctrlLRetiresDetailedResolver() throws Exception { retire("resolve-details", true); }
     @Test void ctrlLRetiresResolver() throws Exception { retire("resolve", true); }
-    @Test void lockRetiresPasswordChangeAndClearsAllFields() throws Exception { retire("password", false); }
-    @Test void ctrlLRetiresPasswordChange() throws Exception { retire("password", true); }
     @Test void latePublicationAfterLockCannotRestoreSessionOrEditor() throws Exception {
         Shell shell = new Shell(); View view = new View(); Session session = new Session();
         var recording = new TokenWritesTest.Recording(); recording.release = new CountDownLatch(1);

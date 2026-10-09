@@ -45,10 +45,6 @@ final class TaskDialogSizing {
         fit(dialog, content, content.preferredTaskWidth(), content::taskSize);
     }
 
-    static void fit(JDialog dialog, PasswordChangePanel content) {
-        fit(dialog, content, content.preferredTaskWidth(), content::taskSize);
-    }
-
     static void fit(JDialog dialog, AboutVaultPanel content) {
         fit(dialog, content, content.preferredTaskWidth(), content::taskSize);
     }

@@ -18,6 +18,11 @@ let
   # Match the actual locked modules so a future dependency update also fails closed.
   totipoLocks = builtins.filter (line: lib.hasPrefix "org.totipo:" line)
     (lib.splitString "\n" (builtins.readFile ./gradle.lockfile));
+  totipoJars = builtins.map
+    (line:
+      let coordinate = lib.splitString ":" (builtins.head (lib.splitString "=" line));
+      in "${builtins.elemAt coordinate 1}-${builtins.elemAt coordinate 2}.jar")
+    totipoLocks;
   cacheReady = builtins.length totipoLocks == 2 && builtins.all
     (line:
       let
@@ -122,8 +127,7 @@ stdenv.mkDerivation (finalAttrs: {
     grep -F -- '-XX:+DisableAttachMechanism' "$out/lib/totipo-desktop/bin/totipo-desktop-unwrapped"
     test "$(find "$out/lib/totipo-desktop/lib" -type f -name '*.jar' | wc -l)" -eq 4
     test -f "$out/lib/totipo-desktop/lib/totipo-desktop-${version}.jar"
-    test -f "$out/lib/totipo-desktop/lib/totipo-storage-nio-0.1.3.jar"
-    test -f "$out/lib/totipo-desktop/lib/totipo-core-0.1.3.jar"
+    ${lib.concatMapStringsSep "\n" (jar: ''test -f "$out/lib/totipo-desktop/lib/${jar}"'') totipoJars}
     test -f "$out/lib/totipo-desktop/lib/bcprov-jdk18on-1.86.jar"
     for jar in build/install/totipo-desktop/lib/*.jar; do
       cmp "$jar" "$out/lib/totipo-desktop/lib/$(basename "$jar")"

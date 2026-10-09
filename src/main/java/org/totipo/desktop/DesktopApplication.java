@@ -171,6 +171,11 @@ public final class DesktopApplication {
                 title = "Vault already exists"; text = "A vault already exists here. Nothing was overwritten. Select it to open it.";
             } else if (create instanceof CreateVaultResult.Uncertain) {
                 title = "Creation uncertain"; text = "Creation may have succeeded. Do not blindly retry creation. Select the vault to open it.";
+            } else if (create instanceof CreateVaultResult.Failed failed
+                    && failed.reason() == CreateVaultResult.FailureReason.OBJECT_DATA_OBSERVED) {
+                title = "Cannot create vault here";
+                text = "This folder contains Totipo object data but no usable vault bootstrap. "
+                        + "Totipo will not create a new vault here. Check synchronization or recovery, or choose another folder.";
             } else { title = "Creation failed"; text = "Creation failed. It was not retried."; }
             try { shell.message(title, text); } finally { finishOperation(); }
             return;
@@ -279,7 +284,7 @@ public final class DesktopApplication {
         inactivity.retired(); timer.stop();
         if (!owner.closeSucceeded()) { shutdown(); }
         if (state == ShellState.UNLOCKED) {
-            state = notice.isEmpty() || owner.reopenRequired() ? ShellState.LOCKED : ShellState.BLOCKING_VAULT_STATE;
+            state = notice.isEmpty() ? ShellState.LOCKED : ShellState.BLOCKING_VAULT_STATE;
         }
         boolean choose = chooseAfterClose; chooseAfterClose = false;
         if (choose && !shuttingDown) { choose(false); }

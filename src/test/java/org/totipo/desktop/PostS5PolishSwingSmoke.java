@@ -294,7 +294,6 @@ public class PostS5PolishSwingSmoke extends S5SwingSmoke {
             polishCapture(mode.equals("Setup URI") ? "add-uri-return" : "add-manual", task);
         }
         key(KeyEvent.VK_ESCAPE); closed();
-        menu("Change Vault Password…"); polishCapture("change-password", uncheckedDialog()); key(KeyEvent.VK_ESCAPE); closed();
         open(true); polishCapture("conflict-simple", uncheckedDialog()); click("Combine details…");
         JPasswordField custom = edt(() -> all(uncheckedDialog()).stream().filter(JPasswordField.class::isInstance).map(JPasswordField.class::cast).findFirst().orElseThrow());
         edt(() -> { custom.scrollRectToVisible(custom.getBounds()); custom.requestFocusInWindow(); });

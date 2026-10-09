@@ -6,22 +6,31 @@ is made. PASS below applies only to the named check and exact tested environment
 Build success, headless component tests and source inspection are not native GUI
 or clipboard qualification.
 
-The previously recorded filesystem qualification used the old source-consumed
-Java implementation. Released Java 0.1.3 targets v1/r18 with unchanged portable semantics;
-the M4b dependency repin and headless tests do not constitute new filesystem qualification.
-Rerun the harness against a candidate package during later release qualification.
-Prior Nix build evidence below predates the released-dependency migration; the
-0.1.1 dependency cache passed human-operated regeneration and diff review;
-human-operated x86_64-linux flake check/build/rebuild passed. Supplied package/JAR
-inventory and hash review passed. The operator reported successful packaged
-launch and a quick smoke test; this does not complete the native GUI, clipboard
-or accessibility qualification checklists.
-See [the M4b repin report](review/M4B_TOTIPO_JAVA_0_1_1_R18_REPIN_REPORT.md) for
-historical source/build/package evidence. The current 0.1.3 pin is recorded in the
-S4 report; it does not establish new native qualification.
+Current dependency: released Java 0.2.0 / Totipo Vault Format v1/r19.
+Historical filesystem and native/package evidence below is not a PASS for this
+repin. Human Nix cache regeneration and artifact-hash review passed. The operator
+reports that `nix flake check path:.`, `nix build path:.` and
+`nix build --rebuild path:.` all passed for this uncommitted 0.2.0/r19 build.
+Detailed operator environment and logs were not supplied; this establishes no
+native GUI/clipboard/accessibility qualification, which remains UNQUALIFIED.
+The password-change GUI checklist item and the
+password-change/fingerprint filesystem harness steps were removed because that
+flow no longer exists; this is a reduced matrix, not new evidence.
+
+The operator subsequently reported a successful smoke test of the reconciled
+build. Individual checklist results, artifact identity and native environment
+details were not supplied. This is positive smoke-test evidence; the full native
+qualification matrix and release status remain unchanged.
+
+The earlier 0.1.1 package evidence is in
+[the M4b report](review/M4B_TOTIPO_JAVA_0_1_1_R18_REPIN_REPORT.md); the earlier
+0.1.3 evidence is in [the S4 report](review/S4_CONFLICT_RESOLUTION_REPORT.md).
+Those reports remain historical. Current automated evidence is in
+[the r19 reconciliation report](review/JAVA_0_2_0_R19_DESKTOP_RECONCILIATION_REPORT.md).
 
 | OS/distribution | Architecture | Desktop/window manager | Java runtime | Filesystem | Route | GUI smoke | Clipboard smoke | Filesystem qualification | Result/date | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Linux 6.18.53; isolated development environment, distribution not exposed | amd64 | None available | Nix OpenJDK 25.0.4.1+1; java.vendor=N/A | ext4; POSIX=true | Explicit Gradle filesystem harness, Java 0.2.0 / r19; desktop 0.0.0-dev; uncommitted reconciliation based on 82ca7a2c4964ffb64676834b18b9ade3b484605b | UNQUALIFIED | UNQUALIFIED | PASS | Filesystem-only PASS, 2026-10-09T19:18:39Z | Reduced create/reopen/token/update/conflict/merge/TOTP harness and cleanup passed; no credential-change or identity checks; applies only to this test filesystem/environment; root path omitted |
 | Linux 6.18.53; isolated development environment, distribution not exposed (/etc/os-release absent) | amd64 | None available | Nix OpenJDK 25.0.4.1+1; java.vendor=N/A | ext4; POSIX=true | Explicit Gradle filesystem harness | UNQUALIFIED | UNQUALIFIED | PASS | Filesystem-only PASS, 2026-10-01T14:57:54Z | Create/reopen/token/update/conflict/merge/password rewrap/TOTP/root stability and cleanup passed; root path intentionally omitted |
 | Same isolated Linux environment | amd64 | None available | OpenJDK 25.0.4.1+1 | ext4 | Generic installDist/ZIP/TAR | UNQUALIFIED | UNQUALIFIED | See harness row; not a GUI path test | NOT QUALIFIED, 2026-10-01 | Build/content/bytecode verification is separate from native qualification |
 | Linux target, operator build environment not fully recorded | UNQUALIFIED | UNQUALIFIED | Pinned full jdk25 | UNQUALIFIED | Nix package | UNQUALIFIED | UNQUALIFIED | UNQUALIFIED | NOT QUALIFIED | Operator reports successful cache/package workflow after source-filter, UTF-8 locale and category-check fixes; native qualification and exact forced-rebuild comparison not recorded |

@@ -1,12 +1,13 @@
 # Desktop architecture
 
-M3a adds explicit vault-password change with session retirement on STALE/UNCERTAIN.
+VAULT is immutable and create-once under v1/r19. Desktop has no in-place
+credential-change action.
 M2b added explicit field-oriented merge and frozen-resolution decisions to M2a
 manual token create/update and explicit publication retry/abandonment, building on
 M1a session/window lifecycle, observation/diagnostics and refresh, and M1b
 logical-token/TOTP browsing. The single-project Swing application consumes
-released Maven modules: desktop -> `org.totipo:totipo-storage-nio:0.1.3` ->
-`org.totipo:totipo-core:0.1.3`. Desktop does not build Java core/storage from
+released Maven modules: desktop -> `org.totipo:totipo-storage-nio:0.2.0` ->
+`org.totipo:totipo-core:0.2.0`. Desktop does not build Java core/storage from
 source. `org.totipo.storage.nio.NioTotipo` remains the filesystem entry point;
 `VaultSession`, `VaultState` and other `org.totipo` application APIs remain the
 core boundary. Desktop never consumes storage SPI or implementation internals.
@@ -27,10 +28,7 @@ TotipoDesktop: invokeLater
             -> one StateSubscriber / states() subscription
             -> one serialized session executor
             -> at most the latest immutable VaultState reference
-            -> one MutationGate shared by token writes and password change
-            -> one PasswordChangeController / modeless PasswordChangeDialog
-                 -> PasswordChangePanel, with three transient password fields
-                 -> one task-owned PasswordChangeSubmission after validation
+            -> one MutationGate for token writes and publication decisions
             -> one TokenWriteController (create/update OR merge OR capability decision)
                  -> desktop TokenManagementPanel / owned modeless task dialog
                  -> captured base/alternative for an open editor
@@ -58,19 +56,15 @@ The package-private `VaultAccess` seam has only `open(Path, char[])` and
 substitute lifecycle outcomes without KDF or filesystem work. No protocol or
 storage-provider behavior is reproduced in this seam.
 
-The high-level `NioTotipo.create` result exposes no pre-creation orphan context.
-Java exposes that context only through the experimental `NioTotipoStore`/storage
-SPI. Adding provider observation, ownership and asynchronous confirmation to this
-seam would extend the current architecture; it is deferred for human review.
-Desktop currently does not observe `objects-v1` names before creation and therefore
-does not provide the recommended observation-triggered orphan warning. Names are
-unauthenticated and must never become an automatic creation veto. README creation
-guidance is not a claim that this safeguard is implemented.
+The high-level `NioTotipo.create` result owns creation safety. Desktop maps
+`CreateVaultResult.Failed.reason() == OBJECT_DATA_OBSERVED` to a refusal message
+with synchronization/recovery or alternate-folder guidance. It performs no
+independent object-name scan and offers no override. Observed names establish
+neither authentication, intended identity nor recoverability.
 
 Each controller owns a separate single-thread executor named `totipo-session-N`.
 It runs token builder factory/setters/save/close, publication retry/capability
-cleanup, password change, and session close. Blocking open, create, password change
-and close never run on the EDT.
+cleanup and session close. Blocking open, create and close never run on the EDT.
 Executors are explicitly shut down; no shutdown interrupts an in-flight operation.
 The application uses neither SwingWorker nor virtual threads nor reactive libraries.
 Production code remains compatible with Java 17.
@@ -227,7 +221,7 @@ notification still overlays that same result area. Conflict header padding is
 balanced above/below its vertically centered title and Resolve control; its
 semantic edge, children and resolver callbacks are preserved.
 Design v0.8 defines no inferred global Read-only state or Open Read-Only mode.
-Java 0.1.3 exposes no global storage access capability; desktop does not probe
+Java 0.2.0 exposes no global storage access capability; desktop does not probe
 permissions or infer one from operation failures. The single MutationGate owns
 workflow/session availability, including reservation and retirement. A future
 explicit read-only session/capability requires separate product design.
@@ -324,7 +318,7 @@ saved identity. Delete uses the target's descriptor with TOMBSTONED status and n
 secret ingress. No desktop protocol persistence is implemented.
 
 `SetupUri` is a small TOTP-only application ingress parser because the consumed
-published Java 0.1.3 JAR has no enrollment parser. It rejects HOTP, malformed URIs,
+published Java 0.2.0 JAR has no enrollment parser. It rejects HOTP, malformed URIs,
 ambiguous/repeated or unsupported parameters, issuer disagreement, invalid Base32,
 unsupported algorithms/digits, and out-of-domain periods. URI secrets use strict
 Base32. `SetupValidation` applies Java's identity UTF-8 limits and setup bounds;
@@ -501,90 +495,19 @@ Builder cleanup never overwrites an affirmed publication result. There is no ext
 executor, filesystem watcher, protocol/storage manipulation or synchronization path.
 
 
-## Explicit password-wrapper change (M3a)
+## Create-only credentials and write admission
 
-The unlocked vault content offers **Change Vault Password…**. Rewrap
-retains the root and does not rewrite TOKEN objects. There is no fingerprint UI,
-fingerprint authorization, token rewrite, secret rotation, password caching, or
-password recovery subsystem. Only public `VaultSession.changePassword` is invoked.
+The canonical VAULT is immutable. Password, KDF and root changes require creating
+a new vault. Migration/cross-vault copy is future product work; no flow or
+placeholder is offered here. Production code has no fingerprint or VaultId binding
+use, so it introduces no identity plumbing or user-facing identifier.
 
-`MutationGate` is a small EDT-owned per-window reservation. `TokenWriteController`
-keeps its existing token semantics and owns the reservation throughout Create,
-Update, Resolve, AdditionalConflict review, and publication retry/stop cleanup.
-`PasswordChangeController` acquires the same reservation before opening its modeless
-form, retaining it throughout submitted work and editable definite failures. The
-gate disables Create/Edit/Resolve/Change Password and rejects stale callbacks as
-well as clicks. A sticky abandoned token-publication notice owns no capability and
-therefore reserves no slot. Password handling never clears that notice.
-
-`PasswordChangePanel` is independently constructible headlessly. The owned
-`PasswordChangeDialog` only supplies the Swing window and forwards close to Cancel
-when cancellation is allowed. The form uses three `JPasswordField`s, calls only
-`getPassword`, and never converts passwords to Strings. `PasswordChangeSubmission`
-reuses `PasswordInput` for current and new arrays: valid UTF-16 and at most 1024
-UTF-8 bytes. Empty and identical passwords are allowed; the UI requires explicit
-Change Password Anyway confirmation for an empty replacement. Design v0.8 requires
-current-password reauthentication even in an unlocked session. The form collects
-Current password, New password and Confirm new password; Java 0.1.3 supplies the
-aligned public changePassword(current, new) API. No unlock password is cached. It compares new and
-confirmation arrays directly and wipes confirmation immediately after comparison
-(or on validation rejection). Rejection wipes current/new too. The panel clears
-all three documents before disabling controls and invoking the submission callback.
-Cancel or vault close clears unsent documents and constructs no operation.
-The concise form explains retained copies, validates on activation, focuses the
-first problem, and uses one outer scroller with a separate footer. Its owned window
-is titled Change Vault Password. STALE/UNCERTAIN retire to LOCKED with the operation
-notice, rather than classifying the vault itself as invalid or blocking.
-
-One submission owns the two remaining caller arrays exclusively. It travels only
-to one task on the existing `totipo-session-N` executor, never into application,
-window, state presentation, preferences or recovery state. The blocking call is
-inside `try/finally`; both arrays are overwritten and references dropped on every
-return or exception. Rejected scheduling also wipes the submission. This is
-best-effort caller-buffer hygiene, not secure JVM erasure. There is no new executor,
-SwingWorker, polling, or second subscription. State rendering, selection, Refresh
-and TOTP continue independently while the form or operation is active.
-
-| Password result | Desktop handling |
-| --- | --- |
-| CHANGED | Record positive wrapper acknowledgement, retire form, release reservation, acknowledge concisely. Same session stays open. No browser mutation, token refresh, or reopen. |
-| AUTHENTICATION_FAILED | Explain authentication of observed vault data did not succeed and does not prove mistyping; this attempt did not change the password. Keep session and form, enable fresh explicit entry. |
-| FAILED | Explain definite required observation/staging failure and non-change by this attempt. Keep session and form, enable fresh explicit entry. No uncertainty inferred. |
-| STALE | Explain authenticated root/canonical BASE changed before replacement, which this attempt did not perform. Immediately retire the current session as an unacceptable basis for continued work; require explicit reopen. No either-password claim. |
-| UNCERTAIN | Explain replacement lacked durable acknowledgement and either password may be canonical. Immediately retire session and require explicit reopen/re-observation. No retry handle, automatic retry, rollback, or password preference. |
-
-Password UNCERTAIN is distinct from TOKEN `PublicationUncertain`, `PartialResolution`,
-and `PublicationRetry`. It has no frozen token publication bytes or exact-publication
-retry. The shared gate prevents overlap with live token capabilities; token sticky
-history neither blocks rewrap nor becomes evidence about its outcome.
-
-An unexpected RuntimeException produces no fabricated PasswordChangeResult. The
-controller records the absence of a typed result separately, wipes input, and
-conservatively retires with a generic redacted message explaining that no outcome
-can be inferred. It catches neither Throwable nor Error. SessionClosedException
-uses the ordinary close lifecycle without a fresh password-error workflow. Typed
-result knowledge is recorded before presentation cleanup; a later UI exception
-cannot reclassify it. Cleanup errors are handled separately and redacted.
-
-STALE/UNCERTAIN retirement immediately marks the window closing on EDT, disables
-actions, clears the form, cancels state presentation and stops TOTP through the
-existing close path. Session close is queued on the session executor. After close
-and content retirement, `DesktopApplication` presents the reopen-required explanation
-in LOCKED, unless shutdown has begun. No interactive stale session
-remains while it is read. There is no automatic Open. An explicit Open creates an ordinary new
-session with no old state, heads, alternatives, partial/retry handles or password
-arrays carried into it.
-
-Window close and application shutdown mark closing immediately, clear unsent
-forms, discard/wipe any still-queued password submission, and queue cleanup/close
-behind a password call that has already started. They never
-interrupt KDF/replacement or wait on EDT. Every eventual typed result retains its
-meaning internally, including CHANGED, but late delivery cannot restore controls,
-reopen the form or show normal success/error UI. STALE/UNCERTAIN close remains
-idempotent. Application shutdown waits for existing controller completion and
-suppresses post-close password messages. Presentation cleanup failure cannot
-prevent queued session close or stop shutdown of other windows.
-
+`MutationGate` remains a small EDT-owned per-window reservation.
+`TokenWriteController` owns it throughout Add, Edit, Delete, Resolve, conflict
+review and publication retry/stop cleanup. The gate rejects overlapping callbacks
+and disables write entry points. A sticky abandoned-publication notice owns no
+capability and reserves no slot. Ordinary token publication uncertainty and
+serialized session cleanup retain their existing behavior.
 
 ## Presentation usability (M3b)
 
@@ -714,7 +637,7 @@ and blocking states. Blocking Details opens the same safe secondary surface.
 Only display name, normalized location, high-level state, the explicit absence of
 an API write-access signal, and a bounded observation/open notice are shown.
 The public API supplies no format/version metadata; no value is fabricated.
-Values are enabled, selectable, read-only text. No session, fingerprint, token,
+Values are enabled, selectable, read-only text. No session, token,
 secret group, Head, password or code object is supplied to that panel.
 
 Shared RadioChoice styling uses ordinary JRadioButton/BasicRadioButtonUI and

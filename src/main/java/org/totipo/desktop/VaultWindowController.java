@@ -19,11 +19,9 @@ final class VaultWindowController {
     private final ExecutorService executor;
     private final StateSubscriber subscriber;
     private final TokenWriteController writes;
-    private final PasswordChangeController passwords;
     private final MutationGate gate;
     private final Consumer<String> retirementMessage;
     private String retirementReason;
-    private boolean reopenRequired;
     private VaultState latest;
     private boolean closing;
     private boolean closeSucceeded;
@@ -53,9 +51,6 @@ final class VaultWindowController {
         executor = Executors.newSingleThreadExecutor(task -> new Thread(task, "totipo-session-" + number));
         gate = new MutationGate(view::writeAvailability);
         writes = new TokenWriteController(executor, view, this::close, gate);
-        passwords = new PasswordChangeController(session, executor, view, gate, reason -> {
-            if (!closing) { retirementReason = reason; reopenRequired = true; close(); }
-        });
         subscriber = new StateSubscriber(this::render, () -> close(true), this::close);
     }
 
@@ -83,7 +78,6 @@ final class VaultWindowController {
                     "A new Create makes a distinct token; it is not a retry of an earlier uncertain publication."), writes::open);
             view.deleteAction(writes::openDelete);
             view.mergeAction(writes::openMerge);
-            view.passwordAction(passwords::open);
             view.showWindow();
             session.states().subscribe(subscriber);
         } catch (RuntimeException unexpected) {
@@ -128,11 +122,8 @@ final class VaultWindowController {
         try {
             if (clipboard != null) { clipboard.originClosing(clipboardOrigin); }
             gate.closing();
-            try { passwords.closing(); }
-            finally {
-                try { writes.closing(); }
-                finally { view.closing(); }
-            }
+            try { writes.closing(); }
+            finally { view.closing(); }
         } catch (RuntimeException cleanupFailure) {
             // Presentation cleanup must not prevent this or other application sessions closing.
             System.err.println("Totipo: session presentation cleanup failure (details redacted).");
@@ -177,8 +168,6 @@ final class VaultWindowController {
             });
         }
     }
-
-    boolean reopenRequired() { Edt.require(); return reopenRequired; }
 
     boolean executorShutdown() {
         return executor.isShutdown();

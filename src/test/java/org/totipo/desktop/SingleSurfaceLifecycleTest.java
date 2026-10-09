@@ -225,7 +225,7 @@ class SingleSurfaceLifecycleTest {
         }
     }
     @Test void longLivedLifecycleFieldsContainNoRawPasswordArrays() {
-        for (Class<?> type : List.of(DesktopApplication.class, VaultWindowController.class, PasswordChangeController.class, JdkVaultPreferences.class)) {
+        for (Class<?> type : List.of(DesktopApplication.class, VaultWindowController.class, JdkVaultPreferences.class)) {
             for (var field : type.getDeclaredFields()) { assertNotEquals(char[].class, field.getType(), field.toString()); }
         }
     }
