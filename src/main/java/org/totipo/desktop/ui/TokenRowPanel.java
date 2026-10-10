@@ -21,10 +21,10 @@ final class TokenRowPanel extends JPanel {
     final JLabel primary;
     final JLabel account;
     final JPanel grid = transparent(new GridBagLayout());
-    final JPanel identityTop = transparent(new BorderLayout());
-    final JPanel identityBottom = transparent(new BorderLayout(DesktopStyle.TIGHT, 0));
-    final JPanel statusTop = transparent(new BorderLayout());
-    final JPanel statusBottom = transparent(new BorderLayout());
+    final JPanel identityTop = lineCell(true);
+    final JPanel identityBottom = lineCell(true);
+    final JPanel statusTop = lineCell(false);
+    final JPanel statusBottom = lineCell(false);
     final JPanel actionTop = transparent(new BorderLayout());
     private final JPanel expanded = transparent(null);
     private final transient List<Outcome> outcomes = new ArrayList<>();
@@ -39,6 +39,20 @@ final class TokenRowPanel extends JPanel {
     private transient java.time.Instant copiedUntil;
     private final Timer feedbackTimer = new Timer(2500, e -> feedbackTick());
     private boolean keyboardFocus;
+    private int lineHeight;
+
+    private JPanel lineCell(boolean identity) {
+        JPanel panel = new JPanel(new BorderLayout()) {
+            private static final long serialVersionUID = 1L;
+            @Override public Dimension getPreferredSize() {
+                return new Dimension(super.getPreferredSize().width, lineHeight);
+            }
+            @Override public Dimension getMinimumSize() {
+                return new Dimension(identity ? 0 : getPreferredSize().width, lineHeight);
+            }
+        };
+        panel.setOpaque(false); return panel;
+    }
 
     private static JPanel transparent(LayoutManager layout) {
         JPanel panel = new JPanel(layout); panel.setOpaque(false); return panel;
@@ -67,7 +81,7 @@ final class TokenRowPanel extends JPanel {
             }
         });
         putClientProperty("totipo.rowPresentation", "divider");
-        primary = literal(TokenPresentation.primary(token)); account = literal(TokenPresentation.account(token));
+        primary = new ElidingLabel(TokenPresentation.primary(token)); account = new ElidingLabel(TokenPresentation.account(token));
         if (alternative != null) {
             var descriptor = alternative.descriptor();
             primary.setText(TokenPresentation.primary(descriptor));
@@ -90,19 +104,14 @@ final class TokenRowPanel extends JPanel {
             public void popupMenuCanceled(javax.swing.event.PopupMenuEvent e) { }
         });
         JLabel sample = codeLabel();
-        int middleWidth = Math.max(sample.getFontMetrics(sample.getFont()).stringWidth("8888 8888"),
-                sample.getFontMetrics(sample.getFont()).stringWidth("Updating…"));
-        long period = token.alternatives().stream().mapToLong(a -> a.descriptor().period().getSeconds()).max().orElse(0);
-        middleWidth = Math.max(middleWidth, account.getFontMetrics(account.getFont()).stringWidth(period + " sec")
-                + new CountdownRing().getPreferredSize().width + DesktopStyle.NORMAL);
-        int lineHeight = Math.max(primary.getPreferredSize().height,
-                Math.max(sample.getPreferredSize().height, new CountdownRing().getPreferredSize().height));
-        int actionWidth = show.getPreferredSize().width;
-        addCell(identityTop, 0, 0, 1, 0, lineHeight);
-        addCell(identityBottom, 0, 1, 1, 0, lineHeight);
-        addCell(statusTop, 1, 0, 0, middleWidth, lineHeight);
-        addCell(statusBottom, 1, 1, 0, middleWidth, lineHeight);
-        addActionCell(actionTop, 2, actionWidth);
+        lineHeight = Math.max(primary.getPreferredSize().height,
+                Math.max(sample.getFontMetrics(sample.getFont()).getHeight(), new CountdownRing().getPreferredSize().height));
+        addCell(identityTop, 0, 0, 1);
+        addCell(identityBottom, 0, 1, 1);
+        addCell(statusTop, 1, 0, 0);
+        addCell(statusBottom, 1, 1, 0);
+        statusTop.setVisible(false); statusBottom.setVisible(false);
+        addActionCell(actionTop, 2);
         add(grid, BorderLayout.NORTH);
         expanded.setLayout(new BoxLayout(expanded, BoxLayout.Y_AXIS)); expanded.setVisible(false); add(expanded, BorderLayout.CENTER);
         show.addActionListener(e -> { if (!retired) { select.run(); reveal.run(); } });
@@ -140,23 +149,17 @@ final class TokenRowPanel extends JPanel {
             cell.setBorder(BorderFactory.createEmptyBorder(0, amount, 0, 0));
         }
     }
-    private void addCell(JPanel cell, int column, int line, double weight, int width, int height) {
-        Dimension preferred = cell.getPreferredSize();
-        cell.setPreferredSize(new Dimension(column == 0 ? preferred.width : width, height));
-        cell.setMinimumSize(new Dimension(width, height));
+    private void addCell(JPanel cell, int column, int line, double weight) {
         GridBagConstraints c = new GridBagConstraints();
         c.gridx = column; c.gridy = line; c.weightx = weight; c.fill = GridBagConstraints.BOTH;
         c.insets = new Insets(line == 0 ? 0 : DesktopStyle.MICRO,
                 column == 0 ? 0 : column == 1 ? DesktopStyle.NORMAL : DesktopStyle.COMPACT, 0, 0);
         grid.add(cell, c);
     }
-    private void addActionCell(JPanel cell, int column, int width) {
+    private void addActionCell(JPanel cell, int column) {
         // Inline commands share the two-line identity height instead of forcing two button heights.
         JPanel holder = transparent(new GridBagLayout());
         GridBagConstraints centered = new GridBagConstraints(); centered.fill = GridBagConstraints.HORIZONTAL; centered.weightx = 1;
-        int height = Math.max(DesktopStyle.INLINE, cell.getPreferredSize().height);
-        cell.setPreferredSize(new Dimension(width, height));
-        cell.setMinimumSize(new Dimension(width, height));
         holder.add(cell, centered);
         GridBagConstraints c = new GridBagConstraints(); c.gridx = column; c.gridy = 0; c.gridheight = 2;
         c.fill = GridBagConstraints.BOTH; c.insets = new Insets(0, column == 2 ? DesktopStyle.COMPACT : DesktopStyle.TIGHT, 0, 0);
@@ -285,7 +288,7 @@ final class TokenRowPanel extends JPanel {
                 actionTop.add(outcome.button, BorderLayout.EAST);
             } else {
                 JPanel line = transparent(new BorderLayout(20, 0));
-                JLabel identity = literal(labels.get(i)); identity.setToolTipText(identity.getText());
+                JLabel identity = new ElidingLabel(labels.get(i));
                 identity.setMinimumSize(new Dimension(0, identity.getPreferredSize().height));
                 JPanel values = transparent(new BorderLayout(20, 0));
                 JPanel status = transparent(new BorderLayout(12, 0));
@@ -327,6 +330,7 @@ final class TokenRowPanel extends JPanel {
         updateAccessible(displays); refresh();
     }
     private void refresh() {
+        statusTop.setVisible(outcomeCount == 1); statusBottom.setVisible(outcomeCount == 1);
         appearance();
         revalidate(); repaint();
     }

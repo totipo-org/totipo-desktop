@@ -173,7 +173,26 @@ complete history, remote synchronization, rollback resistance or absence of conf
 
 Refresh invokes `VaultSession.requestRefresh()` directly on the EDT because the
 API guarantees a non-blocking request. It is disabled during close. There is no
-polling, filesystem watcher, automatic refresh loop or remote sync behavior.
+filesystem polling or remote sync behavior. After successful authenticated session
+startup, the controller owns one `VaultFolderWatcher` daemon thread. It registers
+the vault root and, when it is an ordinary directory, `objects-v1`. Root events
+for `objects-v1` re-evaluate registration; child create/modify/delete events merely
+request observation. The watcher never reads object bytes, interprets object
+names, adopts another VAULT, authors, resolves or retries publication.
+
+WatchService is advisory: providers differ, events can coalesce or be lost, and
+OVERFLOW requests one full ordinary refresh and re-evaluates registration. This
+is not synchronization-completion evidence. A 200 ms burst window uses one pending
+deadline in the blocking notification loop, with at most one queued EDT callback.
+There is no scheduled-task accumulation or filesystem retry loop. An invalid
+objects key is discarded until a later root lifecycle event. Failures degrade
+to manual Vault → Refresh / F5 with sanitized diagnostics.
+
+Delivery calls the existing controller refresh on EDT. Controller identity and
+its closing guard reject stale work; paths are not lifetime authority. Close
+stops the watcher, closes WatchService and clears its controller callback before
+session close. Lock, Change Vault, failures and application/window exit share
+that retirement path. No watcher is started while locked.
 
 ## Lock, close, and shutdown
 
@@ -202,6 +221,12 @@ with 24-pixel outer margins and a modest upward bias in the available height.
 Its basename heading and path are informational labels; the path has no caret,
 focus or input border, and retains its full accessible description and tooltip
 when Swing visually ellipsizes it. Password remains a JPasswordField.
+The locked form and Vault menu share the existing application Create New Vault
+operation. Folder/password cancellation, validation failure, OBJECT_DATA_OBSERVED,
+definite failure and creation uncertainty leave the selected and remembered A
+unchanged. Successful Java creation switches to B and persists B, using the
+existing session-establishment flow. Uncertainty preserves recovery text and
+never deletes a possibly created B. Change Vault keeps its existing-vault chooser.
 NO_VAULT uses the shared `EmptyState`: centered “No vault selected” heading and
 compact centered Select Vault / Create New Vault stack, capped at 280 pixels.
 `SwingUsability.taskActions` supplies the reusable normal task/dialog
@@ -270,7 +295,7 @@ synchronization, or equal causal heads into semantic conflict. No automatic merg
 retry or invented synchronization semantics are introduced.
 
 Sorting, QR/URI import, secret export, keychain, remembered passwords, recent
-history, tray, theming, watchers, remote providers, installers and release publishing
+history, tray, theming, remote providers, installers and release publishing
 remain outside the implemented scope. M3b search/shortcuts and M3c explicit TOTP
 clipboard copying are described below.
 
@@ -492,7 +517,7 @@ The existing `MutationGate` owns the entire resolver/retry session. A queued
 execution. Already executing work can finish, but late UI results are ignored and
 returned retry capabilities are cleaned up on the session executor before closure.
 Builder cleanup never overwrites an affirmed publication result. There is no extra
-executor, filesystem watcher, protocol/storage manipulation or synchronization path.
+executor, additional filesystem watcher, protocol/storage manipulation or synchronization path.
 
 
 ## Create-only credentials and write admission
@@ -647,3 +672,20 @@ semantics and bold selected labels. Disabled action text uses the shared contras
 floor; password fields retain their password delegates with shared focus borders.
 The [S5 report](review/S5_FINAL_CONFORMANCE_REPORT.md) records truthful API granularity,
 the per-item committed Design v0.8 matrix, tests and limited platform qualification.
+
+## Responsive token identity layout
+
+`TokenRowPanel` remains the ordinary and conflict-Alternative row widget. Its
+GridBag identity column has all horizontal weight. Code/timer cells leave layout
+entirely when concealed, and use current child preferred widths when revealed or
+updating. Action holders measure their current natural-width Show Code/Copy/Copied
+button; no largest-label width is reserved. Both identity lines retain a stable
+font-aware height, including complete code glyphs and the countdown ring.
+
+`ElidingLabel` retains full public metadata in its JLabel model and accessible
+name. A cached FontMetrics calculation uses available pixel width, font and full
+text, with binary search over Unicode code point boundaries. Empty text and tiny
+widths are handled without splitting surrogate pairs. Rendering alone uses the
+elided string; literal full metadata appears in a tooltip only when clipped.
+HTML remains disabled for labels and tooltips. Resize and reveal/conceal only
+relayout existing rows; no semantic model or reveal lifetime changes.

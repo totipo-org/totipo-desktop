@@ -257,7 +257,9 @@ class PostS5PolishTest {
                     assertEquals(row.token.hasConflict() ? DesktopStyle.NORMAL - DesktopStyle.SEMANTIC_EDGE : 0, row.identityTop.getInsets().left);
                     row.show.doClick(0); layout(panel);
                     Rectangle copy = SwingUtilities.convertRectangle(row.actionTop.getParent(), row.actionTop.getBounds(), panel.list);
-                    assertEquals(slot, copy); assertFalse(row.show.isVisible()); assertEquals("Copy", TotpCopyTest.buttons(row).get(0).getText());
+                    assertEquals(slot.x + slot.width, copy.x + copy.width);
+                    assertEquals(slot.height, copy.height); assertTrue(copy.width < slot.width);
+                    assertFalse(row.show.isVisible()); assertEquals("Copy", TotpCopyTest.buttons(row).get(0).getText());
                 }
                 JButton resolve = U4ConflictGroupTest.buttons(panel.list, "Resolve").get(0);
                 Rectangle r = SwingUtilities.convertRectangle(resolve.getParent(), resolve.getBounds(), panel.list);
@@ -271,8 +273,11 @@ class PostS5PolishTest {
                 assertSame(content, ((BorderLayout) wrapper.getLayout()).getLayoutComponent(BorderLayout.CENTER));
                 assertEquals(content.getPreferredSize().height + DesktopStyle.BORDER, wrapper.getPreferredSize().height);
                 assertEquals(DesktopStyle.BORDER, divider.getHeight());
-                assertEquals(panel.rows.get(0).show.getPreferredSize().width, r.width);
-                for (TokenRowPanel row : panel.rows) { assertEquals(r.width, TotpCopyTest.buttons(row).get(0).getWidth()); }
+                for (TokenRowPanel row : panel.rows) {
+                    JButton copy = TotpCopyTest.buttons(row).get(0);
+                    assertEquals(copy.getPreferredSize().width, copy.getWidth());
+                    assertTrue(copy.getWidth() < row.show.getPreferredSize().width);
+                }
                 assertEquals(DesktopStyle.ActionRole.SecondaryAction, resolve.getClientProperty("totipo.actionRole"));
                 assertEquals(DesktopStyle.surfaceRaised(), resolve.getBackground());
                 assertEquals(Boolean.TRUE, resolve.getClientProperty("totipo.conflictAction"));
@@ -319,7 +324,7 @@ class PostS5PolishTest {
                         Rectangle r = SwingUtilities.convertRectangle(resolve.getParent(), resolve.getBounds(), panel.list);
                         for (TokenRowPanel child : panel.rows) {
                             Rectangle action = SwingUtilities.convertRectangle(child.show.getParent(), child.show.getBounds(), panel.list);
-                            assertEquals(r.x + r.width, action.x + action.width); assertEquals(r.width, action.width);
+                            assertEquals(r.x + r.width, action.x + action.width);
                         }
                         assertEquals("Resolve", resolve.getAccessibleContext().getAccessibleName());
                     } finally { panel.closing(); }
@@ -407,8 +412,8 @@ class PostS5PolishTest {
                         assertEquals(insets.top, insets.bottom);
                         assertEquals(show.getInsets(), button.getInsets());
                         assertEquals(show.getMargin(), button.getMargin());
-                        assertEquals(show.getPreferredSize(), button.getPreferredSize());
-                        assertEquals(show.getMinimumSize(), button.getMinimumSize());
+                        assertEquals(show.getPreferredSize().height, button.getPreferredSize().height);
+                        assertTrue(copy.getPreferredSize().width < show.getPreferredSize().width);
                         assertEquals(show.getFont(), button.getFont());
                         int textHeight = button.getFontMetrics(button.getFont()).getHeight();
                         assertEquals(0, (button.getPreferredSize().height - textHeight) % 2, "Symmetric whole-unit space around the text box");

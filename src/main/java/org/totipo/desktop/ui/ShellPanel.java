@@ -23,6 +23,7 @@ public final class ShellPanel extends JPanel {
     final JTextArea explanation = new JTextArea();
     final JButton primary = new JButton("Select Vault");
     final JButton secondary = new JButton("Create New Vault…");
+    final JButton createNew = new JButton("Create New Vault…");
     final JPanel task = new JPanel(new GridBagLayout());
     final JPanel actionRow = SwingUsability.taskActions(primary, secondary);
     final EmptyState welcome = new EmptyState(identity, explanation, 480);
@@ -54,6 +55,7 @@ public final class ShellPanel extends JPanel {
         detailsRow.setOpaque(false); detailsRow.add(details);
         DesktopStyle.action(primary, DesktopStyle.ActionRole.PrimaryAction, false);
         DesktopStyle.action(secondary, DesktopStyle.ActionRole.SecondaryAction, false);
+        DesktopStyle.action(createNew, DesktopStyle.ActionRole.QuietAction, false);
         for (JComponent field : new JComponent[] {identity, path, status, passwordLabel, password, error}) {
             field.setMinimumSize(new Dimension(0, field.getPreferredSize().height));
         }
@@ -61,6 +63,7 @@ public final class ShellPanel extends JPanel {
         primary.addActionListener(event -> activate());
         password.addActionListener(event -> activate());
         secondary.addActionListener(event -> { if (state == ShellState.NO_VAULT) { create.run(); } else { select.run(); } });
+        createNew.addActionListener(event -> create.run());
     }
     /** Bound width independently of long identity/path text; sparse tasks sit slightly above center. */
     @Override public void doLayout() {
@@ -94,6 +97,7 @@ public final class ShellPanel extends JPanel {
         }
         if (error.isVisible()) { row = taskLine(explanation, row, 12); }
         row = taskLine(actionRow, row, 24);
+        if (createNew.isVisible()) { row = taskLine(createNew, row, 8); }
         if (details.isVisible()) { taskLine(detailsRow, row, 8); }
         task.revalidate();
     }
@@ -156,6 +160,7 @@ public final class ShellPanel extends JPanel {
             secondary.setMinimumSize(secondary.getPreferredSize());
         }
         primary.setEnabled(!busy); secondary.setEnabled(!busy); password.setEnabled(!busy);
+        createNew.setVisible(next == ShellState.LOCKED); createNew.setEnabled(!busy);
         layoutTask();
         if (getRootPane() != null) { getRootPane().setDefaultButton(primary); }
         revalidate(); repaint();

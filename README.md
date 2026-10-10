@@ -10,11 +10,20 @@ browsing, manual Base32 token creation, and ordinary update of an explicitly
 selected semantic alternative. One application window contains no-vault, locked,
 unlocked, or blocking vault content, with at most one session. Refresh requests local observation.
 
+While OPEN, ordinary changes in the vault's `objects-v1` namespace automatically
+request local refresh. Best-effort JDK filesystem notifications can coalesce or
+lose events; they do not establish synchronization completion. Vault → Refresh
+and F5 remain available. Lock, Change Vault and Exit stop watching.
+
 Selecting a recognizable vault remembers that location immediately, before any
 password succeeds. Startup opens directly to its locked form. A missing or
 non-vault remembered location shows a selection warning. A non-vault selection
 does not replace a previously remembered vault. The full path appears in the
 locked form; the title uses the vault basename.
+The locked form and Vault menu offer Create New Vault using the existing creation
+flow. Cancelling or failing creation preserves the previous remembered vault;
+successful creation opens and remembers the new vault. Uncertain creation keeps
+the previous remembered location and gives recovery advice without deleting data.
 
 Vault → Lock and Ctrl+L (also the platform menu shortcut on macOS) retire owned
 forms without draft confirmation, clear reveal/clipboard ownership, and close the
@@ -38,6 +47,11 @@ The normal collection header is Search / count / Add; Refresh stays in the Vault
 menu and on F5. Empty vaults show a centered Add action; zero search results show
 Clear Search while retaining the normal header. Filtered counts use “M of N.”
 See [the S2.2 report](review/S2_2_SHELL_COLLECTION_REPORT.md).
+
+Token issuer/account text uses the remaining row width and elides by pixel width,
+with full accessible metadata and tooltips for clipped text. Concealed codes
+reserve no code/timer space; revealing adds a compact code/timer and natural-width
+Copy action. Resizing and concealing reclaim identity space without rebuilding rows.
 
 Search filters logical TOTPs by issuer/account only, using case-insensitive
 whitespace-separated AND terms across both fields. A matching conflict Alternative

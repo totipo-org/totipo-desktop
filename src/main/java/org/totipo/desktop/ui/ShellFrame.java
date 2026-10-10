@@ -70,6 +70,8 @@ public final class ShellFrame extends JFrame implements ShellView {
         JMenuItem leave = new JMenuItem("Exit"); leave.addActionListener(event -> exit.run()); file.add(leave);
         JMenuItem change = new JMenuItem("Change Vault…"); change.setEnabled(!busy);
         change.addActionListener(event -> select.run()); vault.add(change);
+        JMenuItem newVault = new JMenuItem("Create New Vault…"); newVault.setEnabled(!busy);
+        newVault.addActionListener(event -> create.run()); vault.add(newVault);
         JMenuItem about = new JMenuItem("About This Vault…"); about.setEnabled(selected != null && !busy);
         about.addActionListener(event -> aboutVault(state == ShellState.LOCKED ? "Locked" : "Cannot safely open", landing.error.getText()));
         vault.add(about);

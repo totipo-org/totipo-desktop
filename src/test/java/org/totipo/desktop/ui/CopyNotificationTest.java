@@ -19,8 +19,8 @@ class CopyNotificationTest {
                 var size = row.getPreferredSize(); var buttonSize = button.getPreferredSize();
                 button.doClick(0);
                 assertSame(row, panel.row(id(1))); assertSame(code, TotpCopyTest.codeLabel(row));
-                assertEquals("Copied", button.getText()); assertEquals(size, row.getPreferredSize());
-                assertEquals(buttonSize, button.getPreferredSize()); assertFalse(panel.copyNotification.isVisible());
+                assertEquals("Copied", button.getText()); assertEquals(size.height, row.getPreferredSize().height);
+                assertEquals(buttonSize.height, button.getPreferredSize().height); assertFalse(panel.copyNotification.isVisible());
                 assertEquals("Copied TOTP code", button.getAccessibleContext().getAccessibleName());
                 assertEquals("Code copied to clipboard", button.getAccessibleContext().getAccessibleDescription());
                 panel.totp.tick(); assertSame(button, TotpCopyTest.buttons(row).get(0)); assertEquals("Copied", button.getText());

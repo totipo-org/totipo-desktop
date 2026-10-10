@@ -22,3 +22,11 @@ Run this with each package route claimed; see PACKAGED_LAUNCH.md.
 - [ ] No EDT freeze during create/open, writes, observation or shutdown.
 
 Do not record passwords, secrets, live TOTP codes or production vault paths.
+
+Focused refresh/create/layout smoke — UNQUALIFIED until human execution:
+
+- [ ] While OPEN, an external synchronized object arrival becomes visible without F5; Vault → Refresh / F5 still works. Notifications do not establish synchronization completion.
+- [ ] Lock stops the old watcher; reopen starts watching again. Change Vault/Exit retire it too.
+- [ ] With remembered vault A locked, Create New Vault is available on the form and Vault menu. Cancel folder/password selection and confirm A remains selected after restart.
+- [ ] Create disposable B from locked A; B opens and is remembered after restart.
+- [ ] Long issuer/account uses available width while concealed; reveal, expiry/conceal, and resize wider/narrower retain complete codes and reachable actions without clipping or overlap. Check a conflict Alternative too.

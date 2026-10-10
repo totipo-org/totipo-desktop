@@ -102,13 +102,15 @@ final class DesktopStyle {
     /** One natural compact action column, including the transient copy-feedback label. */
     static void rowAction(JButton button, boolean conflict) {
         action(button, ActionRole.SecondaryAction, true);
-        int width = 0;
-        for (String label : new String[]{"Show Code", "Copy", "Copied", "Resolve"}) {
-            width = Math.max(width, button.getFontMetrics(button.getFont()).stringWidth(label) + 2 * ROW_BUTTON_PADDING_X);
-        }
         Dimension size = button.getPreferredSize();
-        button.setPreferredSize(new Dimension(width, size.height));
-        button.setMinimumSize(button.getPreferredSize());
+        int height = size.height;
+        button.setPreferredSize(null);
+        button.setMinimumSize(null);
+        button.setMargin(new Insets(0, ROW_BUTTON_PADDING_X, 0, ROW_BUTTON_PADDING_X));
+        // Border padding supplies natural width; preserve only the compact height floor.
+        button.setBorder(new ControlBorder(ActionRole.SecondaryAction,
+                new Insets(Math.max(0, (height - button.getFontMetrics(button.getFont()).getHeight()) / 2),
+                        ROW_BUTTON_PADDING_X, Math.max(0, (height - button.getFontMetrics(button.getFont()).getHeight()) / 2), ROW_BUTTON_PADDING_X)));
         if (conflict) {
             button.setForeground(readable(warning(), button.getBackground(), 4.5));
             button.putClientProperty("totipo.conflictAction", Boolean.TRUE);

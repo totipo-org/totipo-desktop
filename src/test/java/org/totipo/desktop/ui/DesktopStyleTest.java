@@ -224,11 +224,11 @@ class DesktopStyleTest {
                 row.selected(true); assertTrue(outline(row.getBorder(), 1, DesktopStyle.accent()));
                 row.focused(true); assertTrue(outline(row.getBorder(), 2, DesktopStyle.focus()));
                 assertTrue(row.show.isVisible()); row.show.doClick(0);
-                var revealedSize = row.getPreferredSize(); assertEquals(size, revealedSize);
+                var revealedSize = row.getPreferredSize(); assertEquals(size.height, revealedSize.height);
                 TotpCopyTest.buttons(row).get(0).doClick(0); row.selected(false); row.focused(false);
                 assertEquals("Copied", TotpCopyTest.buttons(row).get(0).getText());
                 assertSame(groupBorder, ((JPanel) group).getBorder());
-                assertEquals(insets, row.getInsets()); assertEquals(size, row.getPreferredSize());
+                assertEquals(insets, row.getInsets()); assertEquals(size.height, row.getPreferredSize().height);
                 assertTrue(row.getAccessibleContext().getAccessibleName().contains("conflicting versions"));
                 assertTrue(TotpCopyTest.codeLabel(row).getFont().getSize2D() > row.primary.getFont().getSize2D());
                 assertEquals(Font.PLAIN, row.account.getFont().getStyle());

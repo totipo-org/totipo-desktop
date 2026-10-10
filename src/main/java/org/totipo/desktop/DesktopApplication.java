@@ -162,7 +162,7 @@ public final class DesktopApplication {
             view.quitAction(this::shutdown);
             view.changeVaultAction(() -> { if (controller == owner) { changeVault(); } });
             render();
-            if (owner.start()) { inactivity.unlocked(); events.unlocked(); timer.start(); }
+            if (owner.start()) { owner.watch(selected); inactivity.unlocked(); events.unlocked(); timer.start(); }
             finishOperation(); return;
         }
         if (create != null) {

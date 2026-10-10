@@ -6,6 +6,22 @@ is made. PASS below applies only to the named check and exact tested environment
 Build success, headless component tests and source inspection are not native GUI
 or clipboard qualification.
 
+The refresh/create/layout usability milestone based on `5fb43c2685bc728b259015b268f81881c44d7e95`
+has separate evidence in [its report](review/DESKTOP_REFRESH_CREATE_LAYOUT_POLISH_REPORT.md).
+Its disposable WatchService checks passed on this isolated Linux 6.18.53 amd64
+host with OpenJDK 25.0.4.1+1, on tmpfs and on the workspace's ext4 filesystem.
+Root/objects registration, external create/modify/delete, directory recreation,
+independent NIO publication observation, retirement and daemon-thread shutdown
+were exercised. These are local-filesystem results only. The operator reports
+that the three requested Nix gates passed for this milestone and that the UI
+looks good. The operator subsequently confirmed long-text layout, Create
+cancellation preserving the previous vault, and external Syncthing changes
+appearing, in response to the focused concealed/revealed layout and no-F5 smoke
+request. Focused milestone smoke: PASS (human-reported). Detailed native
+environment, logs and the broader GUI checklist were not supplied.
+The full native qualification matrix remains UNQUALIFIED. VERSION remains
+`0.0.0-dev`, NOT QUALIFIED.
+
 Current dependency: released Java 0.2.0 / Totipo Vault Format v1/r19.
 Historical filesystem and native/package evidence below is not a PASS for this
 repin. Human Nix cache regeneration and artifact-hash review passed. The operator

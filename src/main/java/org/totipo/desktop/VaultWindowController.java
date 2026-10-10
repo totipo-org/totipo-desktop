@@ -27,6 +27,24 @@ final class VaultWindowController {
     private boolean closeSucceeded;
     private final Object clipboardOrigin = new Object();
     private final TotpClipboard clipboard;
+    private VaultFolderWatcher watcher;
+    private boolean started;
+
+    void watch(java.nio.file.Path directory) {
+        watch(directory, (path, callback) -> new VaultFolderWatcher(path, callback, SwingUtilities::invokeLater));
+    }
+    void watch(java.nio.file.Path directory,
+               java.util.function.BiFunction<java.nio.file.Path, Runnable, VaultFolderWatcher> factory) {
+        Edt.require();
+        if (started && !closing && watcher == null) {
+            // This controller is the lifetime identity, never the path. Late delivery
+            // reaches only this owner's guarded refresh, never a replacement session.
+            try { watcher = factory.apply(directory, this::refresh); }
+            catch (RuntimeException unavailable) {
+                System.err.println("Totipo: automatic refresh unavailable; use manual Refresh (details redacted).");
+            }
+        }
+    }
 
     // Ownership transfers on successful construction, before start() touches the view/publisher.
     VaultWindowController(VaultSession session, VaultView view, int number,
@@ -83,7 +101,8 @@ final class VaultWindowController {
         } catch (RuntimeException unexpected) {
             close(true);
         }
-        return !closing;
+        started = !closing;
+        return started;
     }
 
     private void render(VaultState state) {
@@ -116,6 +135,7 @@ final class VaultWindowController {
             return;
         }
         closing = true;
+        if (watcher != null) { watcher.close(); watcher = null; }
         if (failed && retirementReason == null) { retirementReason = "This vault session is unavailable. Try opening it again."; }
         subscriber.cancel();
         latest = null;
