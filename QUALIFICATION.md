@@ -6,6 +6,23 @@ is made. PASS below applies only to the named check and exact tested environment
 Build success, headless component tests and source inspection are not native GUI
 or clipboard qualification.
 
+Normal milestone human Nix gate: `nix flake check path:.` only. Agents do not
+run Nix in this workflow and must not request an additional ordinary `nix build`
+as qualification evidence. `checks.desktop` and `packages.default` are the same
+Linux package derivation: flake checks include its Gradle tests/build,
+distribution/archive verification, install checks and separate wrapper integrity.
+Store reuse is permitted; this does not require a fresh execution of every task.
+`nix build path:.` only materializes that package/creates a local result link.
+`nix build --rebuild path:.` is a separate deliberate release/reproducibility
+spot-check, limited to the tested derivation/builders, never a routine milestone gate.
+This does not qualify native GUI, every filesystem, release publication or
+arbitrary-builder reproducibility. Prior multi-command evidence below records
+historical practice, not current instructions.
+
+The infrastructure milestone's agent checks and human-reported PASS for
+`nix flake check path:.` are recorded in [its report](review/DESKTOP_NIX_CI_UNIFICATION_REPORT.md).
+Remote CI has not run for this change; it requires a later reviewed commit/push.
+
 The refresh/create/layout usability milestone based on `5fb43c2685bc728b259015b268f81881c44d7e95`
 has separate evidence in [its report](review/DESKTOP_REFRESH_CREATE_LAYOUT_POLISH_REPORT.md).
 Its disposable WatchService checks passed on this isolated Linux 6.18.53 amd64

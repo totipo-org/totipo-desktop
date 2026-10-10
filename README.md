@@ -225,20 +225,36 @@ unreleased development state. `./gradlew validateVersion -PreleaseBuild=true`
 intentionally fails until an actual candidate version replaces the sentinel.
 Missing, empty, whitespace-bearing, or unsafe filename versions fail configuration.
 
-### Nix package — human build validation passed
+### Nix package — single normal qualification gate
 
 The flake exposes a Linux-only package using the full pinned `jdk25`, Gradle 9
 and the same `installDist`. Existing dev-shell/jailed-agent inputs remain intact.
 The source is an ordinary repository checkout. Java arrives as released Maven
-artifacts through the dependency cache. After regenerating that cache:
+artifacts through the reviewed dependency cache. The normal human Nix gate is:
 
 ```sh
 nix flake check path:.
-nix build path:.
-nix build --rebuild path:.
-# Separate native qualification uses the installed command:
-./result/bin/totipo-desktop
 ```
+
+`checks.desktop` and `packages.default` reference the same derivation. This gate
+evaluates the flake and realizes the actual desktop package, including its Gradle
+tests, build, distribution/archive verification and install checks. It also
+verifies the wrapper JAR and pinned distribution properties without executing
+the wrapper. Nix can reuse an already qualified store result; this is not a
+forced rebuild. CI uses the pinned Nix environment and this single gate.
+
+`nix build path:.` materializes the default package and creates a local `result`
+link when wanted, for example for `./result/bin/totipo-desktop` native testing.
+It provides no independent build/test result after the same derivation passes
+flake checks and is not an additional qualification gate.
+`nix build --rebuild path:.` is reserved for deliberate release/reproducibility
+spot-checks. Its evidence is limited to the tested derivation/builders, not
+universal reproducibility. Flake checks do not qualify native GUI behavior,
+every filesystem, release publication, or reproducibility across arbitrary builders.
+
+Agents do not run Nix in this workflow. Human routine Nix gate:
+`nix flake check path:.`. Do not request an additional ordinary `nix build`
+as qualification evidence or a forced rebuild for a routine milestone.
 
 The wrapper fixes `JAVA_HOME` to the managed full JDK and supplies launcher shell
 utilities. Runtime use requires neither Gradle, checkout sources nor shell
@@ -248,12 +264,12 @@ installation directories are never vault storage.
 
 The current dependency pin is Java 0.2.0 / v1/r19; BC 1.86 is unchanged.
 Gradle locks and verification hashes track reviewed Maven Central artifacts.
-Human cache regeneration and review passed. The operator reports that
-`nix flake check path:.`, `nix build path:.` and `nix build --rebuild path:.`
-all passed for this pin. Native qualification remains UNQUALIFIED; application
+Human cache regeneration and review passed. Prior human Nix results are recorded
+in the historical r19 reconciliation report; they do not validate this CI change.
+Native qualification remains UNQUALIFIED; application
 release status remains NOT QUALIFIED. See [dependency provenance](TOTIPO_JAVA_DEPENDENCY.md).
 
-From the repository root, generate/refresh using the flake app, which runs the
+Only when dependency inputs change, generate/refresh using the flake app, which runs the
 official Gradle dependency-cache update script for the current system:
 
 ```sh
@@ -273,17 +289,15 @@ set update_script (
 $update_script
 
 nix flake check path:.
-nix build path:.
-nix build --rebuild path:.
 ```
 
-Substitute `aarch64-linux` only when qualifying that system. For this uncommitted
-review, `path:.` includes uncommitted/untracked reconciliation files that Git-based
+Substitute `aarch64-linux` only when qualifying that system. During an uncommitted
+review, `path:.` includes uncommitted/untracked files that Git-based
 flake sources can omit. Do not update `flake.lock` or Gradle verification hashes
 just to make the build pass. Review `package-deps.json`: it should match the locked
 released Totipo artifacts, retain BC 1.86, and leave unrelated dependencies unchanged.
 The update task runs desktop checks and distribution verification only.
-An ordinary second build proves cache reuse; the forced rebuild is separate.
+The ordinary qualification gate remains the single flake check above.
 MITM transport does not waive Gradle's artifact hash verification.
 
 The derivation sets `LC_ALL=C.UTF-8` for dependency fetching and package tests.
@@ -293,7 +307,8 @@ does not make Unicode paths representable under the C locale. After changing
 Nix-store script still references its original derivation/source snapshot.
 
 Pinned nixpkgs supplies Gradle **9.7.1**, running on the same JDK 25. The developer
-and CI wrapper remains **9.8.0**. See the M4a report for compatibility evidence;
+wrapper remains **9.8.0**; CI uses the package's Nix Gradle.
+See the M4a report for compatibility evidence;
 the operator reports successful MITM/package execution. Nix's patched Gradle and
 official setup hook are retained instead of introducing a separate wrapper download in the build.
 

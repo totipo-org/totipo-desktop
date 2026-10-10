@@ -24,11 +24,12 @@ A green Gradle build alone cannot pass this checklist.
 - [ ] All desktop/core/storage-nio production classfiles verified as Java 17.
 - [ ] `./gradlew installDist distTar distZip verifyDistribution verifyDistributionArchives`.
 - [ ] Two clean builds compared (semantic contents and SHA-256); reproducibility differences resolved/documented.
-- [ ] Official `mitmCache.updateScript` regenerated a current reviewed package-deps.json containing released Totipo Maven artifacts.
-- [ ] `nix flake check` and `nix build .` pass on every claimed Nix architecture.
+- [ ] Current reviewed package-deps.json contains released Totipo Maven artifacts; if dependency inputs changed, regenerate via the official `mitmCache.updateScript` and review it.
+- [ ] Normal Nix source/package qualification: `nix flake check path:.` passes on every claimed Linux Nix architecture. This includes the actual default package and wrapper integrity; no additional ordinary `nix build` gate.
 - [ ] Nix Gradle/JDK versions reviewed; source filtering includes desktop/build material only.
 - [ ] Distribution JAR bytes match the exact resolved, verified Maven artifacts.
-- [ ] Nix package contents, wrapper, entry and runtime inspected; repeat build/rebuild evidence recorded honestly.
+- [ ] Nix package contents, wrapper, entry and runtime inspected. Use `nix build path:.` only if a local result link is needed for inspection/native launch.
+- [ ] Separate release reproducibility spot-check: `nix build --rebuild path:.`; record exact derivation/builders and comparison evidence honestly. This is release-specific, not a routine milestone/CI gate or proof of universal reproducibility.
 
 ## Tests
 
