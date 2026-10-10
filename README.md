@@ -203,10 +203,24 @@ target.** Current release status is **NOT QUALIFIED**; see the exact evidence in
 [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md). Build success is not native GUI,
 clipboard, accessibility, or filesystem support qualification.
 
-Development remains `./gradlew run`. To build the canonical generic distribution:
+Development remains `./gradlew run`. Follow **Focused iteration; complete boundary
+qualification**: the [durable ladder](AGENTS.md#qualification-ladder) distinguishes
+development inner-loop checks, final milestone qualification and release-only/
+reproducibility checks. Classify each milestone and record gate execution counts.
+Baseline ordinary production work once with
+`./gradlew test verifyMavenBoundary verifyJava17Bytecode`; iterate with affected
+tests, then run one final normal and one fresh strict/distribution gate from the
+ladder after stability. Do not repeat full builds/distributions/Nix or native smoke
+after each correction. Specialized final checks depend on scope. Documentation-only
+changes use static checks and input-invariance review; inspect Nix inputs before
+requesting its gate. See [QUALIFICATION.md](QUALIFICATION.md#current-qualification-process)
+for current policy and evidence. Release requirements remain in RELEASE_CHECKLIST.md.
+
+To materialize the canonical generic distribution for development use (this does
+not replace final qualification and need not follow every edit):
 
 ```sh
-./gradlew clean build installDist distTar distZip verifyDistributionArchives
+./gradlew installDist distTar distZip verifyDistribution verifyDistributionArchives
 build/install/totipo-desktop/bin/totipo-desktop
 ```
 
@@ -230,7 +244,8 @@ Missing, empty, whitespace-bearing, or unsafe filename versions fail configurati
 The flake exposes a Linux-only package using the full pinned `jdk25`, Gradle 9
 and the same `installDist`. Existing dev-shell/jailed-agent inputs remain intact.
 The source is an ordinary repository checkout. Java arrives as released Maven
-artifacts through the reviewed dependency cache. The normal human Nix gate is:
+artifacts through the reviewed dependency cache. Freeze Nix qualification inputs
+before the human gate for milestones requiring Nix qualification:
 
 ```sh
 nix flake check path:.
