@@ -99,9 +99,9 @@ class RevealPersistenceTest {
             } finally { panel.closing(); }
         });
     }
-    @Test void diagnosticsPreservesGraceButEditAndStateReplacementCancelIt() throws Exception {
+    @Test void diagnosticsPreservesGraceButEditAndRelevantStateReplacementCancelIt() throws Exception {
         edt(() -> {
-            for (String invalidation : List.of("edit", "replacement", "disappearance", "refresh")) {
+            for (String invalidation : List.of("edit", "replacement", "disappearance")) {
                 var clock = new MutableClock(); clock.now = Instant.ofEpochSecond(25);
                 var panel = browser(clock); var state = new State(token(1, active("Alpha")));
                 panel.diagnosticsAction = p -> { }; panel.onEdit((b, a, e) -> { });
@@ -112,7 +112,6 @@ class RevealPersistenceTest {
                         case "edit" -> panel.row(id(1)).edit.doClick(0);
                         case "replacement" -> panel.render(new State(token(1, active("Changed"))).value);
                         case "disappearance" -> panel.render(new State().value);
-                        case "refresh" -> panel.render(state.value);
                         default -> fail();
                     }
                     clock.now = Instant.ofEpochSecond(30); panel.totp.tick();

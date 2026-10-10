@@ -16,6 +16,53 @@ import static org.totipo.desktop.VaultFolderWatcherTest.eventually;
 
 class WatcherSessionIntegrationTest {
     @TempDir Path directory;
+    @Test void watcherAndManualRefreshPreserveUnchangedRevealButExternalAlternativeChangeConceals() throws Exception {
+        Path root = Files.createDirectory(directory.resolve("reveal-vault"));
+        var session = assertInstanceOf(CreateVaultResult.Created.class, NioTotipo.create(root, new char[]{'p'})).session();
+        TokenId a = createToken(session, "Alpha"), b = createToken(session, "Beta");
+        eventually(() -> session.state().token(a).isPresent() && session.state().token(b).isPresent());
+        var view = onEdt(ControllerRevealObservationTest.BrowserWindow::new);
+        var controller = onEdt(() -> new VaultWindowController(session, view, 61, owner -> { }));
+        RealSource source = new RealSource(); CountDownLatch revealed = new CountDownLatch(1);
+        try {
+            edt(() -> {
+                assertTrue(controller.start());
+                controller.watch(root, (path, callback) -> new VaultFolderWatcher(path, callback,
+                        javax.swing.SwingUtilities::invokeLater, source, 100));
+            });
+            await(source.ready);
+            eventually(() -> view.observed != null && view.observed.token(a).isPresent());
+            TokenAlternative original = view.observed.token(a).orElseThrow().alternatives().get(0);
+            edt(() -> { view.probe.time(7); view.afterDelivery = revealed::countDown; view.probe.reveal(a); });
+            await(revealed); edt(() -> view.probe.assertRevealed(a, 23));
+            try (var external = assertInstanceOf(OpenResult.Opened.class, NioTotipo.open(root, new char[]{'p'})).session()) {
+                eventually(() -> external.state().token(b).isPresent());
+                try (var edit = external.state().update(external.state().token(b).orElseThrow().alternatives().get(0))) {
+                    assertInstanceOf(SaveResult.Saved.class, edit.issuer("Changed Beta").save());
+                }
+                eventually(() -> view.observed.token(b).orElseThrow().alternatives().get(0).descriptor().issuer().equals("Changed Beta"));
+                TokenAlternative observed = view.observed.token(a).orElseThrow().alternatives().get(0);
+                assertNotSame(original, observed); assertEquals(original, observed); assertEquals(original.hashCode(), observed.hashCode());
+                edt(() -> { view.probe.time(11); view.probe.assertRevealed(a, 19); view.probe.copyAndAssertVisible(); });
+                VaultState beforeRefresh = view.observed;
+                edt(view.refresh);
+                eventually(() -> view.observed != beforeRefresh); // Wait for a new emission, not a relevance criterion.
+                edt(() -> view.probe.assertRevealed(a, 19));
+                try (var edit = external.state().update(external.state().token(a).orElseThrow().alternatives().get(0))) {
+                    assertInstanceOf(SaveResult.Saved.class, edit.issuer("Changed Alpha").save());
+                }
+                eventually(() -> view.observed.token(a).orElseThrow().alternatives().get(0).descriptor().issuer().equals("Changed Alpha"));
+                edt(() -> view.probe.assertConcealed(a));
+            }
+            edt(() -> { controller.close(); view.probe.assertRetired(); });
+        } finally { edt(controller::close); await(view.disposed); }
+        assertThrows(ClosedWatchServiceException.class, source.service::poll);
+    }
+    private static TokenId createToken(VaultSession session, String issuer) {
+        try (var secret = NewSecret.copyOf(new byte[]{1, 2, 3}); var builder = session.state().createToken()) {
+            return assertInstanceOf(SaveResult.Saved.class, builder.issuer(issuer).secret(secret).save()).tokenId();
+        }
+    }
     static final class RealSource implements VaultFolderWatcher.Source {
         final CountDownLatch ready = new CountDownLatch(1);
         volatile WatchService service;

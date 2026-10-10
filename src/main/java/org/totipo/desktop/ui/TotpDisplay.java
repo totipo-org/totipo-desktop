@@ -21,9 +21,9 @@ final class TotpDisplay {
     record Display(String label, String code, int remaining, long seconds, boolean urgent) { }
     private record Entry(String label, TotpCode code) { }
     private enum Grace { NONE, AUTHORIZED, CONSUMED }
-    private record Request(GraceWindow window, List<String> labels) { }
+    private record Request(GraceWindow window, List<String> labels, List<TokenAlternative> alternatives) { }
     private record GraceWindow(Instant from, Instant until) { }
-    private record Reveal(VaultState base, TokenState token, List<Entry> entries, Grace grace) {
+    private record Reveal(VaultState base, TokenState token, List<TokenAlternative> alternatives, List<Entry> entries, Grace grace) {
         TotpCode earliest() { return entries.stream().map(Entry::code).min(Comparator.comparing(TotpCode::validUntil)).orElseThrow(); }
     }
     private final Clock clock;
@@ -71,7 +71,7 @@ final class TotpDisplay {
             boolean duplicate = outcomes.stream().filter(a -> TokenPresentation.identity(a.descriptor()).equals(identity)).count() > 1;
             labels.add(duplicate || identity.isBlank() ? "Possible code " + (i + 1) : identity);
         }
-        Request request = new Request(null, List.copyOf(labels));
+        Request request = new Request(null, List.copyOf(labels), List.copyOf(outcomes));
         requests.put(token.id(), request);
         generate.generate(base, outcomes, clock.instant(), codes -> {
             Edt.require();
@@ -92,7 +92,7 @@ final class TotpDisplay {
                 TotpCode earliest = revealed.stream().map(Entry::code).min(Comparator.comparing(TotpCode::validUntil)).orElseThrow();
                 Grace grace = Duration.between(accepted, earliest.validUntil()).compareTo(Duration.ofSeconds(10)) < 0
                         ? Grace.AUTHORIZED : Grace.NONE;
-                Reveal reveal = new Reveal(base, token, List.copyOf(revealed), grace);
+                Reveal reveal = new Reveal(base, token, request.alternatives(), List.copyOf(revealed), grace);
                 entries.put(token.id(), reveal); if (automatic) { timer.start(); }
                 render.accept(token.id(), presentation(revealed, accepted));
                 if (grace == Grace.AUTHORIZED && entries.get(token.id()) == reveal) { stage(reveal, outcomes); }
@@ -114,7 +114,7 @@ final class TotpDisplay {
         GraceWindow window = new GraceWindow(target, expected.stream().map(GraceWindow::until).min(Comparator.naturalOrder()).orElseThrow());
         List<String> labels = reveal.entries().stream().map(Entry::label).toList();
         VaultState base = reveal.base(); TokenState token = reveal.token();
-        Request request = new Request(window, labels); requests.put(id, request);
+        Request request = new Request(window, labels, List.copyOf(outcomes)); requests.put(id, request);
         if (!clock.instant().isBefore(target)) { render.accept(id, presentation(id)); }
         if (requests.get(id) != request) { return; }
         generate.generate(base, outcomes, target, codes -> {
@@ -131,11 +131,11 @@ final class TotpDisplay {
             if (acceptable) {
                 List<Entry> next = new ArrayList<>();
                 for (int i = 0; i < codes.size(); i++) { next.add(new Entry(labels.get(i), codes.get(i).orElseThrow())); }
-                Reveal promoted = new Reveal(base, token, List.copyOf(next), Grace.CONSUMED);
+                Reveal promoted = new Reveal(base, token, request.alternatives(), List.copyOf(next), Grace.CONSUMED);
                 if (!accepted.isBefore(window.from())) { entries.put(id, promoted); staged.remove(id); }
                 else { staged.put(id, promoted); }
             } else {
-                if (current != null) { entries.put(id, new Reveal(base, token, current.entries(), Grace.NONE)); }
+                if (current != null) { entries.put(id, new Reveal(base, token, current.alternatives(), current.entries(), Grace.NONE)); }
                 unavailable.accept(id);
             }
             render.accept(id, presentation(id));
@@ -249,6 +249,25 @@ final class TotpDisplay {
         return !now.isBefore(code.validFrom()) && now.isBefore(code.validUntil());
     }
     private static double seconds(Duration d) { return d.getSeconds() + d.getNano() / 1e9; }
+    /** Desktop policy, not Java validity: retain ordinary authorization only for the
+     * same complete semantic Alternative (public equality includes the hidden secret).
+     * Keep captured bases for pending work and grace; observation never regenerates codes.
+     */
+    void retainOrdinary(VaultState state) {
+        Edt.require();
+        Set<TokenId> ids = new HashSet<>(entries.keySet()); ids.addAll(requests.keySet()); ids.addAll(staged.keySet());
+        for (TokenId id : ids) {
+            Request request = requests.get(id);
+            Reveal reveal = entries.getOrDefault(id, staged.get(id));
+            List<TokenAlternative> alternatives = request != null ? request.alternatives() : reveal.alternatives();
+            TokenState token = state.token(id).orElse(null);
+            if (token == null || token.hasConflict() || token.alternatives().size() != 1
+                    || alternatives.size() != 1 || alternatives.get(0).descriptor().status() != TokenStatus.ACTIVE
+                    || !token.alternatives().get(0).equals(alternatives.get(0))) {
+                clear(id);
+            }
+        }
+    }
     void clear(TokenId id) {
         Edt.require(); requests.remove(id); entries.remove(id); staged.remove(id); render.accept(id, List.of());
         if (entries.isEmpty() && requests.values().stream().noneMatch(r -> r.window() != null)) { timer.stop(); }

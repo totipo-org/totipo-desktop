@@ -131,8 +131,10 @@ public final class TokenBrowserPanel extends JPanel {
     }
     public void render(VaultState state) {
         Edt.require(); if (closed) { return; }
-        // U2's conservative observation replacement rule still invalidates all authorization.
-        totp.clear(); childDisplays.values().forEach(TotpDisplay::clear); childDisplays.clear(); latest = state; filter();
+        // Ordinary reveal authorization survives observations of the same semantic Alternative.
+        // Conflict-child observation replacement keeps its existing conservative policy.
+        totp.retainOrdinary(state);
+        childDisplays.values().forEach(TotpDisplay::clear); childDisplays.clear(); latest = state; filter();
     }
     private void filter() {
         Edt.require(); if (closed || latest == null) { return; }

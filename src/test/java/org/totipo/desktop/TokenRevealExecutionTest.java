@@ -39,7 +39,7 @@ class TokenRevealExecutionTest {
             await(generated); await(completed); assertEquals("totipo-session-41", thread.get()); assertEquals(1, requests.get());
         } finally { edt(controller::close); await(retired); }
     }
-    @Test void refreshWhileDerivationIsPendingDiscardsCompletionAndRejectsOldBase() throws Exception {
+    @Test void observationDoesNotCancelProjectionOrRejectHistoricalBase() throws Exception {
         var session = new Session(); var view = new RevealWindow(); var entered = new CountDownLatch(1);
         var release = new CountDownLatch(1); var finished = new CountDownLatch(1); var retired = new CountDownLatch(1);
         AtomicInteger deliveries = new AtomicInteger(), requests = new AtomicInteger();
@@ -57,7 +57,7 @@ class TokenRevealExecutionTest {
             // A completion queued behind the blocked old request is a deterministic executor/EDT barrier.
             edt(() -> view.reveal.generate(next, List.of(), Instant.EPOCH, codes -> finished.countDown()));
             release.countDown(); await(finished);
-            assertEquals(0, deliveries.get()); assertEquals(1, requests.get());
+            assertEquals(2, deliveries.get()); assertEquals(2, requests.get());
         } finally { release.countDown(); edt(controller::close); await(retired); }
     }
     @Test void sessionCloseRetiresPendingRevealBeforeWorkerCompletes() throws Exception {

@@ -77,12 +77,15 @@ final class TokenFixtures {
         };
         final VaultState value;
         State(TokenState... tokens) {
+            this(new ObservationProgress.Finished(0, false), List.of(), tokens);
+        }
+        State(ObservationProgress progress, List<VaultDiagnostic> diagnostics, TokenState... tokens) {
             value = (VaultState) Proxy.newProxyInstance(VaultState.class.getClassLoader(), new Class<?>[]{VaultState.class},
                     (proxy, method, args) -> switch (method.getName()) {
                         case "tokens" -> List.of(tokens);
                         case "token" -> Arrays.stream(tokens).filter(t -> t.id().equals(args[0])).findFirst();
-                        case "observation" -> new ObservationProgress.Finished(0, false);
-                        case "diagnostics" -> List.of();
+                        case "observation" -> progress;
+                        case "diagnostics" -> diagnostics;
                         case "generateTotp" -> {
                             Edt.require();
                             Instant now = (Instant) args[1];

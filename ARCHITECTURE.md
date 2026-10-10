@@ -554,6 +554,26 @@ it or selects a replacement. Counts distinguish all logical tokens from matches;
 empty vault and no-match text are separate from observation status/diagnostics.
 Search is not persisted, logged or included in titles/diagnostics.
 
+Ordinary reveal authorization is presentation-owned and survives observation while
+its selected Alternative remains unchanged. On render, the browser compares the
+captured Alternative with the current ordinary token's sole Alternative using
+Java's public value equality (same session, TokenId and complete semantic value,
+including the hidden secret). Supporting heads, head metadata, diagnostics and
+observation progress do not participate. Disappearance, conflict, tombstoning or
+Alternative replacement revokes pending, active and staged grace authorization;
+returning to an old value cannot resurrect it. Conflict-child observation replacement
+retains its conservative concealment policy. This is desktop presentation policy;
+Java permits historical same-session local TOTP projections independently.
+
+The controller guards session lifetime; the TotpDisplay owner guards the current
+request and code intervals. Generation stays on the existing session executor,
+using the captured state and Alternative. Repeated render, manual Refresh and
+watcher observation never regenerate a preserved code or extend its lifetime.
+Copy, countdown and the existing one-period grace use the retained authorization.
+Search still detaches and erases widgets while preserving authorization until its
+ordinary expiry, even while filtered out. Lock/Change Vault/close retire owners
+immediately, and an explicit replacement request supersedes the old request.
+
 Find, Refresh and Create use Swing action maps. Button and shortcut Refresh/Create
 share Actions and enabled state; MutationGate retains sole workflow ownership.
 Dialog Escape forwards existing guarded Cancel cleanup, and busy work cannot be

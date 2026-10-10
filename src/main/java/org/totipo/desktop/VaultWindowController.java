@@ -78,13 +78,15 @@ final class VaultWindowController {
             view.actions(this::refresh, this::close);
             view.totpAction((base, alternatives, now, done) -> {
                 Edt.require();
-                if (closing || base != latest) { return; }
+                if (closing) { return; }
+                // Same-session historical projections remain valid. The presentation owner
+                // checks request ownership, Alternative relevance and interval validity.
                 executor.execute(() -> {
                     var codes = alternatives.stream().map(alternative -> {
                         try { return java.util.Optional.of(base.generateTotp(alternative, now)); }
                         catch (RuntimeException unavailable) { return java.util.Optional.<org.totipo.TotpCode>empty(); }
                     }).toList();
-                    SwingUtilities.invokeLater(() -> { if (!closing && base == latest) { done.accept(codes); } });
+                    SwingUtilities.invokeLater(() -> { if (!closing) { done.accept(codes); } });
                 });
             });
             if (clipboard != null) {

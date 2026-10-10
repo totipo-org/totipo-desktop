@@ -145,7 +145,7 @@ class GraceRevealTest {
     @Test void stagedOrInFlightDataCannotSurviveEditStateSemanticChangeDisappearanceCloseOrSupersedingReveal() throws Exception {
         edt(() -> {
             for (boolean complete : new boolean[]{false, true}) {
-                for (String reason : List.of("edit", "replacement", "semantic", "disappearance", "close", "superseded")) {
+                for (String reason : List.of("edit", "semantic", "disappearance", "close", "superseded")) {
                     var clock = new MutableClock(); clock.now = Instant.ofEpochSecond(25); var panel = browser(clock); var state = new State(token(1, active("A")));
                     var callbacks = new ArrayList<Consumer<List<Optional<TotpCode>>>>(); deferStage(panel, callbacks); panel.onEdit((b, a, e) -> { });
                     try {
@@ -153,7 +153,6 @@ class GraceRevealTest {
                         if (complete) { callbacks.get(0).accept(code("005678", 30, 60)); }
                         switch (reason) {
                             case "edit" -> panel.row(id(1)).edit.doClick(0);
-                            case "replacement" -> panel.render(state.value);
                             case "semantic" -> panel.render(new State(token(1, active("changed"))).value);
                             case "disappearance" -> panel.render(new State().value);
                             case "close" -> panel.closing();

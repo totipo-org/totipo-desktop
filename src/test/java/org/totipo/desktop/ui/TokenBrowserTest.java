@@ -113,7 +113,7 @@ class TokenBrowserTest {
             } finally { panel.closing(); }
         });
     }
-    @Test void searchRetiresWidgetsButRefreshRetiresAuthorization() throws Exception {
+    @Test void searchAndRepeatedObservationRetireWidgetsButPreserveAuthorization() throws Exception {
         edt(() -> {
             var panel = browser(new MutableClock()); State state = new State(token(1, active("A")), token(2, active("B")));
             try {
@@ -122,7 +122,7 @@ class TokenBrowserTest {
                 panel.search.setText("B"); assertEquals("", code.getText()); assertTrue(panel.totp.running());
                 panel.search.setText(""); assertFalse(panel.row(id(1)).show.isVisible()); assertEquals(1, state.calls.size());
                 code = TotpCopyTest.codeLabel(panel.row(id(1)));
-                panel.render(state.value); assertEquals("", code.getText()); assertTrue(panel.row(id(1)).show.isVisible()); assertEquals(1, state.calls.size());
+                panel.render(state.value); assertEquals("", code.getText()); assertFalse(panel.row(id(1)).show.isVisible()); assertEquals(1, state.calls.size());
             } finally { panel.closing(); }
         });
     }

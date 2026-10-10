@@ -16,6 +16,22 @@ public final class RevealLifecycleProbe {
         browser.copyAction((c, f, u, n) -> TotpClipboard.COPIED);
     }
     public void render(VaultState state) { browser.render(state); }
+    public void time(long seconds) { clock.now = Instant.ofEpochSecond(seconds); browser.refreshPresentation(); }
+    public void reveal(TokenId id) { revealed = id; browser.reveal(id); }
+    public void assertRevealed(TokenId id, long seconds) {
+        browser.refreshPresentation();
+        assertFalse(browser.row(id).show.isVisible());
+        assertEquals(seconds, browser.totp.presentation(id).get(0).seconds());
+        assertTrue(TotpCopyTest.buttons(browser.row(id)).get(0).isEnabled());
+        assertTrue(browser.row(id).getAccessibleContext().getAccessibleName().contains("Code"));
+    }
+    public void assertConcealed(TokenId id) {
+        assertTrue(browser.totp.presentation(id).isEmpty()); assertFalse(browser.totp.pending(id));
+        if (browser.row(id) != null) { assertTrue(browser.row(id).show.isVisible()); }
+    }
+    public boolean pending(TokenId id) {
+        return browser.totp.presentation(id).isEmpty() && browser.totp.pending(id);
+    }
     public void reveal() { revealed = browser.rows.get(0).token.id(); browser.rows.get(0).show.doClick(0); }
     public void copyAndAssertVisible() {
         assertFalse(browser.rows.get(0).show.isVisible()); TotpCopyTest.buttons(browser).get(0).doClick(0);
