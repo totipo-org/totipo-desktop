@@ -70,7 +70,9 @@ public final class ShellFrame extends JFrame implements ShellView {
         JMenuItem leave = new JMenuItem("Exit"); leave.addActionListener(event -> exit.run()); file.add(leave);
         JMenuItem change = new JMenuItem("Change Vault…"); change.setEnabled(!busy);
         change.addActionListener(event -> select.run()); vault.add(change);
-        JMenuItem newVault = new JMenuItem("Create New Vault…"); newVault.setEnabled(!busy);
+        JMenuItem newVault = new JMenuItem("New Vault…"); newVault.setEnabled(!busy);
+        newVault.setMnemonic(java.awt.event.KeyEvent.VK_N);
+        newVault.getAccessibleContext().setAccessibleName("New Vault…");
         newVault.addActionListener(event -> create.run()); vault.add(newVault);
         JMenuItem about = new JMenuItem("About This Vault…"); about.setEnabled(selected != null && !busy);
         about.addActionListener(event -> aboutVault(state == ShellState.LOCKED ? "Locked" : "Cannot safely open", landing.error.getText()));
@@ -93,9 +95,7 @@ public final class ShellFrame extends JFrame implements ShellView {
         renderShell(ShellState.BLOCKING_VAULT_STATE, selected, "This vault session is unavailable. Try opening it again.", true);
     }
     @Override public Path chooseDirectory(Path initial, boolean create) {
-        if (!create) { return DirectoryPicker.ask(this, initial); }
-        JFileChooser chooser = new VaultDirectoryChooser(initial);
-        return chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION ? chooser.getSelectedFile().toPath() : null;
+        return DirectoryPicker.ask(this, initial, create ? DirectoryPicker.Mode.NEW_VAULT : DirectoryPicker.Mode.EXISTING_VAULT);
     }
     @Override public PasswordPromptResult password(Path directory, boolean create, PasswordPromptContext context) {
         return PasswordPrompt.ask(this, directory, create, context);

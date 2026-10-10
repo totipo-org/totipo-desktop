@@ -68,7 +68,7 @@ class PostS5PolishTest {
             assertEquals(button.getY(), other.getY()); assertEquals(button.getHeight(), other.getHeight());
         }
     }
-    @Test void lockedPairUsesLargerNaturalWidthAtNormalAndLargeFonts() throws Exception {
+    @Test void lockedOpenFillsFirstRowAndEqualSecondaryButtonsFillNextRowAtNormalAndLargeFonts() throws Exception {
         edt(() -> {
             Font original = UIManager.getFont("Label.font");
             try {
@@ -76,14 +76,26 @@ class PostS5PolishTest {
                     UIManager.put("Label.font", original.deriveFont(size));
                     ShellPanel shell = new ShellPanel(); shell.render(org.totipo.desktop.ShellState.LOCKED, java.nio.file.Path.of("vault"), "", false);
                     JButton measured = new JButton("Change Vault…"); DesktopStyle.action(measured, DesktopStyle.ActionRole.SecondaryAction, false);
-                    assertEquals(measured.getPreferredSize(), shell.primary.getPreferredSize());
-                    assertEquals(shell.primary.getPreferredSize(), shell.secondary.getPreferredSize());
-                    shell.setSize(900, 700); layout(shell);
-                    assertEquals(shell.primary.getBounds().y, shell.secondary.getBounds().y);
-                    assertEquals(shell.primary.getSize(), shell.secondary.getSize());
-                    assertEquals(DesktopStyle.TIGHT, shell.primary.getX() - shell.secondary.getX() - shell.secondary.getWidth());
-                    assertEquals(DesktopStyle.ActionRole.PrimaryAction, shell.primary.getClientProperty("totipo.actionRole"));
-                    assertEquals(DesktopStyle.ActionRole.SecondaryAction, shell.secondary.getClientProperty("totipo.actionRole"));
+                    assertEquals(measured.getPreferredSize(), shell.secondary.getPreferredSize());
+                    for (int width : new int[] {640, 760, 900}) {
+                        shell.setSize(width, 700); layout(shell);
+                        assertEquals(shell.createNew.getBounds().y, shell.secondary.getBounds().y);
+                        assertEquals(shell.createNew.getHeight(), shell.secondary.getHeight());
+                        assertEquals(DesktopStyle.TIGHT, shell.createNew.getX() - shell.secondary.getX() - shell.secondary.getWidth());
+                        assertEquals(shell.primary.getHeight(), shell.secondary.getHeight());
+                        assertEquals(shell.createNew.getWidth(), shell.secondary.getWidth());
+                        assertEquals(shell.password.getWidth(), shell.primary.getWidth());
+                        assertEquals(DesktopStyle.NORMAL, shell.secondaryActions.getY() - shell.primary.getY() - shell.primary.getHeight());
+                        assertEquals(0, shell.secondary.getX());
+                        assertEquals(shell.secondaryActions.getWidth(), shell.createNew.getX() + shell.createNew.getWidth(), 1);
+                        for (JButton button : new JButton[] {shell.primary, shell.secondary, shell.createNew}) {
+                            assertTrue(button.getWidth() >= button.getPreferredSize().width);
+                            assertTrue(button.getHeight() >= button.getPreferredSize().height);
+                        }
+                        assertEquals(DesktopStyle.ActionRole.PrimaryAction, shell.primary.getClientProperty("totipo.actionRole"));
+                        assertEquals(DesktopStyle.ActionRole.SecondaryAction, shell.secondary.getClientProperty("totipo.actionRole"));
+                        assertEquals(DesktopStyle.ActionRole.SecondaryAction, shell.createNew.getClientProperty("totipo.actionRole"));
+                    }
                 }
             } finally { UIManager.put("Label.font", original); }
         });

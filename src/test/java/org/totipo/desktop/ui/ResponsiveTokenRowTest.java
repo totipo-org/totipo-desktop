@@ -93,7 +93,7 @@ class ResponsiveTokenRowTest {
             shell.actions(() -> { }, creates::incrementAndGet, password -> fail());
             shell.render(org.totipo.desktop.ShellState.LOCKED, java.nio.file.Path.of("a"), "", false);
             assertTrue(shell.createNew.isVisible()); assertTrue(shell.createNew.isEnabled());
-            assertEquals("Create New Vault…", shell.createNew.getText()); shell.createNew.doClick(0); assertEquals(1, creates.get());
+            assertEquals("New Vault…", shell.createNew.getText()); shell.createNew.doClick(0); assertEquals(1, creates.get());
             shell.render(org.totipo.desktop.ShellState.LOCKED, java.nio.file.Path.of("a"), "", true);
             shell.createNew.doClick(0); assertEquals(1, creates.get());
         });

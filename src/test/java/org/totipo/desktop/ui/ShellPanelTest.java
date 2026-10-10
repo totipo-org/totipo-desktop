@@ -34,7 +34,7 @@ class ShellPanelTest {
     @Test void noVaultHasOnePrimaryActionAndBorderedSecondaryCreate() throws Exception {
         edt(() -> {
             ShellPanel panel = new ShellPanel(); panel.render(ShellState.NO_VAULT, null, "", false);
-            assertEquals("Select Vault", panel.primary.getText()); assertEquals("Create New Vault…", panel.secondary.getText());
+            assertEquals("Select Vault", panel.primary.getText()); assertEquals("New Vault…", panel.secondary.getText());
             assertFalse(panel.password.isVisible()); assertFalse(panel.path.isVisible());
             assertEquals("Choose a vault to continue", panel.identity.getText()); assertFalse(panel.status.isVisible());
             assertEquals(DesktopStyle.ActionRole.PrimaryAction, panel.primary.getClientProperty("totipo.actionRole"));
@@ -43,7 +43,7 @@ class ShellPanelTest {
             assertInstanceOf(DesktopStyle.ControlBorder.class, panel.secondary.getBorder());
             assertEquals(panel.primary.getPreferredSize(), panel.secondary.getPreferredSize());
             assertEquals("Select Vault", panel.primary.getAccessibleContext().getAccessibleName());
-            assertEquals("Create New Vault…", panel.secondary.getAccessibleContext().getAccessibleName());
+            assertEquals("New Vault…", panel.secondary.getAccessibleContext().getAccessibleName());
         });
     }
     @Test void noVaultStackHasVisibleNonOverlappingBoundsEvenWithLargeHeading() throws Exception {
@@ -179,9 +179,17 @@ class ShellPanelTest {
                         assertEquals(8, panel.secondary.getY() - panel.primary.getY() - panel.primary.getHeight());
                         assertEquals(24, panel.primary.getY() - panel.identity.getY() - panel.identity.getHeight());
                     } else {
-                        assertTrue(panel.primary.getX() > panel.secondary.getX());
-                        assertEquals(8, panel.primary.getX() - panel.secondary.getX() - panel.secondary.getWidth());
-                        assertEquals(panel.actionRow.getWidth() - 8, panel.primary.getX() + panel.primary.getWidth());
+                        assertSame(panel.secondaryActions, panel.secondary.getParent());
+                        assertSame(panel.secondaryActions, panel.createNew.getParent());
+                        assertEquals(8, panel.createNew.getX() - panel.secondary.getX() - panel.secondary.getWidth());
+                        assertEquals(panel.secondary.getY(), panel.createNew.getY());
+                        assertEquals(panel.secondary.getHeight(), panel.createNew.getHeight());
+                        assertEquals(panel.secondary.getHeight(), panel.primary.getHeight());
+                        assertEquals(panel.secondary.getWidth(), panel.createNew.getWidth());
+                        assertEquals(panel.password.getWidth(), panel.primary.getWidth());
+                        assertEquals(16, panel.secondaryActions.getY() - panel.primary.getY() - panel.primary.getHeight());
+                        assertEquals(0, panel.secondary.getX());
+                        assertEquals(panel.secondaryActions.getWidth(), panel.createNew.getX() + panel.createNew.getWidth(), 1);
                     }
                 }
             }
@@ -219,10 +227,30 @@ class ShellPanelTest {
                 panel.render(ShellState.NO_VAULT, null, "", false); panel.setSize(640, 520); layout(panel);
                 assertSame(panel.welcome.content, panel.primary.getParent()); panel.primary.doClick(0);
                 panel.render(ShellState.LOCKED, Path.of("vault"), "", false); layout(panel);
-                assertSame(panel.actionRow, panel.primary.getParent()); assertSame(panel.actionRow, panel.secondary.getParent());
+                assertSame(panel.lockedActions, panel.primary.getParent()); assertSame(panel.secondaryActions, panel.secondary.getParent());
                 panel.password.setText("p"); panel.primary.doClick(0);
             }
             assertEquals(3, selects.get()); assertEquals(3, opens.get());
+        });
+    }
+    @Test void lockedActionsHaveExplicitNamesMnemonicsAndMatchingSecondaryStyles() throws Exception {
+        edt(() -> {
+            var panel = new ShellPanel(); panel.render(ShellState.LOCKED, Path.of("a"), "", false);
+            assertEquals("New Vault…", panel.createNew.getText());
+            assertEquals("New Vault…", panel.createNew.getAccessibleContext().getAccessibleName());
+            assertEquals(java.awt.event.KeyEvent.VK_N, panel.createNew.getMnemonic());
+            assertEquals(java.awt.event.KeyEvent.VK_C, panel.secondary.getMnemonic());
+            assertEquals(java.awt.event.KeyEvent.VK_O, panel.primary.getMnemonic());
+            assertEquals(DesktopStyle.ActionRole.PrimaryAction, panel.primary.getClientProperty("totipo.actionRole"));
+            for (var button : new javax.swing.JButton[] {panel.secondary, panel.createNew}) {
+                assertEquals(DesktopStyle.ActionRole.SecondaryAction, button.getClientProperty("totipo.actionRole"));
+                assertTrue(button.isContentAreaFilled());
+                assertEquals(DesktopStyle.surfaceRaised(), button.getBackground());
+                assertInstanceOf(DesktopStyle.ControlBorder.class, button.getBorder());
+                assertEquals(panel.secondary.getMargin(), button.getMargin());
+                assertEquals(panel.secondary.getInsets(), button.getInsets());
+                assertEquals(panel.secondary.getPreferredSize().height, button.getPreferredSize().height);
+            }
         });
     }
 }

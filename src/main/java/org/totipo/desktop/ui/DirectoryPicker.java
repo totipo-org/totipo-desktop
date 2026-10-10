@@ -14,9 +14,10 @@ import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 import javax.swing.*;
 
-/** Restricted, read-only folder navigation. Selection validation belongs to the application. */
+/** App-owned folder navigation. Vault recognition and creation belong to the application. */
 final class DirectoryPicker extends JPanel implements AutoCloseable {
     private static final long serialVersionUID = 1L;
+    enum Mode { EXISTING_VAULT, NEW_VAULT }
     final JLabel location = new JLabel();
     final JLabel status = new JLabel();
     final JList<Path> directories = new JList<>(new DefaultListModel<>());
@@ -24,24 +25,41 @@ final class DirectoryPicker extends JPanel implements AutoCloseable {
     final JButton up = new JButton("Up");
     final JButton select = new JButton("Select Folder");
     final JButton cancel = new JButton("Cancel");
+    final JTextField folderName = new JTextField(18);
+    final JButton newFolder = new JButton("New Folder");
+    private final Mode mode;
+    @FunctionalInterface interface DirectoryCreator { void create(Path path) throws IOException; }
+    private final transient DirectoryCreator creator;
     private final transient Consumer<Path> accepted;
     private final transient Runnable cancelled;
     private final transient Executor executor;
     private final transient ExecutorService ownedExecutor;
     private transient Path current;
     private long generation;
-    private boolean retired;
+    private volatile boolean retired;
+    private boolean creating;
 
     DirectoryPicker(Path initial, Consumer<Path> accepted, Runnable cancelled) {
-        this(initial, accepted, cancelled, Executors.newSingleThreadExecutor(task -> {
+        this(initial, Mode.EXISTING_VAULT, accepted, cancelled);
+    }
+    DirectoryPicker(Path initial, Mode mode, Consumer<Path> accepted, Runnable cancelled) {
+        this(initial, mode, accepted, cancelled, Executors.newSingleThreadExecutor(task -> {
             Thread thread = new Thread(task, "totipo-folder-picker"); thread.setDaemon(true); return thread;
-        }), true);
+        }), true, Files::createDirectory);
     }
     DirectoryPicker(Path initial, Consumer<Path> accepted, Runnable cancelled, Executor executor) {
-        this(initial, accepted, cancelled, executor, false);
+        this(initial, Mode.EXISTING_VAULT, accepted, cancelled, executor);
     }
-    private DirectoryPicker(Path initial, Consumer<Path> accepted, Runnable cancelled, Executor executor, boolean own) {
+    DirectoryPicker(Path initial, Mode mode, Consumer<Path> accepted, Runnable cancelled, Executor executor) {
+        this(initial, mode, accepted, cancelled, executor, false, Files::createDirectory);
+    }
+    DirectoryPicker(Path initial, Mode mode, Consumer<Path> accepted, Runnable cancelled, Executor executor, DirectoryCreator creator) {
+        this(initial, mode, accepted, cancelled, executor, false, creator);
+    }
+    private DirectoryPicker(Path initial, Mode mode, Consumer<Path> accepted, Runnable cancelled, Executor executor,
+                            boolean own, DirectoryCreator creator) {
         super(new BorderLayout(12, 0)); Edt.require();
+        this.mode = mode; this.creator = creator;
         this.accepted = accepted; this.cancelled = cancelled; this.executor = executor;
         ownedExecutor = own ? (ExecutorService) executor : null;
         setBorder(BorderFactory.createEmptyBorder(16, 16, 0, 16));
@@ -52,6 +70,19 @@ final class DirectoryPicker extends JPanel implements AutoCloseable {
         location.getAccessibleContext().setAccessibleName("Current folder");
         JPanel navigation = new JPanel(new BorderLayout(12, 0));
         navigation.add(location, BorderLayout.CENTER); navigation.add(up, BorderLayout.EAST);
+        if (mode == Mode.NEW_VAULT) {
+            JPanel creation = new JPanel(new BorderLayout(8, 8));
+            JLabel label = SwingUsability.label("Folder name", folderName); label.setDisplayedMnemonic(KeyEvent.VK_F);
+            DesktopStyle.input(folderName);
+            DesktopStyle.action(newFolder, DesktopStyle.ActionRole.SecondaryAction, false);
+            newFolder.setMnemonic(KeyEvent.VK_N); newFolder.getAccessibleContext().setAccessibleName("New Folder");
+            newFolder.addActionListener(event -> createChild(folderName.getText()));
+            folderName.addActionListener(event -> createChild(folderName.getText()));
+            creation.add(label, BorderLayout.WEST); creation.add(folderName, BorderLayout.CENTER);
+            creation.add(newFolder, BorderLayout.EAST);
+            creation.setBorder(BorderFactory.createEmptyBorder(8, 0, 8, 0));
+            navigation.add(creation, BorderLayout.SOUTH);
+        }
         add(navigation, BorderLayout.NORTH); add(scroll, BorderLayout.CENTER);
         directories.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         directories.getAccessibleContext().setAccessibleName("Folders");
@@ -84,6 +115,12 @@ final class DirectoryPicker extends JPanel implements AutoCloseable {
             }
         });
         cancel.addActionListener(event -> { if (!retired) { cancelled.run(); } });
+        up.setMnemonic(KeyEvent.VK_U); select.setMnemonic(KeyEvent.VK_S); cancel.setMnemonic(KeyEvent.VK_C);
+        for (JButton button : new JButton[] {up, select, cancel}) {
+            button.getAccessibleContext().setAccessibleName(button.getText());
+        }
+        SwingUsability.bind(this, WHEN_ANCESTOR_OF_FOCUSED_COMPONENT, KeyStroke.getKeyStroke("ESCAPE"),
+                "cancel-picker", SwingUsability.action("Cancel", () -> cancel.doClick(0)));
         DesktopStyle.action(up, DesktopStyle.ActionRole.SecondaryAction, false);
         DesktopStyle.action(cancel, DesktopStyle.ActionRole.SecondaryAction, false);
         DesktopStyle.action(select, DesktopStyle.ActionRole.PrimaryAction, false);
@@ -96,10 +133,51 @@ final class DirectoryPicker extends JPanel implements AutoCloseable {
         navigate(start);
     }
     private record Listing(Path directory, List<Path> folders, boolean failed) { }
+    /** One ordinary child only; no recursive creation or protocol-file writes. */
+    void createChild(String name) {
+        Edt.require();
+        if (retired || creating || mode != Mode.NEW_VAULT || current == null || !newFolder.isEnabled()) { return; }
+        Path child;
+        try {
+            Path relative = current.getFileSystem().getPath(name);
+            if (name.isBlank() || relative.isAbsolute() || relative.getNameCount() != 1
+                    || name.equals(".") || name.equals("..") || name.contains("/") || name.contains("\\")
+                    || name.equalsIgnoreCase("vault") || name.equalsIgnoreCase("objects-v1")) {
+                showStatus("Enter a single folder name other than vault or objects-v1."); return;
+            }
+            child = current.resolve(relative);
+        } catch (java.nio.file.InvalidPathException invalid) {
+            showStatus("Enter a valid folder name."); return;
+        }
+        creating = true; long request = ++generation;
+        setBrowsingEnabled(false); showStatus("Creating folder…");
+        executor.execute(() -> {
+            if (retired) { return; }
+            String failure = null;
+            try { creator.create(child); }
+            catch (java.nio.file.FileAlreadyExistsException collision) { failure = "A file or folder with that name already exists. Choose another name."; }
+            catch (IOException | SecurityException unavailable) { failure = "This folder could not be created. Check permissions or choose another folder."; }
+            String message = failure;
+            Runnable publish = () -> {
+                if (retired || request != generation) { return; }
+                creating = false;
+                if (message == null) { folderName.setText(""); navigate(child); directories.requestFocusInWindow(); }
+                else { setBrowsingEnabled(true); showStatus(message); }
+            };
+            if (SwingUtilities.isEventDispatchThread()) { publish.run(); } else { SwingUtilities.invokeLater(publish); }
+        });
+    }
+    private void showStatus(String message) { status.setText(message); status.setVisible(true); }
+    private void setBrowsingEnabled(boolean enabled) {
+        select.setEnabled(enabled); directories.setEnabled(enabled);
+        up.setEnabled(enabled && current != null && current.getParent() != null);
+        newFolder.setEnabled(enabled); folderName.setEnabled(enabled);
+    }
     void navigate(Path target) {
-        Edt.require(); if (retired) { return; }
+        Edt.require(); if (retired || creating) { return; }
         long request = ++generation;
         current = target.toAbsolutePath().normalize(); updateLocation();
+        setBrowsingEnabled(false);
         directories.clearSelection();
         ((DefaultListModel<Path>) directories.getModel()).clear();
         status.setText("Reading folders…"); status.setVisible(true);
@@ -118,6 +196,7 @@ final class DirectoryPicker extends JPanel implements AutoCloseable {
             Runnable publish = () -> {
                 if (retired || request != generation) { return; }
                 current = result.directory(); updateLocation();
+                setBrowsingEnabled(true);
                 var model = (DefaultListModel<Path>) directories.getModel(); model.clear(); model.addAll(result.folders());
                 status.setText(result.failed() ? "This folder could not be listed. Try its parent or select another folder." : "");
                 status.setVisible(result.failed()); revalidate(); repaint();
@@ -145,11 +224,13 @@ final class DirectoryPicker extends JPanel implements AutoCloseable {
         ((DefaultListModel<Path>) directories.getModel()).clear();
         if (ownedExecutor != null) { ownedExecutor.shutdown(); }
     }
-    static Path ask(java.awt.Window owner, Path initial) {
+    static Path ask(java.awt.Window owner, Path initial, Mode mode) {
         Edt.require();
-        JDialog dialog = new JDialog(owner, "Select Vault Folder", java.awt.Dialog.ModalityType.APPLICATION_MODAL);
+        String title = mode == Mode.NEW_VAULT ? "Select New Vault Folder" : "Select Vault Folder";
+        JDialog dialog = new JDialog(owner, title, java.awt.Dialog.ModalityType.APPLICATION_MODAL);
         Path[] result = {null};
-        DirectoryPicker picker = new DirectoryPicker(initial, path -> { result[0] = path; dialog.dispose(); }, dialog::dispose);
+        DirectoryPicker picker = new DirectoryPicker(initial, mode, path -> { result[0] = path; dialog.dispose(); }, dialog::dispose);
+        picker.getAccessibleContext().setAccessibleName(title);
         dialog.setContentPane(picker); dialog.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         dialog.addWindowListener(new WindowAdapter() {
             @Override public void windowClosing(WindowEvent event) { dialog.dispose(); }

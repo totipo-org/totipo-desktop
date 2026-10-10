@@ -22,10 +22,12 @@ public final class ShellPanel extends JPanel {
     final JLabel error = new JLabel();
     final JTextArea explanation = new JTextArea();
     final JButton primary = new JButton("Select Vault");
-    final JButton secondary = new JButton("Create New Vault…");
-    final JButton createNew = new JButton("Create New Vault…");
+    final JButton secondary = new JButton("New Vault…");
+    final JButton createNew = new JButton("New Vault…");
     final JPanel task = new JPanel(new GridBagLayout());
     final JPanel actionRow = SwingUsability.taskActions(primary, secondary);
+    final JPanel lockedActions = new JPanel(new java.awt.GridLayout(2, 1, 0, DesktopStyle.NORMAL));
+    final JPanel secondaryActions = new JPanel(new java.awt.GridLayout(1, 2, DesktopStyle.TIGHT, 0));
     final EmptyState welcome = new EmptyState(identity, explanation, 480);
     static final int MAX_TASK_WIDTH = 560;
     private transient Runnable select = () -> { };
@@ -55,7 +57,10 @@ public final class ShellPanel extends JPanel {
         detailsRow.setOpaque(false); detailsRow.add(details);
         DesktopStyle.action(primary, DesktopStyle.ActionRole.PrimaryAction, false);
         DesktopStyle.action(secondary, DesktopStyle.ActionRole.SecondaryAction, false);
-        DesktopStyle.action(createNew, DesktopStyle.ActionRole.QuietAction, false);
+        DesktopStyle.action(createNew, DesktopStyle.ActionRole.SecondaryAction, false);
+        lockedActions.setOpaque(false); secondaryActions.setOpaque(false);
+        createNew.setMnemonic(java.awt.event.KeyEvent.VK_N);
+        createNew.getAccessibleContext().setAccessibleName("New Vault…");
         for (JComponent field : new JComponent[] {identity, path, status, passwordLabel, password, error}) {
             field.setMinimumSize(new Dimension(0, field.getPreferredSize().height));
         }
@@ -87,7 +92,11 @@ public final class ShellPanel extends JPanel {
             add(welcome); welcome.compose(primary, secondary); return;
         }
         add(task); identity.setHorizontalAlignment(SwingConstants.LEADING); error.setHorizontalAlignment(SwingConstants.LEADING);
-        actionRow.removeAll(); actionRow.add(secondary); actionRow.add(primary);
+        actionRow.removeAll(); lockedActions.removeAll(); secondaryActions.removeAll();
+        if (state == ShellState.LOCKED) {
+            secondaryActions.add(secondary); secondaryActions.add(createNew);
+            lockedActions.add(primary); lockedActions.add(secondaryActions);
+        } else { actionRow.add(secondary); actionRow.add(primary); }
         int row = taskLine(identity, 0, 0);
         row = taskLine(path, row, 8);
         if (status.isVisible()) { row = taskLine(status, row, 16); }
@@ -96,8 +105,7 @@ public final class ShellPanel extends JPanel {
             row = taskLine(password, row, 8);
         }
         if (error.isVisible()) { row = taskLine(explanation, row, 12); }
-        row = taskLine(actionRow, row, 24);
-        if (createNew.isVisible()) { row = taskLine(createNew, row, 8); }
+        row = taskLine(state == ShellState.LOCKED ? lockedActions : actionRow, row, 24);
         if (details.isVisible()) { taskLine(detailsRow, row, 8); }
         task.revalidate();
     }
@@ -149,10 +157,16 @@ public final class ShellPanel extends JPanel {
         explanation.setForeground(next == ShellState.NO_VAULT ? DesktopStyle.textSecondary() : DesktopStyle.danger());
         error.setToolTipText(notice.isEmpty() ? null : notice);
         primary.setText(next == ShellState.NO_VAULT ? "Select Vault" : next == ShellState.BLOCKING_VAULT_STATE ? "Try Again" : "Open");
-        secondary.setText(next == ShellState.NO_VAULT ? "Create New Vault…" : "Change Vault…");
+        secondary.setText(next == ShellState.NO_VAULT ? "New Vault…" : "Change Vault…");
         DesktopStyle.action(primary, DesktopStyle.ActionRole.PrimaryAction, false);
         DesktopStyle.action(secondary, DesktopStyle.ActionRole.SecondaryAction, false);
-        if (next == ShellState.NO_VAULT || next == ShellState.LOCKED) {
+        DesktopStyle.action(createNew, DesktopStyle.ActionRole.SecondaryAction, false);
+        secondary.setMnemonic(next == ShellState.NO_VAULT ? java.awt.event.KeyEvent.VK_N : java.awt.event.KeyEvent.VK_C);
+        secondary.getAccessibleContext().setAccessibleName(secondary.getText());
+        primary.setMnemonic(next == ShellState.NO_VAULT ? java.awt.event.KeyEvent.VK_S
+                : next == ShellState.LOCKED ? java.awt.event.KeyEvent.VK_O : java.awt.event.KeyEvent.VK_T);
+        primary.getAccessibleContext().setAccessibleName(primary.getText());
+        if (next == ShellState.NO_VAULT) {
             int width = Math.max(primary.getPreferredSize().width, secondary.getPreferredSize().width);
             primary.setPreferredSize(new Dimension(width, primary.getPreferredSize().height));
             secondary.setPreferredSize(new Dimension(width, secondary.getPreferredSize().height));
