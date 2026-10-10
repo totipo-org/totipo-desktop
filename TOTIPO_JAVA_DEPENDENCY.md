@@ -49,3 +49,31 @@ Desktop uses high-level `org.totipo` APIs and the ordinary shared-store entry po
 composition facade. There is no local-source, project substitution or Maven-local
 fallback. Java source/spec snapshots and conformance corpus are not desktop build
 or package inputs; Java's operation-scoped conformance does not qualify the desktop.
+
+## Separate implementation and reviewed guidance pins
+
+| Pin | Exact identity | Meaning |
+| --- | --- | --- |
+| Totipo Java artifact | Version **0.2.0**, `org.totipo:totipo-storage-nio:0.2.0` | Runtime artifact consumed by desktop, exposing core 0.2.0 transitively. |
+| Released implementation source | `d6310c177ae930df188fd4f5798622c935698b2e` | Canonical `v0.2.0` source; determines the implementation desktop executes. |
+| Reviewed application-model guidance | `API_DESIGN.md` at `3b24b54becde0c93479c1fbd80ea0fbd2026e2a8` | Later reviewed clarification applying to **Java 0.2.0 semantics**. |
+
+Exact guidance URL:
+[API_DESIGN.md](https://github.com/totipo-dev/totipo-java/blob/3b24b54becde0c93479c1fbd80ea0fbd2026e2a8/API_DESIGN.md).
+SHA-256 of the exact Git blob bytes:
+`bd017168bf0dcb103c5880cff9d6d5b2f358c493fbc305e1eea0b0623ca81493`.
+
+The guidance commit, **Document Java operation and VaultState scheduling model**,
+adds the reviewed **Operation classes and state-snapshot semantics** section.
+Its VERSION remains 0.2.0 and SPEC_PIN remains v1/r19. Its six Java-file changes
+are Javadoc-only; no API signature or implementation behavior changes. The section
+explicitly describes the existing 0.2.0 API; the committed documentation report
+states that this is not a release milestone and published 0.2.0 artifacts remain
+unchanged. Read-only comparison with released source/tests is recorded in
+[the desktop operation audit](review/DESKTOP_JAVA_OPERATION_MODEL_AUDIT.md).
+
+These pins intentionally differ. The artifact/source pin determines executable
+behavior; the application-model guidance pin identifies its later reviewed semantic
+clarification. A documentation-only Java clarification does not require a new Java
+artifact release. **Advancing this documentation pin alone does not change the Java
+runtime dependency.** Existing Maven/JAR provenance above is unchanged.
