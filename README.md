@@ -173,6 +173,35 @@ The run command requires a graphical desktop; build and tests are headless.
 Offline builds require dependencies and the wrapper distribution to be cached
 by a prior online build.
 
+For optional graphical regression review, `org.totipo.desktop.SwingSmoke` is the
+current driver. After test compilation and `installDist`, run one scenario group
+per JVM on an available graphical display:
+
+```sh
+SMOKE_CP='build/classes/java/test:build/classes/java/main:build/install/totipo-desktop/lib/*'
+java -cp "$SMOKE_CP" org.totipo.desktop.SwingSmoke --list
+java -cp "$SMOKE_CP" org.totipo.desktop.SwingSmoke mutations dark
+java -cp "$SMOKE_CP" org.totipo.desktop.SwingSmoke conflicts light
+java -cp "$SMOKE_CP" org.totipo.desktop.SwingSmoke lifecycle dark 20
+java -cp "$SMOKE_CP" org.totipo.desktop.SwingSmoke polish dark
+```
+
+Each group accepts `light`, `dark` or `native`, followed by an optional base font
+size. Synthetic palettes use Metal; polish retains Metal even with `native`, as
+its previous driver did. Other groups use the environment delegate for `native`.
+Optional `-Dsun.java2d.uiScale=2` simulates scaling; it does not qualify a physical
+display. Lifecycle's unreadable-bootstrap scenario requires POSIX permissions and
+an unprivileged user. Drivers use disposable vaults and clear their fixtures on
+success or failure. Screenshots are ignored diagnostics under
+`review/screenshots/swing-smoke/<group>/`; they are not pixel assertions.
+
+These groups replace the historical S3/S4/S5/PostS5 entry names. Robot execution,
+including execution on Xvfb, remains separate from the native
+[GUI](qualification/GUI_SMOKE.md), [packaged launch](qualification/PACKAGED_LAUNCH.md),
+[clipboard](qualification/CLIPBOARD_SMOKE.md) and
+[accessibility](qualification/ACCESSIBILITY_SMOKE.md) procedures. Run the affected
+native procedure at the milestone boundary; this driver does not replace it.
+
 The existing `nix develop` shell supplies the full `jdk25` for Swing, not a
 headless JDK. `./bootstrap-m0.sh` generates/verifies the exact wrapper and
 builds using existing locks and strict verification. To deliberately regenerate

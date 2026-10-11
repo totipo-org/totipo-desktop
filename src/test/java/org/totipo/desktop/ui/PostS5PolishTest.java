@@ -351,7 +351,7 @@ class PostS5PolishTest {
     }
     private static void mouseAction(JButton button) {
         // Same pressed/released model route used by BasicButtonListener; real
-        // OS focus and Robot mouse coverage lives in PostS5PolishSwingSmoke.
+        // OS focus and Robot mouse coverage lives in SwingSmoke's polish group.
         button.getModel().setArmed(true); button.getModel().setPressed(true);
         button.getModel().setPressed(false); button.getModel().setArmed(false);
     }
