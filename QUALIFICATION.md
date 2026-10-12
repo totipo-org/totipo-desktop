@@ -49,15 +49,24 @@ Ordinary production target: baseline normal 1, final normal 1, final strict/
 distribution 1, human Nix 1; docs-only may justify zero broad gates.
 Historical evidence below is preserved, not a current inner-loop matrix.
 
+Local pre-commit qualification uses the Git-aware working tree. Keep modified
+tracked files unstaged; use `git add --intent-to-add <file>` for each new intended
+milestone file, including the review report, before the human gate. Intent-to-add
+establishes source membership only. `git diff --cached --quiet` must pass; actual
+content staging requires explicit user authorization. Retain intent-to-add entries
+for human review. Ignored build/cache/local-secret state stays outside Git source
+membership. Explicit `path:` is reserved for intentional raw/non-Git sources,
+including generated/exported directories. See [agent policy](AGENTS.md#nix-last-and-invalidation).
+
 For milestones requiring Nix qualification, the human gate is
-`nix flake check path:.` only. Agents do not
+`nix flake check` only. Agents do not
 run Nix in this workflow and must not request an additional ordinary `nix build`
 as qualification evidence. `checks.desktop` and `packages.default` are the same
 Linux package derivation: flake checks include its Gradle tests/build,
 distribution/archive verification, install checks and separate wrapper integrity.
 Store reuse is permitted; this does not require a fresh execution of every task.
-`nix build path:.` only materializes that package/creates a local result link.
-`nix build --rebuild path:.` is a separate deliberate release/reproducibility
+`nix build .` only materializes that package/creates a local result link.
+`nix build --rebuild .` is a separate deliberate release/reproducibility
 spot-check, limited to the tested derivation/builders, never a routine milestone gate.
 This does not qualify native GUI, every filesystem, release publication or
 arbitrary-builder reproducibility. Prior multi-command evidence below records

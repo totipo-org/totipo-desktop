@@ -26,4 +26,4 @@ jobs:
             accept-flake-config = true
 
       - name: Build and verify desktop package
-        run: nix flake check --print-build-logs path:.
+        run: nix flake check --print-build-logs

@@ -277,7 +277,7 @@ artifacts through the reviewed dependency cache. Freeze Nix qualification inputs
 before the human gate for milestones requiring Nix qualification:
 
 ```sh
-nix flake check path:.
+nix flake check
 ```
 
 `checks.desktop` and `packages.default` reference the same derivation. This gate
@@ -287,17 +287,17 @@ verifies the wrapper JAR and pinned distribution properties without executing
 the wrapper. Nix can reuse an already qualified store result; this is not a
 forced rebuild. CI uses the pinned Nix environment and this single gate.
 
-`nix build path:.` materializes the default package and creates a local `result`
+`nix build .` materializes the default package and creates a local `result`
 link when wanted, for example for `./result/bin/totipo-desktop` native testing.
 It provides no independent build/test result after the same derivation passes
 flake checks and is not an additional qualification gate.
-`nix build --rebuild path:.` is reserved for deliberate release/reproducibility
+`nix build --rebuild .` is reserved for deliberate release/reproducibility
 spot-checks. Its evidence is limited to the tested derivation/builders, not
 universal reproducibility. Flake checks do not qualify native GUI behavior,
 every filesystem, release publication, or reproducibility across arbitrary builders.
 
 Agents do not run Nix in this workflow. Human routine Nix gate:
-`nix flake check path:.`. Do not request an additional ordinary `nix build`
+`nix flake check`. Do not request an additional ordinary `nix build`
 as qualification evidence or a forced rebuild for a routine milestone.
 
 The wrapper fixes `JAVA_HOME` to the managed full JDK and supplies launcher shell
@@ -317,7 +317,7 @@ Only when dependency inputs change, generate/refresh using the flake app, which 
 official Gradle dependency-cache update script for the current system:
 
 ```sh
-nix run path:.#update-package-deps
+nix run .#update-package-deps
 ```
 
 To build and run that script directly instead:
@@ -327,17 +327,23 @@ set update_script (
     nix build \
         --no-link \
         --print-out-paths \
-        'path:.#packages.x86_64-linux.default.mitmCache.updateScript'
+        '.#packages.x86_64-linux.default.mitmCache.updateScript'
 )
 
 $update_script
 
-nix flake check path:.
+nix flake check
 ```
 
-Substitute `aarch64-linux` only when qualifying that system. During an uncommitted
-review, `path:.` includes uncommitted/untracked files that Git-based
-flake sources can omit. Do not update `flake.lock` or Gradle verification hashes
+Substitute `aarch64-linux` only when qualifying that system. Local pre-commit
+qualification uses the Git-aware working tree: modified tracked files remain
+unstaged; for each new intended milestone file, use
+`git add --intent-to-add <file>` to establish source membership without staging
+contents. Require `git diff --cached --quiet` to pass. Staging actual file contents
+requires explicit user authorization. Ignored caches, build output and local
+secrets must remain outside Git source membership. Explicit `path:` sources are
+reserved for intentional raw/non-Git paths, such as generated or exported source.
+Do not update `flake.lock` or Gradle verification hashes
 just to make the build pass. Review `package-deps.json`: it should match the locked
 released Totipo artifacts, retain BC 1.86, and leave unrelated dependencies unchanged.
 The update task runs desktop checks and distribution verification only.

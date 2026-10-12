@@ -50,7 +50,7 @@ semantics; session replacement guards are separate from state validity.
 
 Follow the committed convention in [QUALIFICATION.md](QUALIFICATION.md): agents
 run normal non-Nix validation; the human milestone gate is exactly
-`nix flake check path:.`. Do not run Nix or request an ordinary `nix build` gate.
+`nix flake check`. Do not run Nix or request an ordinary `nix build` gate.
 
 **Focused iteration; complete boundary qualification.** Do not rerun full desktop
 build/distribution/Nix after every small correction.
@@ -171,8 +171,28 @@ Freeze production source, tests, package/build configuration and qualification
 tooling included by the flake source before requesting exactly the human gate:
 
 ```sh
-nix flake check path:.
+nix flake check
 ```
+
+Local pre-commit Nix qualification uses the Git-aware working tree. Existing
+modified tracked files remain unstaged. For each new intended milestone file,
+including its report, the agent may run:
+
+```sh
+git add --intent-to-add <file>
+git diff --cached --quiet
+```
+
+Intent-to-add establishes source membership only; the second command must pass.
+The invariant is **no staged file content**, not a literally empty index.
+Staging actual file contents remains prohibited without explicit user authorization.
+Leave intent-to-add entries in place for human review/commit after qualification.
+Ignored/local build, cache and secret state must remain outside Git source membership.
+Use Git-aware local forms (`nix build .#<target>`, `nix run .#<app> -- ...`,
+`nix develop`) when consuming this checkout. Explicit `path:` sources remain valid
+only when raw/non-Git semantics are intentional, such as generated/exported source
+or a deliberately raw filesystem path. Do not substitute them for the current
+Git working tree.
 
 Agents never run Nix. No ordinary `nix build` gate. `nix build --rebuild` remains
 release/reproducibility-specific, not routine milestone qualification.

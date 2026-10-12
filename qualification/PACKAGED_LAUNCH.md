@@ -16,8 +16,8 @@ desktop/window manager, date and each result. Do not use `gradlew run` as eviden
 
 ## Nix package
 
-- [ ] Review the official MITM cache (regenerate only when dependency inputs change); qualify with `nix flake check path:.`.
-- [ ] When a local result link is needed for the native inspection/launch below, materialize it with `nix build path:.`. This is not a second qualification gate: checks.desktop and packages.default are the same derivation.
+- [ ] Review the official MITM cache (regenerate only when dependency inputs change); qualify with `nix flake check`.
+- [ ] When a local result link is needed for the native inspection/launch below, materialize it with `nix build .`. This is not a second qualification gate: checks.desktop and packages.default are the same derivation.
 - [ ] Inspect package source: desktop sources and Gradle locks/verification present; Java implementation source, spec snapshots/corpus, .git, build, .gradle, IDE/temp/review files absent. Released Totipo JARs come from the reviewed Maven dependency cache.
 - [ ] Inspect `result/bin/totipo-desktop`: managed full JDK JAVA_HOME is fixed; utilities are supplied; no build-directory/classpath leakage.
 - [ ] Inspect four runtime JARs under lib/totipo-desktop/lib; no test JARs or mutable caches/configuration.
@@ -38,6 +38,6 @@ desktop/window manager, date and each result. Do not use `gradlew run` as eviden
 A successful headless launch reaching a HeadlessException proves only runtime
 entry-point loading. It is not a GUI pass. A second cached Nix build is not a
 reproducibility rebuild. Only for deliberate release/reproducibility spot-checks,
-use `nix build --rebuild path:.` and record the exact derivation/builders and
+use `nix build --rebuild .` and record the exact derivation/builders and
 comparison. This is not routine milestone/CI qualification and does not prove
 universal reproducibility.
