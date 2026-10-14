@@ -12,8 +12,8 @@ Run from the actual package. Each unchecked item remains UNQUALIFIED.
 - [ ] Different external replacement survives Totipo's expiry/close cleanup.
 - [ ] Identical text copied by another application survives cleanup; marker ownership, not text equality, governs clearing.
 - [ ] A newer Totipo copy survives an older copy's callback/expiry; its own expiry still applies.
-- [ ] Closing another vault does not clear the origin vault's current copy.
-- [ ] Closing the origin vault/application attempts to clear its owned payload.
+- [ ] Change Vault clears the retiring session’s owned copy before another vault opens.
+- [ ] Locking or closing the vault/application attempts to clear its owned payload.
 - [ ] TOTP rollover does not automatically copy a new code or restore old data.
 - [ ] Selection and filter changes do not automatically copy; hidden selections clear normally.
 - [ ] Active conflict alternatives have independent Copy buttons; ineligible/tombstoned states do not copy.

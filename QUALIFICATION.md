@@ -8,69 +8,44 @@ or clipboard qualification.
 
 ## Current qualification process
 
-**Focused iteration; complete boundary qualification.** Follow the durable
-[qualification ladder](AGENTS.md#qualification-ladder) for exact commands,
-classification, failure diagnosis, invalidation and execution counts.
-Java-operation classification determines WHAT needs testing.
-Qualification ladder determines WHEN broad tests run.
+Development uses the activated Nix/direnv JDK 25 and Gradle environment.
+Follow [AGENTS.md](AGENTS.md#qualification-ladder) for classification, focused
+iteration, failure diagnosis, source freeze and execution accounting.
 
-Each milestone report records applicable classes: `DOCS_ONLY`, `UI_PRESENTATION`,
-`CONTROLLER_LIFECYCLE`, `FILESYSTEM_WATCHER`, `PRODUCT_MUTATION`,
-`BUILD_DEPENDENCY`, `PACKAGING_RELEASE`.
+The owner and CI use one authoritative automatic gate: `nix flake check`.
+Agents never invoke Nix. Its Linux `checks.desktop` and `packages.default`
+share the package derivation: installDist, full Java tests through check,
+essential distribution inventory and Nix installation checks. Generic ZIP/TAR
+construction is separate when affected or prepared for release. There is no
+mandatory duplicate normal/strict/offline full-suite ladder before Nix.
+A reused store result is qualified reuse, not freshly executed tests.
 
-- **Development inner-loop checks:** baseline ordinary production work once with
-  `./gradlew test verifyMavenBoundary verifyJava17Bytecode`, then use narrow affected
-  tests. No clean/rerun/offline baseline; no baseline ZIP/TAR except packaging work.
-  Do not repeat broad build/distribution/native smoke after each correction.
-- **Final milestone qualification:** after stability, one normal
-  `./gradlew test build verifyMavenBoundary verifyJava17Bytecode`, then one combined
-  fresh strict/distribution gate for production/build/package changes, using the
-  exact command in AGENTS.md. Do not separately repeat its component tasks without
-  input invalidation. Specialized filesystem, GUI, clipboard and accessibility
-  qualification runs once only when affected. Diagnose full failures with focused
-  reproduction/fixes/PASS before rerunning the affected full gate once.
-- **Documentation/provenance-only profile:** when production, tests and build/package
-  inputs are unchanged, use static consistency checks, relevant pin inspection and
-  `git diff --check`; document why distribution evidence remains applicable.
-  No automatic baseline/final Gradle or strict/distribution rebuild. Inspect Nix
-  filtering and explicit inputs before deciding whether human Nix is required.
-- **Release-only/reproducibility checks:** retain the blocking release checklist
-  and deliberate reproducibility spot-checks. Routine milestone PASS does not
-  declare a release or qualify untested platforms/native behavior.
+Headless tests, filesystem qualification, native GUI/clipboard/accessibility,
+actual packaged launch and release-only independent build comparison remain
+distinct. Run affected boundaries, record environments and leave unavailable
+checks UNQUALIFIED. Generic distributions require externally supplied Java 25;
+Nix supplies managed Java 25. Java 17 is no longer a supported desktop runtime.
 
-Freeze all Nix qualification inputs before the human gate. Any such input changed
-afterward requires human Nix again. Checklist/report text alone does not require
-Gradle unless packaged/checked. Harness-only edits require the affected harness
-and Nix-inclusion inspection; verifier-only edits require verification against
-final outputs, with rebuild only for a real packaging problem. Production/test/
-build changes after the strict gate require the applicable Gradle gate.
-Record all attempted gate counts, including failures and invalidation reruns.
-Ordinary production target: baseline normal 1, final normal 1, final strict/
-distribution 1, human Nix 1; docs-only may justify zero broad gates.
-Historical evidence below is preserved, not a current inner-loop matrix.
+Freeze consumed inputs before owner Nix. Use Git-aware intent-to-add membership
+for new intended files, keep tracked edits unstaged and require
+`git diff --cached --quiet`. Changed consumed inputs invalidate affected evidence.
+DOCS_ONLY input-invariant changes need static checks rather than full rebuilds.
 
-Local pre-commit qualification uses the Git-aware working tree. Keep modified
-tracked files unstaged; use `git add --intent-to-add <file>` for each new intended
-milestone file, including the review report, before the human gate. Intent-to-add
-establishes source membership only. `git diff --cached --quiet` must pass; actual
-content staging requires explicit user authorization. Retain intent-to-add entries
-for human review. Ignored build/cache/local-secret state stays outside Git source
-membership. Explicit `path:` is reserved for intentional raw/non-Git sources,
-including generated/exported directories. See [agent policy](AGENTS.md#nix-last-and-invalidation).
+The owner expressly approved this policy transition for the Nix-first/Java 25
+milestone. Previous normal-plus-strict gate requirements are superseded; historical
+results below retain their original scope and do not qualify the new Java target.
+Current milestone evidence and pending native checks are recorded in
+[the simplification report](review/DESKTOP_NIX_FIRST_SIMPLIFICATION_REPORT.md).
+The owner reports `nix flake check` passed after correction of the Nix install
+assertion's literal JDK-path match. The initial attempt failed in installCheckPhase
+after successful Gradle checks. Successful-rerun logs/store-reuse details were not
+provided; no fresh test-execution or native GUI/clipboard PASS is inferred.
 
-For milestones requiring Nix qualification, the human gate is
-`nix flake check` only. Agents do not
-run Nix in this workflow and must not request an additional ordinary `nix build`
-as qualification evidence. `checks.desktop` and `packages.default` are the same
-Linux package derivation: flake checks include its Gradle tests/build,
-distribution/archive verification, install checks and separate wrapper integrity.
-Store reuse is permitted; this does not require a fresh execution of every task.
-`nix build .` only materializes that package/creates a local result link.
-`nix build --rebuild .` is a separate deliberate release/reproducibility
-spot-check, limited to the tested derivation/builders, never a routine milestone gate.
-This does not qualify native GUI, every filesystem, release publication or
-arbitrary-builder reproducibility. Prior multi-command evidence below records
-historical practice, not current instructions.
+The owner subsequently reports a **GUI quick smoke test, including Copy: PASS**
+for this milestone. Exact package route/artifact identity, native environment and
+individual checklist results were not supplied. This records the reported smoke
+scope; clipboard expiry/ownership/history, OS lifecycle, accessibility and the
+full native/package matrix remain UNQUALIFIED where not individually exercised.
 
 The infrastructure milestone's agent checks and human-reported PASS for
 `nix flake check path:.` are recorded in [its report](review/DESKTOP_NIX_CI_UNIFICATION_REPORT.md).

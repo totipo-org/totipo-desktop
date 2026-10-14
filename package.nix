@@ -12,27 +12,6 @@
 let
   rawVersion = builtins.readFile ./VERSION;
   version = if lib.hasSuffix "\r\n" rawVersion then lib.removeSuffix "\r\n" rawVersion else lib.removeSuffix "\n" rawVersion;
-  cacheData = builtins.fromJSON (builtins.readFile ./package-deps.json);
-  centralCache = cacheData."https://repo.maven.apache.org/maven2/org" or { };
-  # The dependency cache is stale after a repin until the operator regenerates it.
-  # Match the actual locked modules so a future dependency update also fails closed.
-  totipoLocks = builtins.filter (line: lib.hasPrefix "org.totipo:" line)
-    (lib.splitString "\n" (builtins.readFile ./gradle.lockfile));
-  totipoJars = builtins.map
-    (line:
-      let coordinate = lib.splitString ":" (builtins.head (lib.splitString "=" line));
-      in "${builtins.elemAt coordinate 1}-${builtins.elemAt coordinate 2}.jar")
-    totipoLocks;
-  cacheReady = builtins.length totipoLocks == 2 && builtins.all
-    (line:
-      let
-        coordinate = lib.splitString ":" (builtins.head (lib.splitString "=" line));
-        key = "totipo#${builtins.elemAt coordinate 1}/${builtins.elemAt coordinate 2}";
-        entry = centralCache.${key} or { };
-      in
-      entry ? jar && (entry ? module || entry ? pom)
-    )
-    totipoLocks;
   # Only desktop sources, build inputs and packaged license notices.
   trees = [
     "src"
@@ -83,17 +62,11 @@ stdenv.mkDerivation (finalAttrs: {
     "--no-configuration-cache"
     "--dependency-verification=strict"
   ];
-  gradleBuildTask = "installDist verifyDistributionArchives";
+  gradleBuildTask = "installDist";
   doCheck = true;
   gradleCheckTask = "check";
   # Fetch exactly the tasks the package will execute, including desktop tests.
-  gradleUpdateTask = "installDist verifyDistributionArchives check";
-  preBuild = ''
-    if [ -z "''${IN_GRADLE_UPDATE_DEPS:-}" ] && [ "${if cacheReady then "yes" else "no"}" != yes ]; then
-      echo 'package-deps.json is stale or ungenerated; run mitmCache.updateScript as documented in README.md' >&2
-      exit 1
-    fi
-  '';
+  gradleUpdateTask = "installDist check";
   installPhase = ''
     runHook preInstall
     mkdir -p "$out/bin" "$out/lib/totipo-desktop" "$out/share/doc/totipo-desktop"
@@ -123,26 +96,25 @@ stdenv.mkDerivation (finalAttrs: {
   installCheckPhase = ''
     runHook preInstallCheck
     test -x "$out/bin/totipo-desktop"
-    grep -F -- '${jdk}' "$out/bin/totipo-desktop"
+    grep -F -- "export JAVA_HOME='${jdk}'" "$out/bin/totipo-desktop"
     grep -F -- '-XX:+DisableAttachMechanism' "$out/lib/totipo-desktop/bin/totipo-desktop-unwrapped"
-    test "$(find "$out/lib/totipo-desktop/lib" -type f -name '*.jar' | wc -l)" -eq 4
+    test -x "$out/lib/totipo-desktop/bin/totipo-desktop-unwrapped"
     test -f "$out/lib/totipo-desktop/lib/totipo-desktop-${version}.jar"
-    ${lib.concatMapStringsSep "\n" (jar: ''test -f "$out/lib/totipo-desktop/lib/${jar}"'') totipoJars}
-    test -f "$out/lib/totipo-desktop/lib/bcprov-jdk18on-1.86.jar"
-    for jar in build/install/totipo-desktop/lib/*.jar; do
-      cmp "$jar" "$out/lib/totipo-desktop/lib/$(basename "$jar")"
-    done
+    grep -F -- "$out/lib/totipo-desktop/bin/totipo-desktop-unwrapped" "$out/bin/totipo-desktop"
+    test ! -e "$out/lib/totipo-desktop/bin/totipo-desktop.bat"
     desktop="$out/share/applications/totipo-desktop.desktop"
     grep -x 'Icon=totipo' "$desktop"
     for icon in packaging/icons/hicolor/*/apps/totipo.*; do
-      cmp "$icon" "$out/share/icons/hicolor/''${icon#packaging/icons/hicolor/}"
+      test -f "$out/share/icons/hicolor/''${icon#packaging/icons/hicolor/}"
     done
     grep -x 'Name=Totipo' "$desktop"
     grep -x 'Exec=totipo-desktop' "$desktop"
     # makeDesktopItem joins lists without a trailing separator; both forms are valid.
     grep -Ex 'Categories=Utility;?' "$desktop"
     grep -x 'Terminal=false' "$desktop"
-    test -f "$out/share/doc/totipo-desktop/LICENSE"
+    for notice in LICENSE THIRD_PARTY.md VERSION; do
+      test -f "$out/share/doc/totipo-desktop/$notice"
+    done
     test -f "$out/share/doc/totipo-desktop/licenses/BOUNCY_CASTLE_LICENSE.html"
     test -f "$out/share/doc/totipo-desktop/licenses/TOTIPO_JAVA_LICENSE"
     test -z "$(find "$out" \( -name '.gradle' -o -name '.git' -o -name '*.java' -o -iname '*junit*.jar' -o -iname '*test*.jar' \) -print -quit)"

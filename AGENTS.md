@@ -48,176 +48,88 @@ semantics; session replacement guards are separate from state validity.
 
 ## Qualification ladder
 
-Follow the committed convention in [QUALIFICATION.md](QUALIFICATION.md): agents
-run normal non-Nix validation; the human milestone gate is exactly
-`nix flake check`. Do not run Nix or request an ordinary `nix build` gate.
+Supported development requires the activated Nix/direnv environment. Nix selects
+one JDK 25 and patched Gradle derivation for development, agents and packaging.
+Desktop compilation and generic runtime support target Java 25.
 
-**Focused iteration; complete boundary qualification.** Do not rerun full desktop
-build/distribution/Nix after every small correction.
-Java-operation classification determines WHAT needs testing.
-Qualification ladder determines WHEN broad tests run. Neither rule weakens the
-operation-model requirements above.
+### Classification and development
 
-### Classification and baseline
-
-Start from clean `main`. Each future agent must classify its milestone and record
-the classification in its report; combine classes when scopes overlap:
-
-| Class | Scope |
-| --- | --- |
-| `DOCS_ONLY` | Documentation/provenance; production, tests and build/package inputs unchanged |
-| `UI_PRESENTATION` | GUI presentation, layout, interaction or accessibility |
-| `CONTROLLER_LIFECYCLE` | Admission, concurrency, session ownership, lock or retirement |
-| `FILESYSTEM_WATCHER` | Watcher integration or filesystem observation |
-| `PRODUCT_MUTATION` | Add/Edit/Delete/Resolve, publication, save or retry |
-| `BUILD_DEPENDENCY` | Build inputs, dependency pins, locks or verification |
-| `PACKAGING_RELEASE` | Distribution, packaging or release work |
-
-For ordinary production milestones, baseline ONCE using a reasonably fast normal
-gate. The committed starting point already has prior distribution qualification:
+Start from clean main. Record applicable milestone classes: `DOCS_ONLY`,
+`UI_PRESENTATION`, `CONTROLLER_LIFECYCLE`, `FILESYSTEM_WATCHER`,
+`PRODUCT_MUTATION`, `BUILD_DEPENDENCY`, `PACKAGING_RELEASE`.
+Java-operation classification determines what needs testing; this ladder determines
+when to run broad qualification. Use a baseline when useful and focused Gradle
+tests during development, for example:
 
 ```sh
-./gradlew test verifyMavenBoundary verifyJava17Bytecode
+gradle test --tests '*VaultWindowControllerTest'
+gradle test --tests '*WatcherSessionIntegrationTest'
+gradle run
 ```
 
-Do not use clean/rerun/offline at baseline. Do not build ZIP/TAR at baseline unless
-the milestone itself concerns packaging/distribution.
+Do not clean or rebuild every distribution after each small edit. Diagnose broad
+failures with focused reproduction, fixes and focused PASS before rerunning the
+affected gate. Do not continue past unexplained build or packaging failures.
 
-### Development inner loop and failure diagnosis
+### Final authority and separate boundaries
 
-Use the narrowest affected tests, for example:
-
-```sh
-./gradlew test --tests '*TokenBrowserTest'
-./gradlew test --tests '*VaultWindowControllerTest'
-./gradlew test --tests '*WatcherSessionIntegrationTest'
-```
-
-Watcher changes may use the focused disposable filesystem harness. UI changes may
-use focused Swing tests. After each edit, do not clean, run distribution tasks,
-force offline rebuilds, request Nix, or rerun filesystem/native smoke.
-
-If a full gate fails, follow:
-
-```text
-full failure -> focused reproduction -> focused fixes -> focused PASS
-             -> rerun the affected full gate once
-```
-
-Do not run the entire matrix repeatedly while diagnosing.
-
-### Final milestone qualification
-
-When source/tests are stable, run the final normal gate ONCE:
-
-```sh
-./gradlew \
-  test \
-  build \
-  verifyMavenBoundary \
-  verifyJava17Bytecode
-```
-
-No clean is needed unless investigating a concrete stale-output issue. Existing
-task dependencies apply: `build` reaches `check`, which includes installed-
-distribution verification and qualification harness compilation.
-
-For production/build/package changes, run the final strict/distribution gate ONCE:
-
-```sh
-./gradlew \
-  --offline \
-  --no-daemon \
-  --no-build-cache \
-  --rerun-tasks \
-  clean \
-  test \
-  build \
-  installDist \
-  distTar \
-  distZip \
-  verifyDistribution \
-  verifyDistributionArchives \
-  verifyMavenBoundary \
-  verifyJava17Bytecode
-```
-
-This is the fresh final distribution proof. Do not separately rerun `clean test`,
-`installDist`, `distTar` or `distZip` afterward unless actual relevant inputs change.
-
-For `DOCS_ONLY`, with `src/main`, `src/test` and Gradle/build/package inputs
-unchanged, use documentation/static consistency checks, dependency/pin inspection
-when relevant, and `git diff --check`. Do not automatically run baseline/final
-Gradle or expensive strict/distribution gates. Explain why the full distribution
-gate was not invalidated. Request human Nix only if changed paths are qualification
-inputs or current policy requires it; inspect source filtering and explicit flake
-references rather than assuming every Markdown edit requires Nix.
-
-Run specialized final qualification once after stability, only for affected scope:
-
-| Affected scope | Specialized final check |
-| --- | --- |
-| Watcher/filesystem | Disposable watcher/filesystem qualification |
-| GUI/layout | Focused native GUI smoke |
-| Clipboard | Clipboard qualification |
-| Accessibility | Relevant accessibility/native qualification |
-
-Do not carry every historical harness into every milestone. Record actual tested
-environments and limitations; headless Swing tests do not establish native PASS.
-
-### Nix last and invalidation
-
-Freeze production source, tests, package/build configuration and qualification
-tooling included by the flake source before requesting exactly the human gate:
+The human-owned authoritative automatic repository gate is exactly:
 
 ```sh
 nix flake check
 ```
 
-Local pre-commit Nix qualification uses the Git-aware working tree. Existing
-modified tracked files remain unstaged. For each new intended milestone file,
-including its report, the agent may run:
+Agents never execute Nix. CI runs the same package-inclusive check. An uncached
+package builds installDist, executes the full application test suite through
+`check`, verifies essential distribution contents and checks Nix installation
+transformations. Store reuse is valid evidence of a qualified derivation; report
+reuse accurately rather than claiming fresh tests.
+
+Agents may run focused or full Gradle checks using the already available Nix
+toolchain. No mandatory normal-plus-strict/offline duplicate full suites precede
+the Nix gate. Build generic archives when the milestone affects them:
+
+```sh
+gradle test build installDist distZip distTar verifyDistribution
+```
+
+Headless Java tests, disposable filesystem qualification, native GUI/clipboard,
+actual packaged launch and deliberate release reproducibility are distinct.
+Run affected specialized checks on the artifact/environment claimed. Record
+unavailable checks as pending/UNQUALIFIED; headless Swing does not establish
+native PASS. Preserve useful behavior tests and historical evidence.
+DOCS_ONLY changes use static consistency checks and `git diff --check`; inspect
+source filtering and explicit flake inputs before requesting human Nix.
+
+### Nix last and invalidation
+
+Freeze all consumed production/test/build/package/qualification inputs before
+requesting the human gate. Any consumed input changed afterward invalidates
+affected evidence and requires the human gate again. Report/checklist-only edits
+do not require Gradle unless packaged or checked; harness changes require their
+affected checks. Verifier-only edits require verification against final outputs;
+rebuild only if a real packaging problem is identified.
+
+Use the Git-aware working tree. Modified tracked files stay unstaged. For each
+new intended milestone file, including its report, agents may run:
 
 ```sh
 git add --intent-to-add <file>
 git diff --cached --quiet
 ```
 
-Intent-to-add establishes source membership only; the second command must pass.
-The invariant is **no staged file content**, not a literally empty index.
-Staging actual file contents remains prohibited without explicit user authorization.
-Leave intent-to-add entries in place for human review/commit after qualification.
-Ignored/local build, cache and secret state must remain outside Git source membership.
-Use Git-aware local forms (`nix build .#<target>`, `nix run .#<app> -- ...`,
-`nix develop`) when consuming this checkout. Explicit `path:` sources remain valid
-only when raw/non-Git semantics are intentional, such as generated/exported source
-or a deliberately raw filesystem path. Do not substitute them for the current
-Git working tree.
+Intent-to-add establishes source membership only; no staged file content is
+permitted without explicit authorization. Leave membership for owner review.
+Ignored caches/build output/secrets remain outside source membership. Git-aware
+local Nix forms consume this checkout; explicit `path:` sources are reserved for
+intentional raw/non-Git sources. No ordinary `nix build` qualification gate.
+A human may materialize a package for native launch; deliberate independent
+release comparisons are separate from routine qualification and store reuse.
 
-Agents never run Nix. No ordinary `nix build` gate. `nix build --rebuild` remains
-release/reproducibility-specific, not routine milestone qualification.
+### Evidence
 
-| Change after final qualification | Required response |
-| --- | --- |
-| Production/test/build input after final strict gate | Rerun applicable Gradle gate |
-| Only GUI smoke checklist/report text | No Gradle rerun unless packaged/checked |
-| Watcher harness; production unchanged | Rerun watcher harness; determine whether Nix source includes it |
-| Distribution verifier | Rerun distribution verification against final outputs; rebuild only if verifier identifies a real packaging problem |
-| Any flake-source input after Nix | Rerun human Nix |
-
-Apply invalidation to consumed qualification inputs, including explicit flake
-references. Files merely present in the checkout are not necessarily consumed.
-
-### Execution counts and evidence
-
-Every substantial report records classification, baseline gate count, focused tests
-(commands and runs), final normal gates, final strict gates, specialized filesystem/
-GUI runs (and other relevant specialized checks), and Nix runs. Count failures and
-invalidation reruns too; distinguish agent runs, human-reported runs and unperformed
-checks. Do not infer cache/fresh execution from a human PASS without logs.
-
-Clean target for ordinary production milestones: baseline normal **1**, final normal
-**1**, final strict/distribution **1**, human Nix **1**. Focused iteration varies;
-specialized runs depend on scope. `DOCS_ONLY` may correctly record zero broad gates
-with an input-invariance explanation. Preserve historical reports, failures and
-input-specific PASS evidence; their old command matrices are not current policy.
+Substantial reports record classification, exact source/toolchain identities,
+baseline/focused/full Gradle commands and execution counts including failures,
+specialized filesystem/GUI/clipboard runs, Nix agent runs (zero), human-reported
+gate results, pending checks, and input invalidation. Do not infer fresh execution
+from a human PASS without logs. No release is authorized by qualification alone.

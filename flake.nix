@@ -17,10 +17,9 @@
         pkgs = import nixpkgs {
           inherit system;
         };
-        desktop = pkgs.callPackage ./package.nix {
-          jdk = pkgs.jdk25;
-          gradle = pkgs.gradle_9.override { java = pkgs.jdk25; };
-        };
+        jdk = pkgs.jdk25;
+        gradle = pkgs.gradle_9.override { java = jdk; };
+        desktop = pkgs.callPackage ./package.nix { inherit jdk gradle; };
       in
       {
         formatter = pkgs.nixpkgs-fmt;
@@ -33,12 +32,6 @@
         # intentionally references the same derivation as packages.default.
         checks = pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
           desktop = desktop;
-          wrapper = pkgs.runCommand "gradle-wrapper-integrity" { } ''
-            echo '238e777fcddd7e34f9708186085def2abd6e08e658505b38718d79d74c21abd5  ${./gradle/wrapper/gradle-wrapper.jar}' | sha256sum --check -
-            grep -Fx 'distributionSha256Sum=bafd5ce9cfaea0fbccfdc8439a1ac42fbd4cd9c89dc9a988228d8a2639a58e6c' ${./gradle/wrapper/gradle-wrapper.properties}
-            grep -Fx 'distributionUrl=https\://services.gradle.org/distributions/gradle-9.8.0-bin.zip' ${./gradle/wrapper/gradle-wrapper.properties}
-            touch "$out"
-          '';
         };
 
         apps = pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
@@ -50,16 +43,18 @@
         };
 
         devShells.default = pkgs.mkShell {
-          packages = with pkgs; [
-            jdk25
-            gradle_9
+          JAVA_HOME = "${jdk}/lib/openjdk";
+          packages = [
+            jdk
+            gradle
+            pkgs.coreutils
 
             (jailed-agents.lib.${system}.makeJailedCodex {
               fwdEnv = [ "JAVA_HOME" ];
 
-              extraPkgs = with pkgs; [
-                jdk25
-                gradle_9
+              extraPkgs = [
+                jdk
+                gradle
               ];
             })
           ];

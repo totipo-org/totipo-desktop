@@ -67,7 +67,7 @@ It runs token builder factory/setters/save/close, publication retry/capability
 cleanup and session close. Blocking open, create and close never run on the EDT.
 Executors are explicitly shut down; no shutdown interrupts an in-flight operation.
 The application uses neither SwingWorker nor virtual threads nor reactive libraries.
-Production code remains compatible with Java 17.
+Desktop compilation and runtime support target Java 25.
 
 ## Shell, selection, and passwords
 
@@ -309,8 +309,7 @@ during open/create. M1a fake states reject unexpected token/editing/TOTP methods
 M2a adds public-interface write fakes; M2b adds merge/partial fakes and deterministic
 close barriers. Real-NIO temporary-directory tests cover
 create/close/open/close, TOTP intervals, desktop token create/update, and a real
-conflict created by historical concurrent updates then explicitly merged. Build/test also
-verify every production class is Java 17 classfile version 61. No new production or
+conflict created by historical concurrent updates then explicitly merged. Gradle uses the JDK 25 compiler with release target 25. No new production or
 test dependencies were needed.
 
 ## Logical-token browser and TOTP (M1b)
@@ -657,15 +656,15 @@ not secure erasure or a guarantee against concurrent OS clipboard activity.
 The Gradle application distribution is the canonical launcher plus runtime-JAR
 layout. The Linux Nix derivation consumes that layout and fixes JAVA_HOME to the
 full pinned desktop-capable JDK; it does not introduce another application entry
-point or storage policy. Generic archives rely on user-supplied Java 17 or newer.
+point or storage policy. Generic archives rely on user-supplied Java 25 or newer.
 VERSION is shared by Gradle and Nix; it identifies a development state until a
 candidate is deliberately chosen. Package construction does not declare a release.
 
 Only generated launch scripts default to `-XX:+DisableAttachMechanism`, reducing
 JVM Attach API availability in this password/TOTP application. It does not prevent
 same-user inspection or memory attacks. Development `run` remains debuggable.
-Distribution verification permits only desktop/core/storage-nio/Bouncy Castle
-JARs and license material; it checks all Totipo production classfiles for Java 17.
+Distribution verification checks resolved runtime inventory, notices, application
+entry point/icons and launcher policy. Standard Gradle constructs the archives.
 No runtime reduction, update network path, icon, default vault path or installer
 framework is introduced. Packaging and vault storage remain separate.
 

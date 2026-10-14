@@ -8,7 +8,7 @@ Run this with each package route claimed; see PACKAGED_LAUNCH.md.
 
 - [ ] Application launches; launcher layout fits and Create/Open are visible.
 - [ ] Create a disposable vault, close it, open it; correct window/session ownership.
-- [ ] Search issuer/account/token ID, including conflicting alternatives; counts and empty states are clear.
+- [ ] Search issuer/account, including conflicting alternatives; counts and empty states are clear.
 - [ ] Keyboard navigation, Ctrl/Cmd+F, Escape search, F5, Ctrl/Cmd+N, arrows/Page/Home/End work.
 - [ ] Normal TOTP rollover updates displayed codes/intervals without copying.
 - [ ] Conflict display shows all alternatives without implying a winner.
@@ -18,7 +18,7 @@ Run this with each package route claimed; see PACKAGED_LAUNCH.md.
 - [ ] Token publication uncertainty requires appropriate explicit decisions and do not imply freshness.
 - [ ] Resize down/up, high DPI, long issuer/account/conflict text: controls remain reachable; scroll works.
 - [ ] Focus remains visible/predictable across refresh, rollover, search, dialogs and cancellation.
-- [ ] Window close affects only its session; application shutdown closes all sessions.
+- [ ] Window close exits the application and retires its single session.
 - [ ] No EDT freeze during create/open, writes, observation or shutdown.
 
 Do not record passwords, secrets, live TOTP codes or production vault paths.

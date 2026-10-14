@@ -12,29 +12,25 @@ A green Gradle build alone cannot pass this checklist.
 - [ ] Exact `org.totipo:totipo-storage-nio:0.2.0` locked; core is transitive `org.totipo:totipo-core:0.2.0`; protocol v1/r19 confirmed.
 - [ ] Gradle verification hashes and released provenance in TOTIPO_JAVA_DEPENDENCY.md reviewed.
 - [ ] VERSION contains the intended version and is **not `0.0.0-dev`**.
-- [ ] `./gradlew validateVersion -PreleaseBuild=true` passes; intended tag equals VERSION.
+- [ ] `gradle validateVersion -PreleaseBuild=true` passes; intended tag equals VERSION.
 - [ ] Dependency/verification/lock/cache changes reviewed; no unexpected dependencies.
 
-## Build
+## Build and qualification
 
-- [ ] `./gradlew clean test build -PreleaseBuild=true`.
-- [ ] `./gradlew --no-daemon --no-build-cache --rerun-tasks clean test`.
-- [ ] `./gradlew --offline --no-daemon --no-build-cache --rerun-tasks clean test`.
-- [ ] Strict dependency verification and locking preserved; `verifyMavenBoundary` passes through `check` with no project/source substitution.
-- [ ] All desktop/core/storage-nio production classfiles verified as Java 17.
-- [ ] `./gradlew installDist distTar distZip verifyDistribution verifyDistributionArchives`.
-- [ ] Two clean builds compared (semantic contents and SHA-256); reproducibility differences resolved/documented.
-- [ ] Current reviewed package-deps.json contains released Totipo Maven artifacts; if dependency inputs changed, regenerate via the official `mitmCache.updateScript` and review it.
-- [ ] Normal Nix source/package qualification: `nix flake check` passes on every claimed Linux Nix architecture. This includes the actual default package and wrapper integrity; no additional ordinary `nix build` gate.
-- [ ] Nix Gradle/JDK versions reviewed; source filtering includes desktop/build material only.
-- [ ] Distribution JAR bytes match the exact resolved, verified Maven artifacts.
-- [ ] Nix package contents, wrapper, entry and runtime inspected. Use `nix build .` only if a local result link is needed for inspection/native launch.
-- [ ] Separate release reproducibility spot-check: `nix build --rebuild .`; record exact derivation/builders and comparison evidence honestly. This is release-specific, not a routine milestone/CI gate or proof of universal reproducibility.
+- [ ] Select/review the real non-development VERSION before qualification; source/version changes invalidate affected evidence.
+- [ ] Supported Nix JDK 25 / Gradle 9.8.0 identities reviewed; strict locks, verification metadata, fixed cache and source filtering preserved.
+- [ ] Owner `nix flake check` passes on each claimed Linux Nix architecture. Record store reuse or actual execution accurately; package tests and essential install checks are included.
+- [ ] Standard `gradle installDist distTar distZip verifyDistribution -PreleaseBuild=true` generates final generic artifacts in the activated Nix environment.
+- [ ] Essential archive files/notices/runtime inventory inspected and actual extracted Java 25 launch qualified, including paths with spaces.
+- [ ] Current reviewed package-deps.json matches dependencies; regenerate only for genuine resolved-input changes.
+- [ ] Nix wrapper invokes the installed application with managed Java 25; desktop entry/icons/notices inspected and actual native launch qualified. Materialize a result link only when needed.
+- [ ] For each reproducibility claim, deliberately build separately and compare final artifacts/hashes with exact source/toolchain/builders recorded. Reused Nix output is not an independent build. Nix `nix build --rebuild .` is a separate human release-only comparison when claiming that package reproducible.
+- [ ] Unexpected differences resolved/documented; no redundant full online/offline suites solely to construct the same application repeatedly.
 
 ## Tests
 
 - [ ] All unit and real-NIO integration tests pass.
-- [ ] Compile/runtime Maven graphs contain exact external Totipo modules; no local fallback.
+- [ ] Declared dependencies and shipped runtime inventory reviewed; no local fallback or test/development artifacts.
 - [ ] Explicit filesystemQualification passes on **every claimed filesystem/environment**, with cleanup confirmed.
 
 ## Native UI — blocking for every claimed platform/package
@@ -44,13 +40,13 @@ A green Gradle build alone cannot pass this checklist.
 - [ ] qualification/CLIPBOARD_SMOKE.md passed; clipboard manager/history limitations recorded.
 - [ ] qualification/ACCESSIBILITY_SMOKE.md keyboard/accessibility checks passed; screen-reader scope stated accurately.
 - [ ] qualification/PACKAGED_LAUNCH.md passed from actual installDist/extracted archives and Nix command as claimed.
-- [ ] JDK 25 tested; Java 17 runtime status explicitly recorded (UNQUALIFIED if unavailable).
+- [ ] Java 25 tested with actual package launch; Java 17 is not supported.
 - [ ] Unperformed GUI/clipboard/filesystem checks leave release status **NOT QUALIFIED**.
 
 ## Security
 
 - [ ] No secret logging, accidental credentials, host paths or source/cache material in artifacts/launchers.
-- [ ] Narrow four-JAR runtime allowlist and dependency inventory unchanged or deliberately reviewed.
+- [ ] Resolved runtime dependency inventory unchanged or deliberately reviewed.
 - [ ] `-XX:+DisableAttachMechanism` present in packaged launchers; no inflated security claims.
 - [ ] Clipboard policy smoke passed with native interoperability evidence.
 - [ ] Uncertainty/stale workflows reviewed; no implied synchronization/freshness.
@@ -61,10 +57,10 @@ A green Gradle build alone cannot pass this checklist.
 
 - [ ] Archive filenames/version correct; both archive contents inspected.
 - [ ] Licenses/notices included; intended runtime only; no developer environment requirement.
-- [ ] Final artifact SHA-256 generated with `scripts/sha256-release-artifacts.sh FILE...` and retained alongside exact artifacts.
+- [ ] Final artifact SHA-256 generated with `sha256sum -- FILE...` and retained alongside exact artifacts.
 - [ ] Any missing intentional application icon recorded as polish work, not replaced by placeholder branding.
 
-## Release — future actions only; do not execute during M4a
+## Release — requires explicit owner authorization
 
 - [ ] Release notes reviewed; precise qualified scope and limitations stated.
 - [ ] All preceding gates pass before any tag is created.

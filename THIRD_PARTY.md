@@ -6,11 +6,11 @@
 | `org.totipo:totipo-storage-nio` | 0.2.0 | https://github.com/totipo-org/totipo-java/tree/v0.2.0 | Apache-2.0; licenses/TOTIPO_JAVA_LICENSE |
 | `org.totipo:totipo-core` (transitive) | 0.2.0 | https://github.com/totipo-org/totipo-java/tree/v0.2.0 | Apache-2.0; licenses/TOTIPO_JAVA_LICENSE |
 | Bouncy Castle bcprov-jdk18on | 1.86 | https://www.bouncycastle.org/ | MIT; licenses/BOUNCY_CASTLE_LICENSE.html |
-| Nix full OpenJDK runtime | jdk25 from nixpkgs b6c8664de9b6cc07fe5666a29f91884ba81197c4; installed build environment 25.0.4.1+1 | https://openjdk.org/ | GPL-2.0 with Classpath exception; runtime legal notices remain in its Nix store closure |
+| Nix full OpenJDK runtime | jdk25 from nixpkgs 39ad350a0602fa0a58a544344e3e9187526ea45c; installed build environment 25.0.4.1+1 | https://openjdk.org/ | GPL-2.0 with Classpath exception; runtime legal notices remain in its Nix store closure |
 
 The generic distribution supplies only the first four rows and requires a
-user-supplied Java 17 or newer runtime. Nix selects the full JDK as a managed
-runtime dependency; the package itself has not yet been built/qualified here.
+user-supplied Java 25 or newer runtime. Nix selects the full JDK as a managed
+runtime dependency; current package qualification is recorded separately in QUALIFICATION.md.
 The JDK's own legal directory includes additional third-party notices.
 JUnit and other test dependencies are not shipped. Gradle is a build tool, not
 an application runtime dependency. Maven-fetched Totipo Java and Bouncy Castle bytecode is

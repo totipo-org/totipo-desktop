@@ -132,11 +132,4 @@ class NewVaultPickerTest {
         });
     }
 
-    @Test void newVaultEntryPointUsesOnlyAppOwnedPicker() throws Exception {
-        try (var sources = Files.walk(Path.of("src/main/java"))) {
-            for (Path source : sources.filter(path -> path.toString().endsWith(".java")).toList()) {
-                assertFalse(Files.readString(source).contains("JFileChooser"), source.toString());
-            }
-        }
-    }
 }

@@ -81,7 +81,7 @@ when its exact per-copy marker is still present. It cannot delete copies retaine
 elsewhere and does not provide secure clipboard erasure. Clipboard unavailability
 requires another deliberate Copy click; Totipo never restores previous clipboard data.
 
-Each vault window allows one write workflow at a time for Add, Edit, Delete,
+The single vault session allows one write workflow at a time for Add, Edit, Delete,
 Resolve and publication retry decisions.
 
 VAULT is immutable and create-once. Desktop provides no in-place password change.
@@ -158,20 +158,20 @@ Gradle resolves `org.totipo:totipo-storage-nio:0.2.0` and its transitive
 `org.totipo:totipo-core:0.2.0` from Maven Central. Internet access is needed
 for first resolution unless dependencies are already cached or Nix-provided.
 
-Build with **JDK 25** in `JAVA_HOME` (toolchain auto-download is disabled).
-Production classes target **Java 17**; tests use JDK 25. The repository wrapper
-pins Gradle **9.8.0**, bin distribution and checksums.
+Supported development requires Nix: activate `nix develop` or allow the
+repository's direnv environment. Both select the same full **JDK 25** and patched
+**Gradle 9.8.0** as the Linux package and agent environment. Toolchain auto-download
+is disabled. Desktop production, tests and qualification sources target Java 25.
+Non-Nix Gradle acquisition is not supported.
 
 ```sh
-./gradlew clean test build
-./gradlew --no-daemon --no-build-cache --rerun-tasks clean test
-./gradlew --offline --no-daemon --no-build-cache --rerun-tasks clean test
-./gradlew run
+gradle test --tests '*TokenBrowserTest'
+gradle run
 ```
 
-The run command requires a graphical desktop; build and tests are headless.
-Offline builds require dependencies and the wrapper distribution to be cached
-by a prior online build.
+The run command requires a graphical desktop; tests are headless. First dependency
+resolution needs network access or the reviewed Nix-provided cache. Use focused
+checks while editing; see [qualification policy](AGENTS.md#qualification-ladder).
 
 For optional graphical regression review, `org.totipo.desktop.SwingSmoke` is the
 current driver. After test compilation and `installDist`, run one scenario group
@@ -202,12 +202,11 @@ including execution on Xvfb, remains separate from the native
 [accessibility](qualification/ACCESSIBILITY_SMOKE.md) procedures. Run the affected
 native procedure at the milestone boundary; this driver does not replace it.
 
-The existing `nix develop` shell supplies the full `jdk25` for Swing, not a
-headless JDK. `./bootstrap-m0.sh` generates/verifies the exact wrapper and
-builds using existing locks and strict verification. To deliberately regenerate
-locks and SHA-256 verification metadata, use `./bootstrap-m0.sh --refresh-dependencies`
-with JDK 25 and Gradle available, then review all generated inputs. It does not
-update the Nix flake lock or Java dependency version.
+The Nix shell supplies the full desktop-capable JDK. Dependency changes are
+deliberate review work: use standard Gradle `dependencies --write-locks` and
+`--write-verification-metadata sha256` when needed, review generated locks/hashes,
+and separately update the Nix dependency cache below. These commands do not
+authorize accepting new artifacts or changing pins.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for threading, state, and ownership policy,
 [TOTIPO_JAVA_DEPENDENCY.md](TOTIPO_JAVA_DEPENDENCY.md) for the released dependency boundary, and
@@ -232,39 +231,33 @@ target.** Current release status is **NOT QUALIFIED**; see the exact evidence in
 [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md). Build success is not native GUI,
 clipboard, accessibility, or filesystem support qualification.
 
-Development remains `./gradlew run`. Follow **Focused iteration; complete boundary
-qualification**: the [durable ladder](AGENTS.md#qualification-ladder) distinguishes
-development inner-loop checks, final milestone qualification and release-only/
-reproducibility checks. Classify each milestone and record gate execution counts.
-Baseline ordinary production work once with
-`./gradlew test verifyMavenBoundary verifyJava17Bytecode`; iterate with affected
-tests, then run one final normal and one fresh strict/distribution gate from the
-ladder after stability. Do not repeat full builds/distributions/Nix or native smoke
-after each correction. Specialized final checks depend on scope. Documentation-only
-changes use static checks and input-invariance review; inspect Nix inputs before
-requesting its gate. See [QUALIFICATION.md](QUALIFICATION.md#current-qualification-process)
-for current policy and evidence. Release requirements remain in RELEASE_CHECKLIST.md.
+Development uses `gradle run` and focused tests. The owner and CI use
+`nix flake check` as the authoritative package-inclusive automatic gate.
+No duplicate full online/offline suites are required before it. Separate
+filesystem, native GUI/clipboard and actual package launch evidence remain
+necessary for claimed environments. See [QUALIFICATION.md](QUALIFICATION.md)
+and the release checklist for policy and current evidence.
 
 To materialize the canonical generic distribution for development use (this does
 not replace final qualification and need not follow every edit):
 
 ```sh
-./gradlew installDist distTar distZip verifyDistribution verifyDistributionArchives
+gradle installDist distTar distZip verifyDistribution
 build/install/totipo-desktop/bin/totipo-desktop
 ```
 
 `build/distributions` contains the ZIP and TAR. Both contain generated launchers,
 the application JAR, core/storage-nio/Bouncy Castle runtime JARs, and licenses.
-They **do not include Java**: install **Java 17 or newer** and set `JAVA_HOME` or
-provide `java` on PATH. Production bytecode remains Java 17. This environment has
-JDK 25 only; Java 17 runtime and native packaged launch remain UNQUALIFIED.
-`verifyDistribution` checks the installed layout; `verifyDistributionArchives`
-also compares both archives against it. Generated launchers disable JVM Attach
+They **do not include Java**: install **Java 25 or newer** and set `JAVA_HOME` or
+provide `java` on PATH. `verifyDistribution` checks essential installed files,
+resolved runtime dependencies, application entry point/icons and launcher policy.
+Actual extracted archive launch is a separate check; standard Gradle owns archive
+construction. Generated launchers disable JVM Attach
 API availability with `-XX:+DisableAttachMechanism`; this does not prevent
 same-user process inspection or memory attacks. Development `run` is unchanged.
 
 `VERSION` is the single application-version source. It currently names an
-unreleased development state. `./gradlew validateVersion -PreleaseBuild=true`
+unreleased development state. `gradle validateVersion -PreleaseBuild=true`
 intentionally fails until an actual candidate version replaces the sentinel.
 Missing, empty, whitespace-bearing, or unsafe filename versions fail configuration.
 
@@ -282,9 +275,8 @@ nix flake check
 
 `checks.desktop` and `packages.default` reference the same derivation. This gate
 evaluates the flake and realizes the actual desktop package, including its Gradle
-tests, build, distribution/archive verification and install checks. It also
-verifies the wrapper JAR and pinned distribution properties without executing
-the wrapper. Nix can reuse an already qualified store result; this is not a
+tests through check, installed distribution verification and Nix-specific install
+checks. It does not generate generic ZIP/TAR archives. Nix can reuse an already qualified store result; this is not a
 forced rebuild. CI uses the pinned Nix environment and this single gate.
 
 `nix build .` materializes the default package and creates a local `result`
@@ -356,18 +348,18 @@ does not make Unicode paths representable under the C locale. After changing
 `package.nix`, regenerate the update script with the command above; an existing
 Nix-store script still references its original derivation/source snapshot.
 
-Pinned nixpkgs supplies Gradle **9.7.1**, running on the same JDK 25. The developer
-wrapper remains **9.8.0**; CI uses the package's Nix Gradle.
-See the M4a report for compatibility evidence;
-the operator reports successful MITM/package execution. Nix's patched Gradle and
-official setup hook are retained instead of introducing a separate wrapper download in the build.
+Root nixpkgs is locked at `39ad350a0602fa0a58a544344e3e9187526ea45c`.
+Its Gradle **9.8.0** is explicitly overridden to use the shared JDK 25 in
+development, agent and package declarations. Nix's patched Gradle and official
+fetchDeps/setup hook are retained. The dependency cache, locks and verification
+metadata remain reviewed inputs.
 
 ### Explicit filesystem qualification
 
 Create/select an empty disposable test root on each filesystem to be claimed:
 
 ```sh
-./gradlew filesystemQualification -PqualificationRoot=/explicit/disposable/test/root
+gradle filesystemQualification -PqualificationRoot=/explicit/disposable/test/root
 ```
 
 No default root is provided. The harness creates a unique `totipo-qualification-`
@@ -380,6 +372,5 @@ network shares, cloud synchronization or FUSE configurations.
 
 Updates are manual. M4a adds no updater, native installers, signing, tags or
 publication. Future final artifacts get SHA-256 checksums with
-`scripts/sha256-release-artifacts.sh FILE [FILE ...]`; it does not change or upload
-files. See [THIRD_PARTY.md](THIRD_PARTY.md) for the production inventory and
+the standard `sha256sum -- FILE [FILE ...]` command. See [THIRD_PARTY.md](THIRD_PARTY.md) for the production inventory and
 [the M4a report](review/M4A_RELEASE_HARDENING_REPORT.md) for all limitations.
