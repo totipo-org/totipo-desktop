@@ -173,6 +173,24 @@ The run command requires a graphical desktop; tests are headless. First dependen
 resolution needs network access or the reviewed Nix-provided cache. Use focused
 checks while editing; see [qualification policy](AGENTS.md#qualification-ladder).
 
+The development shell also includes [java-dev-tools](https://github.com/ingon/java-dev-tools)
+for Java source navigation in Helix and dependency source resolution. Start Helix
+from the activated shell and keep its Java server command as `jdtls`; no local
+`languages.toml` is required. `GRADLE_HOME` is supplied for Eclipse/Buildship too.
+Run `java-ide-sources` from the repository root to resolve and verify dependency
+sources. After intentional dependency changes, use
+`java-ide-sources --write-verification-metadata sha256` and review new checksums
+against canonical artifacts before accepting them. Runtime dependency versions
+and locks are separate from source attachments; the package dependency cache
+continues to cover its existing build/check tasks.
+
+After updating the tooling input, reload direnv or reenter `nix develop`, restart
+Helix, and check `hx --health java`, then navigate to project, JDK and dependency
+sources. Refresh the Gradle import in Eclipse/JDTLS after output-layout changes:
+IDE compilation uses `build/eclipse/`, separate from Gradle's classes. Generated
+Eclipse files and output are ignored. Each Git checkout gets its own JDTLS
+workspace; set `JDTLS_WORKSPACE` only when an explicit override is needed.
+
 For optional graphical regression review, `org.totipo.desktop.SwingSmoke` is the
 current driver. After test compilation and `installDist`, run one scenario group
 per JVM on an available graphical display:

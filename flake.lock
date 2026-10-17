@@ -129,6 +129,26 @@
         "type": "github"
       }
     },
+    "java-dev-tools": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1792274392,
+        "narHash": "sha256-RkJ7M4Cm8NTCjMCJnxM8iyyiloP7+dsJseVdDoYYmO4=",
+        "owner": "ingon",
+        "repo": "java-dev-tools",
+        "rev": "b5fe56eaebc570a50dbb9803e7d7a8cf179731d3",
+        "type": "github"
+      },
+      "original": {
+        "owner": "ingon",
+        "repo": "java-dev-tools",
+        "type": "github"
+      }
+    },
     "llm-agents": {
       "inputs": {
         "bun2nix": "bun2nix",
@@ -203,6 +223,7 @@
       "inputs": {
         "flake-utils": "flake-utils",
         "jailed-agents": "jailed-agents",
+        "java-dev-tools": "java-dev-tools",
         "llm-agents": "llm-agents",
         "nixpkgs": "nixpkgs_3"
       }

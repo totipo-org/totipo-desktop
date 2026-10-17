@@ -2,6 +2,16 @@ import java.util.jar.JarFile
 
 plugins { application }
 
+// Buildship/JDTLS applies Eclipse on import; keep its output separate from Gradle's.
+allprojects {
+    pluginManager.withPlugin("eclipse") {
+        extensions.configure<org.gradle.plugins.ide.eclipse.model.EclipseModel> {
+            classpath.defaultOutputDir = layout.buildDirectory.dir("eclipse/default").get().asFile
+            classpath.baseSourceOutputDir.set(layout.buildDirectory.dir("eclipse"))
+        }
+    }
+}
+
 group = "org.totipo"
 description = "Totipo Swing desktop shell"
 

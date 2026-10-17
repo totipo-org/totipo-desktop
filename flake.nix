@@ -4,6 +4,10 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     flake-utils.url = "github:numtide/flake-utils";
+    java-dev-tools = {
+      url = "github:ingon/java-dev-tools";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     llm-agents.url = "github:numtide/llm-agents.nix";
     jailed-agents = {
       url = "github:andersonjoseph/jailed-agents";
@@ -11,7 +15,7 @@
     };
   };
 
-  outputs = { nixpkgs, flake-utils, jailed-agents, ... }:
+  outputs = { nixpkgs, flake-utils, jailed-agents, java-dev-tools, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs {
@@ -19,6 +23,7 @@
         };
         jdk = pkgs.jdk25;
         gradle = pkgs.gradle_9.override { java = jdk; };
+        javaEditor = java-dev-tools.lib.mkJavaEditor { inherit pkgs jdk gradle; };
         desktop = pkgs.callPackage ./package.nix { inherit jdk gradle; };
       in
       {
@@ -42,7 +47,7 @@
           };
         };
 
-        devShells.default = pkgs.mkShell {
+        devShells.default = pkgs.mkShell (javaEditor.shellEnv // {
           JAVA_HOME = "${jdk}/lib/openjdk";
           packages = [
             jdk
@@ -57,8 +62,8 @@
                 gradle
               ];
             })
-          ];
-        };
+          ] ++ javaEditor.packages;
+        });
       });
 
   nixConfig = {

@@ -1,6 +1,9 @@
 .direnv/
 .gradle/
 build/
+.project
+.classpath
+.settings/
 *.class
 
 /result
