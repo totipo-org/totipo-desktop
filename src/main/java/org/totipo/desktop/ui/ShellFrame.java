@@ -11,6 +11,8 @@ import org.totipo.desktop.ShellState;
 public final class ShellFrame extends JFrame implements ShellView {
     private static final long serialVersionUID = 1L;
     private final ShellPanel landing = new ShellPanel();
+    private transient Consumer<VaultSelection> selectionAction = choice -> { };
+    private final VaultSelectionPanel selection = new VaultSelectionPanel(choice -> selectionAction.accept(choice));
     private transient Runnable select;
     private transient Runnable create;
     private transient Runnable exit;
@@ -45,15 +47,22 @@ public final class ShellFrame extends JFrame implements ShellView {
                 KeyStroke.getKeyStroke("control L"), "lock-vault", SwingUsability.action("Lock", lock));
     }
     @Override public void renderShell(ShellState next, Path target, String message, boolean busy) {
-        Edt.require(); state = next; selected = target;
-        setTitle(target == null ? "Totipo" : "Totipo — " + UntrustedText.display(
+        Edt.require(); boolean enteringSelection = next == ShellState.VAULT_SELECTION && state != next;
+        state = next; selected = target;
+        setTitle(next == ShellState.VAULT_SELECTION ? "Totipo — Choose a vault" : target == null ? "Totipo" : "Totipo — " + UntrustedText.display(
                 target.getFileName() == null ? target.toString() : target.getFileName().toString()));
         if (next != ShellState.UNLOCKED) {
             mounted = null;
-            setContentPane(landing); landing.render(next, target, message, busy);
+            if (next == ShellState.VAULT_SELECTION) {
+                if (enteringSelection) { selection.navigationEntered(); }
+                landing.clear(); setContentPane(selection); selection.status(message); selection.defaultButton(getRootPane());
+            } else { setContentPane(landing); landing.render(next, target, message, busy); }
             setJMenuBar(landingMenus(busy));
         } else { landing.clear(); }
         revalidate(); repaint();
+        if (enteringSelection) {
+            SwingUtilities.invokeLater(() -> { if (state == ShellState.VAULT_SELECTION) { selection.focusList(); } });
+        }
         if (next == ShellState.LOCKED && !busy) {
             SwingUtilities.invokeLater(() -> { if (state == ShellState.LOCKED) { landing.password.requestFocusInWindow(); } });
         }
@@ -68,13 +77,13 @@ public final class ShellFrame extends JFrame implements ShellView {
     private JMenuBar landingMenus(boolean busy) {
         JMenuBar bar = new JMenuBar(); JMenu file = new JMenu("File"); JMenu vault = new JMenu("Vault");
         JMenuItem leave = new JMenuItem("Exit"); leave.addActionListener(event -> exit.run()); file.add(leave);
-        JMenuItem change = new JMenuItem("Change Vault…"); change.setEnabled(!busy);
+        JMenuItem change = new JMenuItem("Change Vault…"); change.setEnabled(!busy && state != ShellState.VAULT_SELECTION);
         change.addActionListener(event -> select.run()); vault.add(change);
         JMenuItem newVault = new JMenuItem("New Vault…"); newVault.setEnabled(!busy);
         newVault.setMnemonic(java.awt.event.KeyEvent.VK_N);
         newVault.getAccessibleContext().setAccessibleName("New Vault…");
         newVault.addActionListener(event -> create.run()); vault.add(newVault);
-        JMenuItem about = new JMenuItem("About This Vault…"); about.setEnabled(selected != null && !busy);
+        JMenuItem about = new JMenuItem("About This Vault…"); about.setEnabled(selected != null && !busy && state != ShellState.VAULT_SELECTION);
         about.addActionListener(event -> aboutVault(state == ShellState.LOCKED ? "Locked" : "Cannot safely open", landing.error.getText()));
         vault.add(about);
         bar.add(file); bar.add(vault); DesktopStyle.menus(bar); return bar;
@@ -96,6 +105,16 @@ public final class ShellFrame extends JFrame implements ShellView {
     }
     @Override public Path chooseDirectory(Path initial, boolean create) {
         return DirectoryPicker.ask(this, initial, create ? DirectoryPicker.Mode.NEW_VAULT : DirectoryPicker.Mode.EXISTING_VAULT);
+    }
+    @Override public void vaultSelectionAction(Consumer<VaultSelection> action) { selectionAction = action; }
+    @Override public void renderVaultSelection(java.util.List<Path> remembered, Path highlighted, boolean canReturn, boolean busy) {
+        selection.render(remembered, highlighted, canReturn, busy);
+    }
+    @Override public boolean confirmForgetVault(Path path) {
+        return JOptionPane.showOptionDialog(this,
+                "Forget this local entry? No vault files will be deleted, moved, or changed.\n" + path,
+                "Forget Vault Entry", JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE,
+                null, new Object[] {"Forget Entry", "Cancel"}, "Cancel") == 0;
     }
     @Override public PasswordPromptResult password(Path directory, boolean create, PasswordPromptContext context) {
         return PasswordPrompt.ask(this, directory, create, context);

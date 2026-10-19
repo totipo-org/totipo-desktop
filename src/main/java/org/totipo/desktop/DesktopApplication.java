@@ -21,13 +21,14 @@ public final class DesktopApplication {
     private final Function<Path, VaultView> content;
     private final ExecutorService executor;
     private final TotpClipboard clipboard;
-    private final VaultPreferences preferences;
+    private final VaultRegistry registry;
     private final InactivityLock inactivity;
     private final Timer timer;
     private final DesktopEvents events;
     private VaultWindowController controller;
     private ShellState state = ShellState.NO_VAULT;
     private Path selected;
+    private Path selectionReturn;
     private String notice = "";
     private boolean busy;
     private boolean shown;
@@ -61,12 +62,13 @@ public final class DesktopApplication {
                        TotpClipboard clipboard, VaultPreferences preferences, Clock clock) {
         Edt.require();
         this.access = access; this.shell = shell; this.content = content;
-        this.clipboard = clipboard; this.preferences = preferences;
+        this.clipboard = clipboard; this.registry = new VaultRegistry(preferences);
         executor = Executors.newSingleThreadExecutor(task -> new Thread(task, "totipo-application"));
         inactivity = new InactivityLock(clock, this::lock);
         timer = new Timer(1000, event -> eventsPoll());
         shell.actions(this::changeVault, this::create, this::shutdown);
         shell.openAction(this::open);
+        shell.vaultSelectionAction(this::selectionAction);
         shell.lockAction(this::lock);
         shell.retryAction(() -> {
             if (!busy && state == ShellState.BLOCKING_VAULT_STATE) { state = ShellState.LOCKED; notice = ""; render(); }
@@ -77,17 +79,22 @@ public final class DesktopApplication {
         Edt.require();
         if (shown || shuttingDown) { return; }
         shown = true;
-        var remembered = preferences.lastVault();
-        if (remembered.isEmpty()) { render(); shell.showWindow(); return; }
+        if (registry.paths().size() >= 2) {
+            selected = registry.selected().orElse(null);
+            enterSelection(false); shell.showWindow(); return;
+        }
+        if (registry.paths().isEmpty()) { render(); shell.showWindow(); return; }
         busy = true;
-        Path target = remembered.get();
+        Path target = registry.paths().getFirst();
+        long attempt = generation;
         executor.execute(() -> {
             boolean found = VaultTarget.recognizable(target);
             SwingUtilities.invokeLater(() -> {
                 busy = false;
                 if (shuttingDown) { finishShutdown(); return; }
-                if (found) { selected = target; state = ShellState.LOCKED; }
-                else { notice = "The remembered vault location is unavailable. Select a vault to continue."; }
+                if (attempt != generation) { render(); shell.showWindow(); return; }
+                selected = target; state = ShellState.LOCKED;
+                if (!found) { notice = "The remembered vault location is unavailable. Reconnect it or choose another vault."; }
                 // First visible content is already the resolved startup state.
                 render(); shell.showWindow();
             });
@@ -95,6 +102,9 @@ public final class DesktopApplication {
     }
     private void render() {
         if (!shuttingDown) {
+            if (state == ShellState.VAULT_SELECTION) {
+                shell.renderVaultSelection(registry.paths(), selected, selectionReturn != null, busy);
+            }
             shell.renderShell(state, selected, notice, busy);
             shell.busy(notice, busy);
         }
@@ -133,10 +143,10 @@ public final class DesktopApplication {
                 System.err.println("Totipo: unexpected open/create failure (details redacted).");
             } finally { Arrays.fill(password, '\0'); }
             OpenResult openResult = opened; CreateVaultResult createResult = created;
-            SwingUtilities.invokeLater(() -> accept(directory, openResult, createResult, attempt));
+            SwingUtilities.invokeLater(() -> accept(directory, openResult, createResult, attempt, create));
         });
     }
-    private void accept(Path directory, OpenResult open, CreateVaultResult create, long attempt) {
+    private void accept(Path directory, OpenResult open, CreateVaultResult create, long attempt, boolean creating) {
         VaultSession session = open instanceof OpenResult.Opened opened ? opened.session()
                 : create instanceof CreateVaultResult.Created created ? created.session() : null;
         if (shuttingDown || attempt != generation) {
@@ -145,7 +155,8 @@ public final class DesktopApplication {
         }
         if (session != null) {
             selected = directory.toAbsolutePath().normalize();
-            if (create != null) { preferences.setLastVault(selected); }
+            selectionReturn = null;
+            if (create != null) { registry.select(selected); }
             VaultView view = null;
             try {
                 view = content.apply(directory);
@@ -165,7 +176,7 @@ public final class DesktopApplication {
             if (owner.start()) { owner.watch(selected); inactivity.unlocked(); events.unlocked(); timer.start(); }
             finishOperation(); return;
         }
-        if (create != null) {
+        if (creating) {
             String title; String text;
             if (create instanceof CreateVaultResult.AlreadyExists) {
                 title = "Vault already exists"; text = "A vault already exists here. Nothing was overwritten. Select it to open it.";
@@ -211,7 +222,7 @@ public final class DesktopApplication {
         generation++; chooseAfterClose = false;
         inactivity.retired(); timer.stop();
         shell.retireDialogs();
-        if (selected != null) { state = ShellState.LOCKED; }
+        if (selected != null && state != ShellState.VAULT_SELECTION) { state = ShellState.LOCKED; }
         notice = "";
         if (controller != null) { busy = true; controller.close(); }
         render();
@@ -221,32 +232,70 @@ public final class DesktopApplication {
         if (busy || shuttingDown) { return; }
         if (controller != null) {
             lock(); chooseAfterClose = true;
-        } else { choose(false); }
+        } else if (state != ShellState.VAULT_SELECTION) { enterSelection(true); }
+    }
+    private void enterSelection(boolean canReturn) {
+        if (busy || shuttingDown || controller != null) { return; }
+        generation++;
+        shell.retireDialogs();
+        selectionReturn = canReturn ? selected : null;
+        state = ShellState.VAULT_SELECTION; notice = ""; render();
+    }
+    private void selectionAction(VaultSelection choice) {
+        Edt.require();
+        if (busy || shuttingDown || controller != null || state != ShellState.VAULT_SELECTION) { return; }
+        switch (choice.action()) {
+            case SELECT -> {
+                if (choice.path() != null && registry.contains(choice.path())) { selectTarget(choice.path(), true, true); }
+            }
+            case BROWSE -> choose(false);
+            case CREATE -> choose(true);
+            case RETURN -> {
+                if (selectionReturn != null) { selectTarget(selectionReturn, false, true); }
+            }
+            case FORGET -> {
+                if (choice.path() == null || !registry.contains(choice.path())) { return; }
+                busy = true; render(); long attempt = generation;
+                try {
+                    if (!shell.confirmForgetVault(choice.path()) || shuttingDown || attempt != generation) { return; }
+                    Path forgotten = choice.path().toAbsolutePath().normalize();
+                    registry.forget(forgotten);
+                    if (forgotten.equals(selected)) { selected = null; }
+                    if (forgotten.equals(selectionReturn)) { selectionReturn = null; }
+                    if (registry.paths().isEmpty()) { state = ShellState.NO_VAULT; }
+                    notice = "Forgot the local entry. No vault files were changed.";
+                } finally { finishOperation(); }
+            }
+        }
+    }
+    private void selectTarget(Path target, boolean remember, boolean allowUnavailable) {
+        Path candidate = target.toAbsolutePath().normalize();
+        busy = true; notice = ""; render();
+        long attempt = generation;
+        executor.execute(() -> {
+            boolean found = VaultTarget.recognizable(candidate);
+            SwingUtilities.invokeLater(() -> {
+                if (!shuttingDown && attempt == generation) {
+                    if (found || allowUnavailable) {
+                        selected = candidate;
+                        if (remember) { registry.select(candidate); }
+                        selectionReturn = null; state = ShellState.LOCKED;
+                        if (!found) { notice = "The remembered vault location is unavailable. Reconnect it or choose another vault."; }
+                    } else { notice = "This location is not a recognizable Totipo vault. Select another location."; }
+                }
+                finishOperation();
+            });
+        });
     }
     private void choose(boolean create) {
         if (busy || shuttingDown || controller != null) { return; }
-        if (!create && selected != null) { state = ShellState.LOCKED; }
         busy = true; notice = ""; render();
         boolean handedOff = false;
         try {
+            long promptGeneration = generation;
             Path target = shell.chooseDirectory(selected, create);
-            if (shuttingDown) { return; }
+            if (shuttingDown || promptGeneration != generation) { return; }
             if (target == null) {
-                if (!create && selected != null) {
-                    Path previous = selected;
-                    long attempt = generation;
-                    handedOff = true;
-                    executor.execute(() -> {
-                        boolean found = VaultTarget.recognizable(previous);
-                        SwingUtilities.invokeLater(() -> {
-                            if (!shuttingDown && attempt == generation && !found) {
-                                selected = null; state = ShellState.NO_VAULT;
-                                notice = "The previous vault location is unavailable. Select a vault to continue.";
-                            }
-                            finishOperation();
-                        });
-                    });
-                }
                 return;
             }
             target = target.toAbsolutePath().normalize();
@@ -254,25 +303,12 @@ public final class DesktopApplication {
                 try (var result = shell.password(target, true, PasswordPromptContext.EXPLICIT)) {
                     char[] password = result.takePassword();
                     if (password != null) {
-                        if (shuttingDown) { Arrays.fill(password, '\0'); return; }
+                        if (shuttingDown || promptGeneration != generation) { Arrays.fill(password, '\0'); return; }
                         busy = false; begin(target, password, true); handedOff = true;
                     }
                 }
             } else {
-                Path candidate = target;
-                long attempt = generation;
-                handedOff = true;
-                executor.execute(() -> {
-                    boolean found = VaultTarget.recognizable(candidate);
-                    SwingUtilities.invokeLater(() -> {
-                        if (!shuttingDown && attempt == generation) {
-                            if (found) {
-                                selected = candidate; preferences.setLastVault(candidate); state = ShellState.LOCKED;
-                            } else { notice = "This location is not a recognizable Totipo vault. Select another location."; }
-                        }
-                        finishOperation();
-                    });
-                });
+                selectTarget(target, true, registry.contains(target)); handedOff = true;
             }
         } finally { if (!handedOff) { finishOperation(); } }
     }
@@ -287,7 +323,7 @@ public final class DesktopApplication {
             state = notice.isEmpty() ? ShellState.LOCKED : ShellState.BLOCKING_VAULT_STATE;
         }
         boolean choose = chooseAfterClose; chooseAfterClose = false;
-        if (choose && !shuttingDown) { choose(false); }
+        if (choose && !shuttingDown) { enterSelection(true); }
         else { render(); }
         finishShutdown();
     }

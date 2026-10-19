@@ -24,7 +24,7 @@ class ApplicationQuitTest {
 
     @Test void mainWindowCloseRunsSameQuitPathWithoutReturningToLauncher() throws Exception { quit(false); }
 
-    @Test void changeVaultCancelStaysLockedUntilExplicitExit() throws Exception {
+    @Test void changeVaultSelectionStaysSessionFreeUntilExplicitExit() throws Exception {
         java.nio.file.Files.writeString(directory.resolve("vault"), "TOTIPO-VLT");
         Session session = new Session(); Shell launcher = new Shell(); Window window = new Window();
         VaultAccess access = new VaultAccess() {
@@ -36,7 +36,7 @@ class ApplicationQuitTest {
             edt(() -> app.begin(directory, new char[] {'p'}, false)); await(launcher.ready);
             edt(() -> { launcher.ready = new CountDownLatch(1); launcher.directory = null; window.changeVault.run(); });
             await(launcher.ready);
-            edt(() -> { assertEquals(ShellState.LOCKED, app.state()); launcher.close.run(); });
+            edt(() -> { assertEquals(ShellState.VAULT_SELECTION, app.state()); launcher.close.run(); });
             await(launcher.disposed);
             assertEquals(1, session.closes.get()); assertEquals(1, window.disposals);
             assertEquals(0, launcher.shown); assertTrue(app.executorShutdown());

@@ -56,6 +56,14 @@ class ClipboardLifecycleTest {
             });
             await(launcher.ready);
             edt(() -> {
+                assertEquals(ShellState.VAULT_SELECTION, app.state()); probe.assertEmpty();
+                assertEquals(TotpClipboard.UNAVAILABLE, wa.copyNow());
+                launcher.ready = new CountDownLatch(1);
+                launcher.selectionAction.accept(new org.totipo.desktop.ui.VaultSelection(
+                        org.totipo.desktop.ui.VaultSelection.Action.BROWSE, null));
+            });
+            await(launcher.ready);
+            edt(() -> {
                 assertEquals(ShellState.LOCKED, app.state());
                 assertEquals(target, app.selectedVault());
                 launcher.submit.accept(new char[0]);

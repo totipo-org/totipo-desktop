@@ -37,7 +37,7 @@ TotipoDesktop: invokeLater
                  -> sticky non-secret abandoned-publication boolean
 ```
 
-`DesktopApplication` owns the current selected path independently of authentication,
+`DesktopApplication` owns a local `VaultRegistry` and the current selected path independently of authentication,
 one persistent shell, and at most one controller until session close finishes.
 The shell renders and emits actions; it does not own protocol behavior.
 `ShellView` and `VaultView` are small presentation interfaces for testing these
@@ -71,8 +71,20 @@ Desktop compilation and runtime support target Java 25.
 
 ## Shell, selection, and passwords
 
-Select/Change Vault use an owned modal `DirectoryPicker` with read-only directory
-navigation. Create retains its separate Swing directory chooser. The picker has
+Select/Change Vault navigate to `VAULT_SELECTION`, mounting the persistent
+`VaultSelectionPanel` as the main content of the existing frame. There is no
+selection dialog or second application window. The panel lists remembered paths
+in insertion order. Each custom-rendered row shows a bold directory basename above
+its smaller muted parent directory, with 8-pixel vertical padding inside the native
+focus border. Both lines use pixel-measured middle ellipsis when needed, preferring
+whole beginning/ending path components. Rows follow viewport width with vertical
+scrolling only; elision recalculates during layout after resize or font changes.
+Full absolute paths remain in tooltips and accessible descriptions; list-model paths
+and persistence are never truncated. Roots display their root path on both lines.
+The locked form and Vault menu share this flow. Select, Enter and double-click
+show a locked vault without authentication; Browse uses the owned modal
+`DirectoryPicker` with read-only directory navigation. New Vault retains its
+separate Swing directory chooser and existing creation flow. The directory picker has
 an informational current path, Up, a directory-only JList occupying the expanding
 center, Cancel, and Select This Folder. Enter/double-click navigates; Select
 chooses the displayed directory rather than the highlighted child. No file
@@ -84,12 +96,56 @@ the picker, and Select stays activatable for non-vault folders.
 Desktop code does not create directories, recursively inspect them, or canonicalize
 paths. A bounded read of the public `TOTIPO-VLT` bootstrap signature recognizes
 a target without authenticating it or accepting its version/length as valid. A
-recognizable selected path is normalized and remembered immediately. Missing or
-clearly non-vault targets do not replace it. The NIO open result remains authoritative.
+recognizable selected path is normalized and registered immediately. Missing or
+clearly non-vault new targets do not replace it. Previously registered unavailable
+paths remain selectable, locked with a recovery warning. The NIO open result remains authoritative.
 Only one application operation is accepted at a time; actions stay disabled across
 chooser/create prompts, work, result presentation and
 unclaimed-session cleanup. Modal dialogs can run nested EDT loops, so shutdown is
 checked after prompting as well as when the background result reaches the EDT.
+
+`VaultRegistry` owns normalized absolute paths, deduplication, insertion order,
+selection and forgetting; it performs no filesystem work and has no session authority.
+Normalization uses `toAbsolutePath().normalize()`, never symlink resolution.
+`JdkVaultPreferences` stores a versioned snapshot under `vaultRegistryV1` in the
+existing `/org/totipo/desktop` user-preference node: version, selected index (or -1),
+and Base64 UTF-8 paths. A single preference value keeps the order and selection
+together; preferences remain best effort and subject to the JDK value-size limit.
+No credentials, keys, decrypted data, session objects or token metadata are stored.
+The registry is installation-local, never synchronized or written into vault storage.
+
+Absent or unusable registry metadata falls back to the normalized legacy `lastVault`
+preference and attempts an idempotent migration. The legacy value is retained even
+if saving fails. A valid empty registry or null selection takes precedence over
+legacy, preventing forgotten entries from being reimported on ordinary restart.
+Startup with zero registered paths shows NO_VAULT; with one it checks that path
+on the application executor and shows it LOCKED, including recovery guidance if
+unavailable. With two or more it immediately shows VAULT_SELECTION without probing
+any path. The last registered selection is highlighted but not activated or changed;
+no last selection leaves no row selected. Startup never authenticates automatically.
+Missing paths remain registered for recovery.
+Forgetting requires explicit confirmation that only local history changes. It has
+no filesystem mutation API, never implicitly selects another path, and forgetting
+an entry leaves VAULT_SELECTION while other entries remain. Forgetting the selected
+entry clears the selection and Return target without choosing another; forgetting
+the final entry enters NO_VAULT.
+
+The selector appears only after the existing controller-close callback clears
+session ownership. Sensitive content, forms, clipboard/reveal ownership, subscriber
+and watcher retire immediately; session close waits behind admitted work on its
+existing executor. `selectionReturn` is an optional non-secret navigation path,
+captured only when entering selection through Change Vault. Return checks that path
+on the application executor and shows its locked form, including unavailable-path
+guidance; it never reopens a session. Startup has no Return target. Browse/Create
+cancellation and creation failure/uncertainty leave the selection screen in place.
+Shell actions use `ShellView.vaultSelectionAction`; list rendering is separate from
+application operation admission. Busy, controller identity, generation and shutdown
+checks also cover confirmation dialogs and late selection/creation results.
+Lock on the session-free selector invalidates pending work without navigating to
+the highlighted vault. Failed authentication on B leaves A closed. Registry membership is
+never session authority, and callbacks retain controller/generation ownership guards.
+Independent vault passwords and session retirement compartmentalize normal use;
+arbitrary process/device compromise can still expose other vaults.
 
 Passwords come from `JPasswordField.getPassword()` as desktop-owned `char[]` values.
 No password is converted to String, logged, or included in presentation/diagnostics.
@@ -215,7 +271,8 @@ controller has reported closed. Then the application executor shuts down and the
 shell is disposed. The EDT never waits for background work. There is no
 `System.exit()` shortcut.
 
-Shell states are `NO_VAULT`, `LOCKED`, `UNLOCKED`, and `BLOCKING_VAULT_STATE`.
+Shell states are `NO_VAULT`, `VAULT_SELECTION`, `LOCKED`, `UNLOCKED`, and
+`BLOCKING_VAULT_STATE` (the existing blocking error presentation).
 LOCKED uses a horizontally centered task block capped at 560 logical pixels,
 with 24-pixel outer margins and a modest upward bias in the available height.
 Its basename heading and path are informational labels; the path has no caret,
@@ -226,7 +283,8 @@ operation. Folder/password cancellation, validation failure, OBJECT_DATA_OBSERVE
 definite failure and creation uncertainty leave the selected and remembered A
 unchanged. Successful Java creation switches to B and persists B, using the
 existing session-establishment flow. Uncertainty preserves recovery text and
-never deletes a possibly created B. Change Vault keeps its existing-vault chooser.
+never deletes a possibly created B. Change Vault opens the remembered-vault selector,
+with the existing directory picker available through Browse.
 NO_VAULT uses the shared `EmptyState`: centered “No vault selected” heading and
 compact centered Select Vault / Create New Vault stack, capped at 280 pixels.
 `SwingUsability.taskActions` supplies the reusable normal task/dialog
@@ -261,8 +319,8 @@ Lock invalidates application generation, retires controller-owned drafts/reveals
 clipboard and all owned dialogs, stops the inactivity timer, and replaces content
 immediately. Session close follows queued session work. Open remains unavailable
 until close completes, including unclaimed late-result cleanup. Change Vault waits
-for that completion before its chooser; Cancel stays LOCKED, with no session
-resurrection. Late open results close unclaimed sessions; existing controller
+for that completion before entering VAULT_SELECTION; Return shows LOCKED, with no
+session resurrection. Browse/Create cancel stays on VAULT_SELECTION. Late open results close unclaimed sessions; existing controller
 closing checks reject late observation, derivation, write, and password results.
 
 `InactivityLock` uses an injected wall clock and a fixed 15-minute deadline.
@@ -295,7 +353,7 @@ synchronization, or equal causal heads into semantic conflict. No automatic merg
 retry or invented synchronization semantics are introduced.
 
 Sorting, QR/URI import, secret export, keychain, remembered passwords, recent
-history, tray, theming, remote providers, installers and release publishing
+token history, tray, theming, remote providers, installers and release publishing
 remain outside the implemented scope. M3b search/shortcuts and M3c explicit TOTP
 clipboard copying are described below.
 

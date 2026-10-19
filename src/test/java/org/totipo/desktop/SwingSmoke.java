@@ -97,6 +97,9 @@ public final class SwingSmoke {
 
     /** Called on EDT; application executor owns open/create/close, driver owns fixture saves. */
     private void showApplication(Path remembered, boolean unlock) {
+        showApplication(remembered, unlock, remembered == null ? List.of() : List.of(remembered));
+    }
+    private void showApplication(Path remembered, boolean unlock, List<Path> registry) {
         VaultAccess access = new VaultAccess() {
             public OpenResult open(Path path, char[] password) {
                 var result = NioTotipo.open(path, password);
@@ -108,6 +111,7 @@ public final class SwingSmoke {
         app = new DesktopApplication(access, frame, path -> new VaultContent(frame),
                 new org.totipo.desktop.clipboard.TotpClipboard(), new VaultPreferences() {
             public Optional<Path> lastVault() { return Optional.ofNullable(remembered); }
+            public VaultRegistry.Snapshot loadRegistry() { return new VaultRegistry.Snapshot(registry, remembered); }
             public void setLastVault(Path path) { }
             public void clearLastVault() { }
         });
@@ -588,14 +592,35 @@ public final class SwingSmoke {
     // Password, blocking-state and keyboard surfaces.
     private void lifecycle() throws Exception {
         vault = fixture("lifecycle");
+        Path secondVault = fixture("second-vault");
+        try (VaultSession second = ((CreateVaultResult.Created) NioTotipo.create(secondVault, "independent".toCharArray())).session()) {
+            if (second == null) { throw new AssertionError("No second vault"); }
+        }
         try (VaultSession initial = ((CreateVaultResult.Created) NioTotipo.create(vault, "review".toCharArray())).session()) { distinct = conflict(initial, false); }
         edt(() -> {
             frame = new ShellFrame(); frame.setLocation(0, 0);
             System.out.println("Environment " + UIManager.getLookAndFeel().getClass().getName()
                     + "; font=" + UIManager.getFont("Label.font").getSize() + "; transform=" + frame.getGraphicsConfiguration().getDefaultTransform());
-            showApplication(vault, false);
+            showApplication(vault, false, List.of(vault, secondVault));
         });
-        waitFor(() -> app.state() == ShellState.LOCKED && frame.isShowing()); captureLifecycle("locked");
+        waitFor(() -> app.state() == ShellState.VAULT_SELECTION && frame.isShowing());
+        captureImage("remembered-vaults-shell", frame);
+        if (!edt(() -> all(frame).stream().filter(JList.class::isInstance).map(JList.class::cast)
+                .anyMatch(list -> vault.equals(list.getSelectedValue())))) { throw new AssertionError("Last vault not highlighted"); }
+        waitFor(() -> KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner() instanceof JList<?>);
+        key(KeyEvent.VK_ENTER); waitFor(() -> app.state() == ShellState.LOCKED); captureLifecycle("locked");
+        click(button(frame, "Change Vault…")); waitFor(() -> app.state() == ShellState.VAULT_SELECTION);
+        edt(() -> all(frame).stream().filter(JList.class::isInstance).map(JList.class::cast)
+                .findFirst().orElseThrow().setSelectedIndex(1));
+        click(button(frame, "Select Vault")); waitFor(() -> app.state() == ShellState.LOCKED && secondVault.equals(app.selectedVault()));
+        if (edt(app::state) != ShellState.LOCKED) { throw new AssertionError("Switch unlocked second vault"); }
+        menu("Change Vault…"); waitFor(() -> app.state() == ShellState.VAULT_SELECTION);
+        click(button(frame, "Return to Locked Vault")); waitFor(() -> app.state() == ShellState.LOCKED);
+        if (!edt(app::selectedVault).equals(secondVault)) { throw new AssertionError("Return changed vault"); }
+        menu("Change Vault…"); waitFor(() -> app.state() == ShellState.VAULT_SELECTION);
+        edt(() -> all(frame).stream().filter(JList.class::isInstance).map(JList.class::cast)
+                .findFirst().orElseThrow().setSelectedIndex(0));
+        click(button(frame, "Select Vault")); waitFor(() -> app.state() == ShellState.LOCKED && vault.equals(app.selectedVault()));
         waitFor(() -> KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner() instanceof JPasswordField);
         edt(() -> all(frame).stream().filter(JPasswordField.class::isInstance).map(JPasswordField.class::cast).findFirst().orElseThrow().setText("wrong"));
         key(KeyEvent.VK_ENTER); waitFor(() -> all(frame).stream().anyMatch(c -> c instanceof JTextArea a && a.getText().contains("that password")));
@@ -614,6 +639,12 @@ public final class SwingSmoke {
         key(KeyEvent.VK_DOWN);
         if (edt(() -> all(uncheckedDialog()).stream().filter(JRadioButton.class::isInstance).map(JRadioButton.class::cast).filter(AbstractButton::isSelected).count()) != 1) { throw new AssertionError("Radio arrow navigation unavailable"); }
         click(option("Slie · a")); captureLifecycle("simple-resolver-selected"); click("Combine details…"); captureLifecycle("detailed-resolver"); key(KeyEvent.VK_ESCAPE); closed();
+        menu("Change Vault…"); waitFor(() -> app.state() == ShellState.VAULT_SELECTION);
+        if (edt(() -> all(frame).stream().anyMatch(c -> c instanceof JButton b && b.getText().equals("Copy")))) {
+            throw new AssertionError("Retired content remained in selection shell");
+        }
+        captureImage("after-session-retirement", frame);
+        click(button(frame, "Return to Locked Vault")); waitFor(() -> app.state() == ShellState.LOCKED);
         edt(app::shutdown); waitFor(() -> !frame.isDisplayable());
         Path blocked = fixture("lifecycle"); Files.writeString(blocked.resolve("vault"), "TOTIPO-VLT\u007funsupported");
         edt(() -> {

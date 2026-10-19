@@ -15,20 +15,40 @@ request local refresh. Best-effort JDK filesystem notifications can coalesce or
 lose events; they do not establish synchronization completion. Vault → Refresh
 and F5 remain available. Lock, Change Vault and Exit stop watching.
 
-Selecting a recognizable vault remembers that location immediately, before any
-password succeeds. Startup opens directly to its locked form. A missing or
-non-vault remembered location shows a selection warning. A non-vault selection
-does not replace a previously remembered vault. The full path appears in the
-locked form; the title uses the vault basename.
-The locked form and Vault menu offer Create New Vault using the existing creation
-flow. Cancelling or failing creation preserves the previous remembered vault;
-successful creation opens and remembers the new vault. Uncertain creation keeps
-the previous remembered location and gives recovery advice without deleting data.
+Totipo remembers multiple independent vault directories in an installation-local
+registry. **Change Vault…** on the locked form or in the Vault menu navigates to a
+Vault Selection screen in the same window, listing remembered vaults by directory
+name and full path. Select one (also Enter or double-click) to show its locked form, Browse
+for another existing vault, or use New Vault to create one. Selecting a recognizable
+new vault remembers it before authentication; an invalid new selection does not
+replace the previous selection. With no registered vaults, startup shows No Vault;
+with one, it shows that vault locked. With two or more, startup shows Vault Selection
+with the last selection highlighted, requiring an explicit choice before the password
+form. Startup never authenticates automatically. Unavailable registered paths remain
+listed; selecting one shows its locked form with recovery guidance.
+
+The registry uses local JDK user preferences, stores only normalized paths and
+selection, and is never synchronized or written into vault directories. Existing
+users' single remembered location migrates automatically and idempotently; the
+legacy preference remains as a fallback if migration cannot be saved. Forget Entry
+removes only the local remembered entry: no vault files are deleted, moved, or
+changed. Forgetting an entry stays on Vault Selection while entries remain;
+forgetting the final entry shows No Vault. Forgetting the selected vault clears
+that selection and never opens another entry. Cancelling, failing, or uncertain creation preserves the registry
+and selection. Confirmed creation registers and opens the new vault while keeping
+previous entries; uncertainty retains the existing recovery guidance.
 
 Vault → Lock and Ctrl+L (also the platform menu shortcut on macOS) retire owned
 forms without draft confirmation, clear reveal/clipboard ownership, and close the
-session. Change Vault locks first; cancelling its chooser leaves the previous
-vault locked. File → Exit and window close exit the application. Desktop inactivity
+session. Change Vault waits for complete retirement before showing Vault Selection.
+The screen offers Return to Locked Vault when reached from a selected vault; this
+never restores an unlocked session. At multi-vault startup there is no Return action.
+Canceling Browse or Create stays on Vault Selection. At most one session is active,
+including while closing, and no session is retained on the selection screen. Each vault requires
+its independent password; no password or decrypted key is cached for switching.
+Independent credentials and session retirement provide compartmentalization, but do not protect other vaults
+against arbitrary compromise of the application process or device.
+File → Exit and window close exit the application. Desktop inactivity
 locks after 15 minutes; only direct keyboard/pointer/scroll interaction resets
 the deadline. Focus loss/minimization alone does not lock or conceal.
 

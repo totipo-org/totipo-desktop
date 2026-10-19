@@ -80,22 +80,22 @@ class SingleSurfaceLifecycleTest {
             assertEquals(1, f.opens.get()); f.releaseClose.countDown(); f.locked();
         }
     }
-    @Test void changeVaultRetiresBeforeChooserAndCancelNeverResurrectsSession() throws Exception {
+    @Test void changeVaultRetiresBeforeSelectionAndReturnNeverResurrectsSession() throws Exception {
         try (Fixture f = new Fixture()) {
             f.releaseClose = new CountDownLatch(1); f.open();
             edt(() -> {
-                f.shell.ready = new CountDownLatch(1); f.shell.directory = null;
-                f.shell.duringDirectory = () -> { assertEquals(ShellState.LOCKED, f.app.state()); assertEquals(1, f.sessions.getFirst().closes.get());
-                    assertTrue(f.contents.getFirst().closing); };
+                f.shell.ready = new CountDownLatch(1);
                 f.contents.getFirst().changeVault.run();
                 assertEquals(ShellState.LOCKED, f.app.state()); assertEquals(0, f.shell.directories);
             });
             await(f.sessions.getFirst().closeEntered); assertEquals(0, f.shell.directories);
             f.releaseClose.countDown(); await(f.shell.ready);
-            // This fixture has no filesystem vault. Cancellation must report its unavailable location.
-            // RememberedVaultTest separately covers an available previous target staying LOCKED.
-            edt(() -> { assertEquals(ShellState.NO_VAULT, f.app.state()); assertNull(f.app.selectedVault());
-                assertEquals(1, f.shell.directories); assertEquals(1, f.contents.size()); });
+            edt(() -> { assertEquals(ShellState.VAULT_SELECTION, f.app.state()); assertEquals(TARGET, f.app.selectedVault());
+                assertEquals(0, f.shell.directories); assertEquals(1, f.contents.size());
+                f.shell.ready = new CountDownLatch(1);
+                f.shell.selectionAction.accept(new org.totipo.desktop.ui.VaultSelection(org.totipo.desktop.ui.VaultSelection.Action.RETURN, null)); });
+            await(f.shell.ready);
+            edt(() -> assertEquals(ShellState.LOCKED, f.app.state()));
             assertEquals(1, f.opens.get());
         }
     }
@@ -104,6 +104,7 @@ class SingleSurfaceLifecycleTest {
             f.releaseClose = new CountDownLatch(1); f.open();
             edt(() -> { f.contents.getFirst().changeVault.run(); f.app.lock(); });
             f.releaseClose.countDown(); f.locked(); edt(() -> assertEquals(0, f.shell.directories));
+            edt(() -> assertEquals(0, f.shell.selectorVisits));
         }
     }
     @Test void ctrlLDispatchInvokesLock() throws Exception {
@@ -222,6 +223,7 @@ class SingleSurfaceLifecycleTest {
             f.open(); f.sessions.getFirst().failClose = true;
             edt(() -> f.contents.getFirst().changeVault.run()); await(f.shell.disposed);
             assertEquals(0, f.shell.directories); assertEquals(1, f.opens.get()); assertTrue(f.app.executorShutdown());
+            assertEquals(0, f.shell.selectorVisits);
         }
     }
     @Test void longLivedLifecycleFieldsContainNoRawPasswordArrays() {

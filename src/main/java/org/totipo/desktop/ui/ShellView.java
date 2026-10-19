@@ -12,6 +12,9 @@ public interface ShellView {
     void retryAction(Runnable retry);
     void renderShell(ShellState state, Path selected, String message, boolean busy);
     Path chooseDirectory(Path initialLocation, boolean create);
+    void vaultSelectionAction(Consumer<VaultSelection> action);
+    void renderVaultSelection(java.util.List<Path> remembered, Path highlighted, boolean canReturn, boolean busy);
+    boolean confirmForgetVault(Path path);
     PasswordPromptResult password(Path directory, boolean create, PasswordPromptContext context);
     boolean confirmEmptyPassword();
     default boolean confirmEmptyOpenPassword() { return false; }

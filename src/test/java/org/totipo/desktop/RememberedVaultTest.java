@@ -38,7 +38,10 @@ class RememberedVaultTest {
     }
     void stop(DesktopApplication app, Shell shell) throws Exception { edt(app::shutdown); await(shell.disposed); }
     void choose(Shell shell, Path target) throws Exception {
-        edt(() -> { shell.ready = new CountDownLatch(1); shell.directory = target; shell.open.run(); }); await(shell.ready);
+        edt(shell.open);
+        edt(() -> { shell.ready = new CountDownLatch(1); shell.directory = target;
+            shell.selectionAction.accept(new org.totipo.desktop.ui.VaultSelection(
+                    org.totipo.desktop.ui.VaultSelection.Action.BROWSE, null)); }); await(shell.ready);
     }
     @Test void noRememberedVaultStartsInNoVault() throws Exception {
         Shell shell = new Shell(); Access access = new Access(); var app = app(access, shell, new Store(null));
@@ -66,7 +69,7 @@ class RememberedVaultTest {
             var app = app(access, shell, store);
             try {
                 edt(app::show); await(shell.ready);
-                edt(() -> { assertEquals(ShellState.NO_VAULT, app.state()); assertTrue(shell.notice.contains("unavailable"));
+                edt(() -> { assertEquals(ShellState.LOCKED, app.state()); assertEquals(target, app.selectedVault()); assertTrue(shell.notice.contains("unavailable"));
                     assertFalse(shell.notice.contains("corrupt")); assertEquals(1, shell.shown); });
                 assertEquals(0, access.opens.get()); assertEquals(0, store.writes);
             } finally { stop(app, shell); }
@@ -112,7 +115,7 @@ class RememberedVaultTest {
         Store store = new Store(a); Shell shell = new Shell(); Access access = new Access(); var app = app(access, shell, store);
         try {
             edt(app::show); await(shell.ready); choose(shell, invalid);
-            edt(() -> { assertEquals(a, store.path); assertEquals(a, app.selectedVault()); assertEquals(ShellState.LOCKED, app.state());
+            edt(() -> { assertEquals(a, store.path); assertEquals(a, app.selectedVault()); assertEquals(ShellState.VAULT_SELECTION, app.state());
                 assertTrue(shell.notice.contains("not a recognizable")); });
             assertEquals(0, store.writes); choose(shell, b); assertEquals(b, store.path);
         } finally { stop(app, shell); }
@@ -128,23 +131,23 @@ class RememberedVaultTest {
                 shell.retry.run(); assertEquals(ShellState.LOCKED, app.state()); });
         } finally { stop(app, shell); }
     }
-    @Test void lockedChangeVaultCancelPreservesLockedTarget() throws Exception {
+    @Test void lockedChangeVaultBrowseCancelRetainsSelectionScreenAndTarget() throws Exception {
         Path a = vault("a"); Shell shell = new Shell(); Store store = new Store(a); var app = app(new Access(), shell, store);
         try { edt(app::show); await(shell.ready); choose(shell, null);
-            edt(() -> { assertEquals(ShellState.LOCKED, app.state()); assertEquals(a, app.selectedVault()); assertEquals(a, store.path); }); }
+            edt(() -> { assertEquals(ShellState.VAULT_SELECTION, app.state()); assertEquals(a, app.selectedVault()); assertEquals(a, store.path); }); }
         finally { stop(app, shell); }
     }
-    @Test void cancellingChangeWhenPreviousLocationDisappearedFallsBackToNoVault() throws Exception {
+    @Test void cancellingChangeWhenPreviousLocationDisappearedRetainsLockedSelection() throws Exception {
         Path a = vault("disappeared"); Shell shell = new Shell(); Store store = new Store(a); var app = app(new Access(), shell, store);
         try {
             edt(app::show); await(shell.ready); Files.delete(a.resolve("vault")); Files.delete(a); choose(shell, null);
-            edt(() -> { assertEquals(ShellState.NO_VAULT, app.state()); assertNull(app.selectedVault());
-                assertTrue(shell.notice.contains("previous vault location is unavailable")); });
+            edt(() -> { assertEquals(ShellState.VAULT_SELECTION, app.state()); assertEquals(a, app.selectedVault());
+                assertEquals(a, store.path); });
         } finally { stop(app, shell); }
     }
     @Test void noVaultChooserCancelStaysNoVault() throws Exception {
         Shell shell = new Shell(); Store store = new Store(null); var app = app(new Access(), shell, store);
-        try { edt(app::show); choose(shell, null); edt(() -> assertEquals(ShellState.NO_VAULT, app.state())); assertNull(store.path); }
+        try { edt(app::show); choose(shell, null); edt(() -> assertEquals(ShellState.VAULT_SELECTION, app.state())); assertNull(store.path); }
         finally { stop(app, shell); }
     }
     @Test void isolatedJdkStorePersistsOnlyNormalizedPathAcrossStoreInstances() throws Exception {

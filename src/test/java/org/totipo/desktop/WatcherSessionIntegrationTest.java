@@ -173,6 +173,12 @@ class WatcherSessionIntegrationTest {
                 await(current.closeEntered); eventually(() -> watchThreads() == 0);
                 eventually(() -> current.closes.get() == 1);
                 if (step < 2) { eventually(() -> { try { return onEdt(() -> !shell.busy); } catch (Exception e) { throw new AssertionError(e); } }); }
+                if (step == 1) {
+                    edt(() -> { shell.ready = new CountDownLatch(1);
+                        assertEquals(ShellState.VAULT_SELECTION, app.state());
+                        shell.selectionAction.accept(new org.totipo.desktop.ui.VaultSelection(org.totipo.desktop.ui.VaultSelection.Action.RETURN, null)); });
+                    await(shell.ready);
+                }
             }
         } finally { edt(app::shutdown); await(shell.disposed); }
     }

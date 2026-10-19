@@ -109,10 +109,23 @@ public final class TestSupport {
         java.util.function.Consumer<char[]> submit;
         Runnable lock;
         Runnable retry;
+        java.util.function.Consumer<org.totipo.desktop.ui.VaultSelection> selectionAction;
+        List<Path> remembered = List.of();
+        Path highlighted;
+        boolean canReturn;
+        int selectorVisits;
+        boolean allowForget = true;
+        Runnable duringForget = () -> { };
+        @Override public void vaultSelectionAction(java.util.function.Consumer<org.totipo.desktop.ui.VaultSelection> action) { selectionAction = action; }
+        @Override public void renderVaultSelection(List<Path> paths, Path selected, boolean back, boolean working) {
+            Edt.require(); remembered = paths; highlighted = selected; canReturn = back;
+        }
+        @Override public boolean confirmForgetVault(Path path) { assertTrue(busy); duringForget.run(); return allowForget; }
         @Override public void openAction(java.util.function.Consumer<char[]> action) { submit = action; }
         @Override public void lockAction(Runnable action) { lock = action; }
         @Override public void retryAction(Runnable action) { retry = action; }
         @Override public void renderShell(ShellState value, Path path, String message, boolean busy) {
+            if (value == ShellState.VAULT_SELECTION && state != value) { selectorVisits++; }
             Edt.require(); state = value; selected = path; notice = message;
         }
         @Override public void retireDialogs() { }
