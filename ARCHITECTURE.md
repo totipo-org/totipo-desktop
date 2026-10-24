@@ -352,10 +352,11 @@ into completeness, uncertainty into success/failure, local publication into remo
 synchronization, or equal causal heads into semantic conflict. No automatic merge,
 retry or invented synchronization semantics are introduced.
 
-Sorting, QR/URI import, secret export, keychain, remembered passwords, recent
+User-controlled sorting, QR image scanning, secret export, keychain, remembered passwords, recent
 token history, tray, theming, remote providers, installers and release publishing
 remain outside the implemented scope. M3b search/shortcuts and M3c explicit TOTP
-clipboard copying are described below.
+clipboard copying are described below. Pasted TOTP setup URI acquisition is
+implemented in the token-management flow described below.
 
 ## Verification
 
