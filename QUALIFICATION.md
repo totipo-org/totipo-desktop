@@ -1,7 +1,8 @@
 # Qualification evidence
 
 Release status: **NOT QUALIFIED**. No first release has been declared.
-Linux is the first desktop qualification target. No Windows/macOS support claim
+Portable ZIP on Linux and the installed Nix package on native NixOS are both
+required initial 0.1.0 targets. No Windows/macOS support claim
 is made. PASS below applies only to the named check and exact tested environment.
 Build success, headless component tests and source inspection are not native GUI
 or clipboard qualification.
@@ -15,8 +16,9 @@ iteration, failure diagnosis, source freeze and execution accounting.
 The owner and CI use one authoritative automatic gate: `nix flake check`.
 Agents never invoke Nix. Its Linux `checks.desktop` and `packages.default`
 share the package derivation: installDist, full Java tests through check,
-essential distribution inventory and Nix installation checks. Generic ZIP/TAR
-construction is separate when affected or prepared for release. There is no
+final ZIP inventory/hash verification and Nix installation/payload-equivalence
+checks. The same build exports the canonical ZIP via the Nix `portable` output.
+TAR remains an internal Gradle capability with no publication/qualification gate. There is no
 mandatory duplicate normal/strict/offline full-suite ladder before Nix.
 A reused store result is qualified reuse, not freshly executed tests.
 
@@ -125,3 +127,70 @@ Manual checklists:
 
 Build, runtime-loading and reproducibility evidence is recorded separately in
 [the M4a report](review/M4A_RELEASE_HARDENING_REPORT.md).
+
+## 0.1.0 portable and Nix contract (M4b-R2)
+
+The canonical cross-platform Java artifact is the standard Gradle application
+ZIP: original separate application/core/storage/BC JARs, both generated launchers,
+embedded icons/resources and license notices. No Java runtime is bundled. The
+Nix deployment supplies the pinned managed JDK and desktop integration. Both
+initial native routes must pass before 0.1.0 is advertised as qualified; package
+construction alone qualifies neither. VERSION remains `0.0.0-dev` in this
+infrastructure milestone.
+
+[Packaged launch](qualification/PACKAGED_LAUNCH.md) gives the exact commands for
+obtaining the same-build ZIP/Nix outputs, comparing actual hashes, extracting,
+running outside the checkout, and executing the separate filesystem harness
+against release JARs. `verifyDistribution` checks complete final ZIP inventory,
+duplicates, CRC/size, extracted-file identities, original JAR/license bytes,
+resources and launcher policy; `portable.sha256` records every file plus ZIP
+hash/size. Nix install checks compare installed JAR hashes with those identities;
+`nix-deployment.sha256` records deployment-specific bytes after fixups. A separately
+built ZIP needs the same explicit comparison. Mismatches block evidence reuse.
+No independent reproducibility claim follows from these comparisons.
+
+Common application evidence includes create/open/encrypted publication/reopen,
+token management/TOTP, conflict resolution, filesystem/provider observation,
+locking/session lifetime, GUI/keyboard and clipboard policy. Identical application
+and dependency hashes allow referencing common scenario evidence by ID. Actual
+OS, runtime, filesystem/provider, GUI/clipboard/accessibility and deployment
+claims require their own named environment evidence. In particular, both native
+launchers must exercise ordinary application functionality, and NixOS must pass
+managed runtime, installed graphical-menu launch and desktop/icon integration.
+The existing native checklists remain authoritative; record unperformed items.
+
+Windows/macOS begin UNQUALIFIED. Later qualification may append support evidence
+against the original immutable 0.1.0 ZIP with its original SHA-256 and size,
+without rebuilding, moving tags or replacing artifacts. Failure on a later
+platform leaves that environment UNQUALIFIED. TAR publication and independent TAR
+qualification are no longer required. Fat JARs, bundled runtimes, native installers
+and updating remain deferred.
+
+### Append-only support evidence
+
+Keep historical rows/reports. Append dated records and corrections referencing
+prior evidence IDs; do not overwrite prior failures or promote old smoke results
+to candidate PASS. Each record must identify:
+
+- Evidence ID/date, source commit plus dirty-input identity if applicable, VERSION,
+  exact ZIP hash/size and manifest, Nix output/derivation/closure identities where
+  relevant, and all application/dependency hashes (or immutable attached manifest).
+- OS/version, distribution and architecture; Java vendor/version/build and runtime
+  path/identity; filesystem/mount/provider; desktop/session/window manager,
+  X11/Wayland, scaling, clipboard manager/history, paste target, remote-desktop
+  layer and accessibility/screen-reader environment (explicitly none if absent).
+- Actual commands and exit results, automated versus human-observed per-item
+  PASS/FAIL/UNQUALIFIED, cleanup, logs, limitations, and any reused evidence ID
+  with byte-equivalence justification and remaining route-specific checks.
+- Input freeze and any subsequent invalidation. Human `nix flake check` result
+  must distinguish fresh execution from store reuse or unavailable logs.
+
+Current M4b-R2 infrastructure evidence is in
+[the report](review/M4B_R2_PORTABLE_NIX_DISTRIBUTION_REPORT.md). Native Linux ZIP,
+NixOS package, Windows and macOS candidate qualification all remain UNQUALIFIED.
+
+2026-10-25: the maintainer reports `nix flake check` **PASS** for M4b-R2 after
+consumed-input freeze. Post-result input hashes match the frozen manifest. Logs,
+output identities and fresh-execution/store-reuse details were not supplied;
+no fresh test execution or native qualification is inferred. This records the
+infrastructure gate only; release status remains **NOT QUALIFIED**.

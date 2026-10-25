@@ -90,8 +90,11 @@ toolchain. No mandatory normal-plus-strict/offline duplicate full suites precede
 the Nix gate. Build generic archives when the milestone affects them:
 
 ```sh
-gradle test build installDist distZip distTar verifyDistribution
+gradle test build installDist distZip verifyDistribution
 ```
+
+The portable ZIP is canonical. `distTar` remains available internally, without a
+separate publication or qualification requirement.
 
 Headless Java tests, disposable filesystem qualification, native GUI/clipboard,
 actual packaged launch and deliberate release reproducibility are distinct.

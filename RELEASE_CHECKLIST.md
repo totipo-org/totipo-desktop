@@ -1,8 +1,8 @@
 # Blocking release checklist
 
 Current status: **NOT QUALIFIED**. M4a establishes build/qualification machinery;
-no first release has been declared. Choose an actual candidate version and
-complete the native qualification matrix in M4b before considering release.
+no first release has been declared. Prepare the actual 0.1.0 release candidate and
+complete Linux ZIP and native NixOS qualification before considering release.
 Every required box must have evidence; UNQUALIFIED is a blocker, not PASS.
 A green Gradle build alone cannot pass this checklist.
 
@@ -20,10 +20,11 @@ A green Gradle build alone cannot pass this checklist.
 - [ ] Select/review the real non-development VERSION before qualification; source/version changes invalidate affected evidence.
 - [ ] Supported Nix JDK 25 / Gradle 9.8.0 identities reviewed; strict locks, verification metadata, fixed cache and source filtering preserved.
 - [ ] Owner `nix flake check` passes on each claimed Linux Nix architecture. Record store reuse or actual execution accurately; package tests and essential install checks are included.
-- [ ] Standard `gradle installDist distTar distZip verifyDistribution -PreleaseBuild=true` generates final generic artifacts in the activated Nix environment.
-- [ ] Essential archive files/notices/runtime inventory inspected and actual extracted Java 25 launch qualified, including paths with spaces.
+- [ ] Final canonical Gradle portable ZIP and SHA-256 inventory retained. Prefer the same-build Nix `portable` output; `gradle verifyDistribution -PreleaseBuild=true` verifies a local build. Independently built payloads require explicit matching JAR hashes.
+- [ ] Final ZIP complete inventory, duplicate/extra/missing checks, CRC, extracted bytes, per-file hashes, notices/resources and ZIP SHA-256/size verified; actual extracted Java 25 launch qualified outside checkout, including paths with spaces.
 - [ ] Current reviewed package-deps.json matches dependencies; regenerate only for genuine resolved-input changes.
 - [ ] Nix wrapper invokes the installed application with managed Java 25; desktop entry/icons/notices inspected and actual native launch qualified. Materialize a result link only when needed.
+- [ ] Actual Nix application/dependency SHA-256 identities equal the canonical ZIP; original signed BC bytes retained. Deployment-specific wrapper/runtime/desktop/icons identified separately.
 - [ ] For each reproducibility claim, deliberately build separately and compare final artifacts/hashes with exact source/toolchain/builders recorded. Reused Nix output is not an independent build. Nix `nix build --rebuild .` is a separate human release-only comparison when claiming that package reproducible.
 - [ ] Unexpected differences resolved/documented; no redundant full online/offline suites solely to construct the same application repeatedly.
 
@@ -31,7 +32,7 @@ A green Gradle build alone cannot pass this checklist.
 
 - [ ] All unit and real-NIO integration tests pass.
 - [ ] Declared dependencies and shipped runtime inventory reviewed; no local fallback or test/development artifacts.
-- [ ] Explicit filesystemQualification passes on **every claimed filesystem/environment**, with cleanup confirmed.
+- [ ] Separate filesystem harness runs against exact extracted release JARs on **every claimed filesystem/runtime/provider**, with source identity and cleanup confirmed; no development classes substituted.
 
 ## Native UI — blocking for every claimed platform/package
 
@@ -39,7 +40,8 @@ A green Gradle build alone cannot pass this checklist.
 - [ ] qualification/GUI_SMOKE.md passed; AdditionalConflict presentation evidence recorded.
 - [ ] qualification/CLIPBOARD_SMOKE.md passed; clipboard manager/history limitations recorded.
 - [ ] qualification/ACCESSIBILITY_SMOKE.md keyboard/accessibility checks passed; screen-reader scope stated accurately.
-- [ ] qualification/PACKAGED_LAUNCH.md passed from actual installDist/extracted archives and Nix command as claimed.
+- [ ] qualification/PACKAGED_LAUNCH.md passed from the canonical extracted ZIP on Linux and installed Nix launcher/menu on native NixOS. Both initial targets required, exact environments recorded.
+- [ ] Shared common application evidence cites matching JAR hashes; no OS/filesystem/runtime/GUI/clipboard/accessibility PASS automatically transferred between routes.
 - [ ] Java 25 tested with actual package launch; Java 17 is not supported.
 - [ ] Unperformed GUI/clipboard/filesystem checks leave release status **NOT QUALIFIED**.
 
@@ -55,9 +57,10 @@ A green Gradle build alone cannot pass this checklist.
 
 ## Artifacts
 
-- [ ] Archive filenames/version correct; both archive contents inspected.
+- [ ] Canonical ZIP filename/version correct; final ZIP inspected. TAR is optional internal output, with no release publication or independent qualification requirement.
 - [ ] Licenses/notices included; intended runtime only; no developer environment requirement.
 - [ ] Final artifact SHA-256 generated with `sha256sum -- FILE...` and retained alongside exact artifacts.
+- [ ] Original immutable ZIP, size and per-file manifest retained for later Windows/macOS qualification; those platforms initially UNQUALIFIED. Later dated append-only support evidence must use original bytes without rebuilding, replacing artifacts or moving tags.
 - [ ] Any missing intentional application icon recorded as polish work, not replaced by placeholder branding.
 
 ## Release — requires explicit owner authorization

@@ -712,8 +712,10 @@ not secure erasure or a guarantee against concurrent OS clipboard activity.
 
 ## Packaging boundary (M4a)
 
-The Gradle application distribution is the canonical launcher plus runtime-JAR
-layout. The Linux Nix derivation consumes that layout and fixes JAVA_HOME to the
+The standard Gradle application ZIP is the canonical portable launcher plus
+original runtime-JAR layout. TAR remains optional internal output. The Linux
+Nix derivation exports that verified ZIP from the same build, compares installed
+application/dependency SHA-256 identities with it, and fixes JAVA_HOME to the
 full pinned desktop-capable JDK; it does not introduce another application entry
 point or storage policy. Generic archives rely on user-supplied Java 25 or newer.
 VERSION is shared by Gradle and Nix; it identifies a development state until a
@@ -722,8 +724,12 @@ candidate is deliberately chosen. Package construction does not declare a releas
 Only generated launch scripts default to `-XX:+DisableAttachMechanism`, reducing
 JVM Attach API availability in this password/TOTP application. It does not prevent
 same-user inspection or memory attacks. Development `run` remains debuggable.
-Distribution verification checks resolved runtime inventory, notices, application
-entry point/icons and launcher policy. Standard Gradle constructs the archives.
+Distribution verification checks complete final ZIP inventory, duplicate entries,
+CRC/size, extracted content hashes, original runtime JAR and notice bytes,
+application entry point/icons and launcher policy. Standard Gradle constructs the ZIP.
+Nix wrapper, managed runtime and desktop integration have separate identities and
+native qualification. Both Linux ZIP and native NixOS are initial 0.1.0 gates;
+common application evidence may be shared only with matching payload hashes.
 No runtime reduction, update network path, icon, default vault path or installer
 framework is introduced. Packaging and vault storage remain separate.
 

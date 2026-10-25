@@ -4,7 +4,9 @@ Record date, commit, VERSION, artifact checksum/store path, OS/distribution,
 architecture, desktop/window manager (including X11/Wayland), runtime and display
 scaling. Use disposable test vaults. Mark each item PASS/FAIL/UNQUALIFIED with
 non-secret observations. A headless component test or Xvfb is not native qualification.
-Run this with each package route claimed; see PACKAGED_LAUNCH.md.
+Run applicable native checks with each package route claimed; see
+PACKAGED_LAUNCH.md for common evidence reuse by matching JAR identities and
+the separate Linux ZIP/NixOS launcher and desktop-integration requirements.
 
 - [ ] Application launches; launcher layout fits and Create/Open are visible.
 - [ ] Create a disposable vault, close it, open it; correct window/session ownership.
@@ -13,6 +15,7 @@ Run this with each package route claimed; see PACKAGED_LAUNCH.md.
 - [ ] Normal TOTP rollover updates displayed codes/intervals without copying.
 - [ ] Conflict display shows all alternatives without implying a winner.
 - [ ] Create token and edit a selected alternative; validation and cancellation work.
+- [ ] Delete a disposable token; cancellation preserves it, confirmed deletion survives reopen.
 - [ ] Merge uses two steps: deliberate alternative selection, then explicit field/secret choices.
 - [ ] AdditionalConflict decision presentation is inspected using a controlled harness/fake if available; record method, otherwise UNQUALIFIED.
 - [ ] Token publication uncertainty requires appropriate explicit decisions and do not imply freshness.

@@ -96,8 +96,8 @@ storage permissions or fabricate vault-format metadata.
 
 ## Packaging and qualification
 
-No first release has been declared. **Linux is the first desktop qualification
-target.** Current release status is **NOT QUALIFIED**; see the exact evidence in
+No first release has been declared. **Linux portable ZIP and native NixOS package
+are the initial required qualification targets.** Current release status is **NOT QUALIFIED**; see the exact evidence in
 [QUALIFICATION.md](../QUALIFICATION.md) and the blocking
 [RELEASE_CHECKLIST.md](../RELEASE_CHECKLIST.md). Build success is not native GUI,
 clipboard, accessibility, or filesystem support qualification.
@@ -113,15 +113,19 @@ To materialize the canonical generic distribution for development use (this does
 not replace final qualification and need not follow every edit):
 
 ```sh
-gradle installDist distTar distZip verifyDistribution
+gradle verifyDistribution
 build/install/totipo-desktop/bin/totipo-desktop
 ```
 
-`build/distributions` contains the ZIP and TAR. Both contain generated launchers,
+`build/distributions` contains the canonical portable ZIP. Gradle `distTar` remains
+available for internal use; TAR publication and separate qualification are not required.
+The ZIP contains generated launchers,
 the application JAR, core/storage-nio/Bouncy Castle runtime JARs, and licenses.
 They **do not include Java**: install **Java 25 or newer** and set `JAVA_HOME` or
-provide `java` on PATH. `verifyDistribution` checks essential installed files,
-resolved runtime dependencies, application entry point/icons and launcher policy.
+provide `java` on PATH. `verifyDistribution` checks installed and final ZIP
+inventory, duplicates, CRC/size, extracted bytes, original JAR/license identities,
+application entry point/icons and launcher policy. Its report at
+`build/reports/distribution/portable.sha256` records ZIP SHA-256/size and every file.
 Actual extracted archive launch is a separate check; standard Gradle owns archive
 construction. Generated launchers disable JVM Attach
 API availability with `-XX:+DisableAttachMechanism`; this does not prevent
@@ -147,7 +151,9 @@ nix flake check
 `checks.desktop` and `packages.default` reference the same derivation. This gate
 evaluates the flake and realizes the actual desktop package, including its Gradle
 tests through check, installed distribution verification and Nix-specific install
-checks. It does not generate generic ZIP/TAR archives. Nix can reuse an already qualified store result; this is not a
+checks. It exports the verified canonical ZIP and manifests in its `portable`
+output from the same application build, and checks actual installed JAR hashes
+against that ZIP. Nix can reuse an already qualified store result; this is not a
 forced rebuild. CI uses the pinned Nix environment and this single gate.
 
 `nix build .` materializes the default package and creates a local `result`
@@ -232,6 +238,14 @@ Create/select an empty disposable test root on each filesystem to be claimed:
 ```sh
 gradle filesystemQualification -PqualificationRoot=/explicit/disposable/test/root
 ```
+
+For release evidence supply `-PqualificationDistribution=/absolute/extracted/totipo-desktop-VERSION`
+to execute with only the supplied JARs plus the separate harness, or compile the
+harness directly against those JARs without Gradle. See
+[packaged launch](../qualification/PACKAGED_LAUNCH.md) for copyable commands,
+same-build Nix/ZIP materialization, native Linux/NixOS steps and evidence reuse.
+Qualification code is never released. Later Windows/macOS qualification uses the
+original immutable ZIP without rebuilding; see [qualification](../QUALIFICATION.md).
 
 No default root is provided. The harness creates a unique `totipo-qualification-`
 child, uses only test credentials, and deletes only that child without following
