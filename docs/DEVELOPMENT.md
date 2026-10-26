@@ -7,7 +7,7 @@ for publication status and downloads; assets are available once published.
 The portable ZIP requires a separately installed desktop-capable Java 25 runtime;
 the Linux Nix deployment provides managed Java 25. Full native qualification
 remains pending for every platform; Windows and macOS are UNQUALIFIED and support
-is not claimed. See [installation instructions](RELEASE_0_1_0.md#retrieving-artifacts-after-authorized-publication).
+is not claimed. See [installation instructions](GITHUB_RELEASE_0_1_0.md#downloads-and-installation).
 [Qualification](../QUALIFICATION.md)
 owns evidence; the [release checklist](../RELEASE_CHECKLIST.md) owns release gates.
 Building or running does not declare a release.
@@ -108,7 +108,7 @@ disclosures and basic human smoke. Full native qualification can follow publicat
 against original immutable artifacts. Initial targets are NixOS (Nix package and
 ZIP with Java 25) and Linux Mint (the same ZIP with independently installed Java 25).
 See [QUALIFICATION.md](../QUALIFICATION.md), [RELEASE_CHECKLIST.md](../RELEASE_CHECKLIST.md)
-and the [0.1.0 release plan](RELEASE_0_1_0.md). Build success is not native GUI,
+and the [publication procedure](DESKTOP_RELEASE_AUTOMATION.md). Build success is not native GUI,
 clipboard, accessibility, or filesystem support qualification.
 
 Development uses `gradle run` and focused tests. The owner and CI use

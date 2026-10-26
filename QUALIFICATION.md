@@ -145,7 +145,7 @@ Update this current support index with links to the appended evidence. Never
 rebuild application artifacts, move release tags, replace assets or rewrite
 historical results to claim retroactive qualification. Preserve failures; a
 product defect should lead to a subsequent corrective release. See the
-[release plan](docs/RELEASE_0_1_0.md) and
+[release notes and artifact retrieval](docs/GITHUB_RELEASE_0_1_0.md) and
 [preparation report](review/M4B_R3_DESKTOP_0_1_0_RELEASE_PREPARATION_REPORT.md).
 
 ## Current qualification process

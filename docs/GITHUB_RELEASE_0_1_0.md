@@ -17,8 +17,8 @@ no fat JAR, native installer, updater or public TAR is provided.
 
 This preview uses Totipo Java storage-nio/core **0.2.0**, Totipo Vault Format
 **v1/r19** (spec commit `cdb4e91be1c6d3704874b2b92457ffe7be5e9084`), and
-Bouncy Castle **1.86**. See [dependency provenance](https://github.com/totipo-org/totipo-desktop/blob/REPLACE_WITH_FULL_REVIEWED_RELEASE_COMMIT/TOTIPO_JAVA_DEPENDENCY.md)
-and [licenses/runtime disclosures](https://github.com/totipo-org/totipo-desktop/blob/REPLACE_WITH_FULL_REVIEWED_RELEASE_COMMIT/THIRD_PARTY.md).
+Bouncy Castle **1.86**. See [dependency provenance](https://github.com/totipo-org/totipo-desktop/blob/v0.1.0/TOTIPO_JAVA_DEPENDENCY.md)
+and [licenses/runtime disclosures](https://github.com/totipo-org/totipo-desktop/blob/v0.1.0/THIRD_PARTY.md).
 
 **Native status at planned publication: RELEASED / UNQUALIFIED.** Required
 automated checks, artifact collection and all nine basic maintainer smoke steps
@@ -46,19 +46,16 @@ rollback protection have no general qualification claim. Follow explicit retry
 choices after uncertain writes. Clipboard cleanup is best effort; history/other
 apps/remote desktops may retain codes. Lock before leaving; focus loss alone does
 not lock and OS-lock/suspend detection is platform dependent. See
-[security, backups and recovery](https://github.com/totipo-org/totipo-desktop/blob/REPLACE_WITH_FULL_REVIEWED_RELEASE_COMMIT/docs/USER_GUIDE.md#security-backups-and-recovery).
+[security, backups and recovery](https://github.com/totipo-org/totipo-desktop/blob/v0.1.0/docs/USER_GUIDE.md#security-backups-and-recovery).
 
 ## Release identity and evidence
 
-**Draft template: not publication-ready.** Replace every
-`REPLACE_WITH_FULL_REVIEWED_RELEASE_COMMIT` below and in all documentation URLs
-with the final clean release commit's full 40-character SHA in the external
-GitHub draft. Verify the clean-commit/artifact binding and immutable links before
-publication. Create this release as a **GitHub prerelease**, titled
-**Totipo Desktop 0.1.0 preview**, targeting `v0.1.0`.
+This **GitHub prerelease**, **Totipo Desktop 0.1.0 preview**, identifies its exact
+source commit through the annotated `v0.1.0` tag shown on the release page.
+Documentation links and Nix retrieval below use that same release tag.
 
 - Version: **0.1.0**; intended tag: `v0.1.0`.
-- Full release commit: `REPLACE_WITH_FULL_REVIEWED_RELEASE_COMMIT`.
+- Source: annotated tag `v0.1.0`; GitHub displays the associated commit.
 - Preparation source: `68995c54425c727bd94ddae2052728c77123ce1f-dirty`;
   this identifies preparation metadata, not the final release commit.
 - ZIP: **6,591,400 bytes**; SHA-256
@@ -79,7 +76,7 @@ ext-family version, Firefox version and clipboard-manager context were not
 recorded. Application exit passed; disposable-folder deletion is unconfirmed.
 This is basic smoke evidence; full native qualification remains pending for
 **every platform**. See the
-[original preparation evidence](https://github.com/totipo-org/totipo-desktop/blob/REPLACE_WITH_FULL_REVIEWED_RELEASE_COMMIT/review/M4B_R3_DESKTOP_0_1_0_RELEASE_PREPARATION_REPORT.md)
+[original preparation evidence](https://github.com/totipo-org/totipo-desktop/blob/v0.1.0/review/M4B_R3_DESKTOP_0_1_0_RELEASE_PREPARATION_REPORT.md)
 and [current qualification status](https://github.com/totipo-org/totipo-desktop/blob/main/QUALIFICATION.md).
 
 Captured **x86_64-linux** Nix identities (collector 2026-10-25T17:25:09Z):
@@ -139,14 +136,17 @@ directory. If using the JDK's `jar xf` instead of `unzip`, explicitly run
 permissions. The Windows launcher is `bin/totipo-desktop.bat`; **Windows and
 macOS are UNQUALIFIED**, and these instructions do not establish support.
 See the immutable
-[packaged-launch instructions](https://github.com/totipo-org/totipo-desktop/blob/REPLACE_WITH_FULL_REVIEWED_RELEASE_COMMIT/qualification/PACKAGED_LAUNCH.md).
+[packaged-launch instructions](https://github.com/totipo-org/totipo-desktop/blob/v0.1.0/qualification/PACKAGED_LAUNCH.md).
 
 The Linux Nix deployment provides a **managed Java 25 runtime**, graphical desktop
-entry and icons. With Nix installed, use the full release commit:
+entry and icons. With Nix installed, use the release tag:
+
+Verify the tag's commit against the full source SHA shown on the release page;
+use that SHA instead of the tag in the source URL when recording qualification.
+Do not substitute `main` or a later build.
 
 ```sh
-RELEASE_COMMIT='REPLACE_WITH_FULL_REVIEWED_RELEASE_COMMIT'
-RELEASE_SOURCE="github:totipo-org/totipo-desktop/$RELEASE_COMMIT"
+RELEASE_SOURCE='github:totipo-org/totipo-desktop/v0.1.0'
 nix build "$RELEASE_SOURCE#packages.x86_64-linux.default" \
   "$RELEASE_SOURCE#packages.x86_64-linux.default.portable" --no-link --print-out-paths
 ```

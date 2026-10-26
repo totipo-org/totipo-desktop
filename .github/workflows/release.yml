@@ -1,0 +1,89 @@
+name: Desktop preview release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: github.repository == 'totipo-org/totipo-desktop'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify annotated tag, version and reviewed main
+        run: |
+          test "$(git cat-file -t "$GITHUB_REF")" = tag
+          test "$GITHUB_REF_NAME" = "v$(cat VERSION)"
+          test "$(git rev-parse "$GITHUB_REF^{commit}")" = "$(git rev-parse HEAD)"
+          test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+        with:
+          extra_nix_config: |
+            accept-flake-config = true
+      - name: Qualify package and verify same-build ZIP and manifests
+        run: |
+          nix flake check --print-build-logs
+          nix run .#collect-release-evidence -- "$RUNNER_TEMP/evidence"
+          portable=$(nix eval --raw .#packages.x86_64-linux.default.portable.outPath)
+          mkdir "$RUNNER_TEMP/assets"
+          cp "$portable/totipo-desktop-$(cat VERSION).zip" \
+            "$portable/portable.sha256" "$portable/nix-deployment.sha256" "$RUNNER_TEMP/assets/"
+      - name: Prepare public checksums and reviewed notes
+        run: |
+          version=$(cat VERSION)
+          cp "docs/GITHUB_RELEASE_${version//./_}.md" "$RUNNER_TEMP/notes.md"
+          cd "$RUNNER_TEMP/assets"
+          sha256sum -- "totipo-desktop-$version.zip" portable.sha256 nix-deployment.sha256 > SHA256SUMS
+          sha256sum --strict --check SHA256SUMS
+          cat SHA256SUMS >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: desktop-release
+          path: |
+            ${{ runner.temp }}/assets
+            ${{ runner.temp }}/notes.md
+            ${{ runner.temp }}/evidence
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: desktop-release
+          path: ${{ runner.temp }}/candidate
+      - name: Publish prerelease
+        working-directory: ${{ runner.temp }}/candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          cd assets
+          sha256sum --strict --check SHA256SUMS
+          gh release create "$GITHUB_REF_NAME" --verify-tag --prerelease --latest=false \
+            --title "Totipo Desktop $version preview" --notes-file ../notes.md \
+            "totipo-desktop-$version.zip" portable.sha256 nix-deployment.sha256 SHA256SUMS

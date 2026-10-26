@@ -17,7 +17,10 @@ fresh execution without logs. All nine minimal human smoke steps passed.
 - [ ] Reviewed release source/dependencies and eventual clean release commit;
       no untracked consumed inputs. Record preparation HEAD plus unstaged input
       manifest now, then exact release commit before tagging. Verify unchanged
-      consumed bytes when moving from prepared worktree to that commit.
+      consumed bytes, modes and membership when moving from prepared worktree to
+      that commit; establish its package derivation/output and immutable GitHub
+      source binding using the recorded
+      [B2 procedure](review/M4B_R4_RELEASE_READINESS_REVIEW.md#8-source-freeze-and-clean-commit-implications).
 - [x] VERSION is `0.1.0`; `gradle validateVersion -PreleaseBuild=true` passes;
       intended tag is `v0.1.0` (version prefixed with `v`). Gradle and Nix derive
       application version from VERSION.
@@ -55,9 +58,10 @@ fresh execution without logs. All nine minimal human smoke steps passed.
       exact portable and Nix artifacts; record each step, runtime, date, artifact,
       environment and actual results. Serious functional/crypto/integrity failure
       blocks readiness. Prior generic smoke or headless tests cannot supply PASS.
-- [ ] Preview notes and immutable-source retrieval/publication plan in
-      [docs/RELEASE_0_1_0.md](docs/RELEASE_0_1_0.md) reviewed, including explicit
-      RELEASED / UNQUALIFIED status and progressive qualification plan.
+- [ ] [Preview notes and immutable-source retrieval instructions](docs/GITHUB_RELEASE_0_1_0.md)
+      and [publication procedure](docs/DESKTOP_RELEASE_AUTOMATION.md) reviewed,
+      including rendered notes/links, explicit RELEASED / UNQUALIFIED status and
+      progressive qualification plan.
 
 ## Required only for a PLATFORM QUALIFIED claim
 
@@ -88,13 +92,17 @@ block preview publication. No blanket Linux/NixOS qualification is implied.
 
 ## Publication — separate explicit maintainer authorization
 
+Use the [Actions release procedure](docs/DESKTOP_RELEASE_AUTOMATION.md) after
+accepting M4b-R5. The maintainer's annotated tag push triggers qualification and
+publication automatically; complete acceptance and authorization before pushing it.
+
 - [ ] Every required pre-publication box above passed; mark exact candidate
       RELEASE-READY. Native qualification status remains separately recorded.
 - [ ] Maintainer accepts proposed policy/notes and explicitly authorizes release.
 - [ ] Reviewed clean release commit recorded; tag `v0.1.0` points to it and agrees
       with VERSION. Follow existing signing policy; no new signing requirement.
 - [ ] Publish only original verified ZIP, checksum inventory and deployment
-      manifest/checksums per release plan. TAR is internal, not a public asset.
+      manifest/checksums per publication procedure. TAR is internal, not a public asset.
 - [ ] Record publication URL/date, source/tag/commit and original artifact hashes;
       set RELEASED / UNQUALIFIED until applicable platform matrices pass.
 

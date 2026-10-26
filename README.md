@@ -15,7 +15,7 @@ the Linux Nix deployment provides managed Java 25. Full native qualification
 remains pending for every platform, including Linux and NixOS. Windows and macOS
 are UNQUALIFIED; platform support is not claimed.
 See [current qualification status](QUALIFICATION.md) and
-[0.1.0 installation instructions](docs/RELEASE_0_1_0.md#retrieving-artifacts-after-authorized-publication).
+[0.1.0 installation instructions](docs/GITHUB_RELEASE_0_1_0.md#downloads-and-installation).
 The instructions below run from source.
 
 ## What you can do
