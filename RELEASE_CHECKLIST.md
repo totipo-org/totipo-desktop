@@ -5,6 +5,11 @@ Qualification is specific to the exact candidate; the completed 0.1.0 checks bel
 are historical evidence and do not qualify this version. See
 [current qualification](QUALIFICATION.md) and the
 [cleanup report](review/DESKTOP_RELEASE_VERSION_CLEANUP_REPORT.md).
+The About link changes application bytes again; the earlier 0.1.1 human gate
+below no longer qualifies the current candidate. See the
+[About link report](review/DESKTOP_0_1_1_ABOUT_LINK_REPORT.md) for current evidence
+and the replacement human gate/About dialog smoke PASS reported 2026-10-26.
+Full native platform qualification remains separate and UNQUALIFIED.
 
 ## Current release requirements
 
@@ -15,7 +20,9 @@ are historical evidence and do not qualify this version. See
 - [ ] Freeze all consumed inputs and obtain human `nix flake check` PASS. Record
       logs, derivation/output/runtime identities and fresh execution or store reuse.
       Changed consumed inputs require qualification again.
-      Gate PASS human-reported 2026-10-26; all 182 frozen hashes still match.
+      Replacement gate PASS human-reported 2026-10-26 for the selectable-URL
+      candidate; all 182 hashes in `build/about-url-frozen-inputs.sha256` still
+      match. The earlier gate in the cleanup report remains historical.
       Logs/output identities and execution/reuse details remain unprovided, so
       this combined evidence item remains open.
 - [ ] Retain the same-build portable ZIP, portable and Nix deployment manifests;
@@ -27,9 +34,14 @@ are historical evidence and do not qualify this version. See
       scenarios in [pre-release smoke](qualification/PRE_RELEASE_SMOKE.md), with
       current candidate paths and a new dated result record; preserve old results.
       Check Help → About Totipo… from locked and unlocked screens, actual installed
-      version, selectable repository, keyboard access, Enter/Escape and dismissal.
+      version, selectable URL, mouse/keyboard/browser activation, Close/Escape
+      and dismissal. Use the About link report's short native smoke procedure.
+      About dialog smoke PASS human-reported 2026-10-26; launch route,
+      artifact/environment identities and individual step results were not
+      supplied. This does not establish the full pre-release smoke on both routes.
 - [ ] Prepare and review version-specific GitHub notes required by the workflow,
       including immutable source, retrieval instructions and exact qualification.
+      [0.1.1 notes](docs/GITHUB_RELEASE_0_1_1.md) prepared; human review pending.
 - [ ] Mark RELEASE-READY only after all required candidate checks pass. Obtain
       explicit maintainer release authorization, then follow the
       [publication procedure](docs/DESKTOP_RELEASE_AUTOMATION.md). Ordinary versions

@@ -33,8 +33,11 @@ using the immutable release source identified in the release notes. Consult
 [current qualification](../QUALIFICATION.md) before choosing a platform or route.
 
 Choose **Help → About Totipo…** to see the installed application version and
-project repository. The repository reference is selectable for copying. Close
-the dialog with **Close**, Enter or Escape. **Vault → About This Vault…** shows
+project URL. Click the URL, Tab to it and press Enter/Space, or use Alt+G to open
+your default browser. The URL is selectable; use the normal text-copy shortcut
+to copy it. If browsing fails, the message provides the address to open manually.
+Dismiss the dialog with **Close** or Escape (Enter activates Close when the URL
+is not focused). **Vault → About This Vault…** shows
 separate vault details.
 
 ## Create, open, and remember vaults
