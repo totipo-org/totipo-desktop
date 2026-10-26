@@ -1,9 +1,15 @@
 # Totipo Desktop user guide
 
 Totipo Desktop stores time-based one-time password (TOTP) authenticator entries
-in encrypted vault folders. It is unreleased, **NOT QUALIFIED**, and has not
-completed first-release qualification. Linux is the first target; Windows and
-macOS are not claimed as supported. See [current qualification](../QUALIFICATION.md).
+in encrypted vault folders. Totipo Desktop 0.1.0 is the first desktop preview.
+Check the [0.1.0 release page](https://github.com/totipo-org/totipo-desktop/releases/tag/v0.1.0)
+for publication status and downloads; assets are available once published.
+The portable ZIP requires a separately installed desktop-capable Java 25 runtime;
+the Linux Nix deployment provides managed Java 25.
+Full native qualification remains pending for every platform. Linux and NixOS
+are initial test targets; Windows and macOS are UNQUALIFIED and support is not
+claimed. See [current qualification](../QUALIFICATION.md) and
+[installation instructions](RELEASE_0_1_0.md#retrieving-artifacts-after-authorized-publication).
 For running from source, start with the [README](../README.md); build and package
 procedures are in [development](DEVELOPMENT.md).
 

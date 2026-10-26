@@ -1,11 +1,152 @@
 # Qualification evidence
 
-Release status: **NOT QUALIFIED**. No first release has been declared.
-Portable ZIP on Linux and the installed Nix package on native NixOS are both
-required initial 0.1.0 targets. No Windows/macOS support claim
-is made. PASS below applies only to the named check and exact tested environment.
+Current candidate: **0.1.0 preview, unpublished; RELEASE-READY pending**.
+All native platforms remain **UNQUALIFIED**. No first release has been declared.
+No Linux, NixOS, Windows or macOS platform support claim is made.
+PASS below applies only to the named check and exact tested environment.
 Build success, headless component tests and source inspection are not native GUI
 or clipboard qualification.
+
+2026-10-25, M4b-R3: the maintainer reports **`nix flake check` PASS** for the
+frozen 0.1.0 preview candidate. All 178 consumed-input hashes were rechecked
+successfully afterward; HEAD and source membership are unchanged. Logs, output
+identities and fresh-execution/store-reuse details were not supplied with that
+initial result. This records
+the package-inclusive automatic gate, including configured installation/payload
+checks, without inferring fresh tests or native GUI qualification. Canonical
+output identity capture, independent actual-output comparison, human smoke and
+final acceptance remain pending; RELEASE-READY has not been declared. See the
+[M4b-R3 report](review/M4B_R3_DESKTOP_0_1_0_RELEASE_PREPARATION_REPORT.md).
+
+2026-10-25, subsequent M4b-R3 evidence: the maintainer materialized the same-build
+x86_64-linux outputs using the documented command. Nix deployment:
+`/nix/store/x50f32kh1f8mwbpyprrx2l0y1q3vfl2x-totipo-desktop-0.1.0`;
+portable output:
+`/nix/store/vsps5jpn230wkrvwwwp1n71fn568d4yv-totipo-desktop-0.1.0-portable`.
+These paths are human-reported and not visible in the agent filesystem. Original
+manifests, derivation/runtime identities, independent actual-output comparison
+and human smoke remain pending. Frozen inputs still match. Materialization is
+neither another gate nor proof of independent reproducibility or native PASS.
+
+2026-10-25, collector follow-up: at the maintainer's request, a small
+`nix run .#collect-release-evidence` app now records/verifies these identities.
+It changes flake/tooling inputs, so the prior reported PASS remains evidence for
+the earlier snapshot and a replacement human `nix flake check` is pending.
+Collector Bash/fixture checks passed; actual Nix app execution and human smoke
+remain pending. See the report's follow-up for the replacement input freeze.
+
+2026-10-25T17:25:09Z, actual collector evidence: the maintainer ran the Nix app
+successfully. The shared bundle `build/release-evidence/20261025T172509Z/` was
+inspected and all 18 evidence-file checksums verified. Canonical ZIP SHA-256 is
+`baf0ea66247ddcd310b1b9b7eb413ba5cf08d2c0d827d7dfbb07071a869f35bf`, size
+6,591,400 bytes; its full manifest equals the previously verified local Gradle
+manifest. Recorded logs show ZIP/extracted inventory, installed JAR equivalence,
+deployment hashes and managed-runtime verification PASS. Derivation, NAR and
+runtime closure identities are retained in the report and bundle. All 179
+replacement frozen-input hashes still match. Actual collector execution and
+artifact-identity capture are now complete; the replacement human Nix gate result,
+minimal human smoke and final acceptance remain pending. No native platform
+qualification or fresh application-test execution is inferred.
+
+2026-10-25, replacement automatic gate: the maintainer reports **`nix flake check`
+PASS** after the collector follow-up freeze. All 179 frozen consumed-input hashes
+were rechecked successfully afterward; branch/HEAD and source membership remain
+unchanged, with no staged file contents. Logs and fresh-execution/store-reuse
+details were not supplied; no fresh tests or native qualification are inferred.
+This satisfies the replacement gate for the current tooling snapshot and
+supersedes the pending gate status above. Artifact collection already passed.
+Minimal human smoke and final maintainer acceptance remain pending; the candidate
+is unpublished and has not been declared RELEASE-READY.
+
+2026-10-25T17:50:10Z, partial portable human smoke: verified original ZIP/extracted
+hashes and external-Java-25 launch outside checkout, ordinary rendering and
+reachable startup controls PASS (human-reported, Cinnamon/X11). Minimal smoke
+steps 1–2 passed; steps 3–9 remain pending. Full native qualification is unchanged.
+Exact artifact/runtime and remaining environment fields are recorded in the report.
+
+2026-10-25, portable smoke continuation: disposable encrypted vault creation,
+test token addition, reveal and matching copy/paste into Firefox PASS
+(human-reported). The maintainer confirmed the captured NixOS installation as the
+native environment; Cinnamon/X11, same portable artifact and Java 25. Minimal
+steps 1–5 passed; steps 6–9 and final acceptance remain pending. Firefox version
+and clipboard-manager context are not supplied; full native qualification is unchanged.
+
+2026-10-25, portable smoke continuation: locking, exit, relaunch and password
+reopen PASS (human-reported). The token persisted and revealed a code after
+reopening. Step 6 passed; step 7's independent validity/rollover comparison and
+Nix launcher steps 8–9 remain pending. Artifact/runtime/environment are unchanged.
+
+2026-10-25, portable smoke completion: the maintainer confirmed two consecutive
+TOTP intervals matched the supplied independent offline JDK/JShell HmacSHA1
+reference. With persistence/reopen already passed, minimal portable steps 1–7
+are PASS. Nix installed-launcher/functionality steps 8–9 and cleanup remain
+pending; no full native qualification follows from these minimal results.
+
+2026-10-25, minimal smoke complete: installed Nix launcher startup/rendering,
+separate disposable-vault creation, token addition/reveal/copy into Firefox,
+lock/exit/relaunch/reopen, persistence and final exit PASS (human-reported).
+The managed wrapper was launched with caller Java overrides cleared and minimal
+PATH. Test filesystem reported `ext2/ext3` by `stat`; a specific ext-family version
+was not established. **All nine minimal smoke steps passed** on the exact recorded
+portable/Nix artifacts, NixOS 26.05/Cinnamon/X11 and Java 25. Application shutdown
+passed; disposable-folder deletion remains unconfirmed. Firefox version and
+clipboard-manager context remain unrecorded. The current smoke table and report
+retain the dated results. Final maintainer acceptance remains pending;
+RELEASE-READY is not declared and every full native platform remains UNQUALIFIED.
+
+## Release readiness and platform qualification (M4b-R3 policy)
+
+The maintainer approved preview publication before complete native qualification.
+This explicitly supersedes earlier publication-blocking native policy in M4a,
+M4b-R1 and M4b-R2; historical results and requirements for platform claims retain
+their original scope. These are distinct statuses:
+
+| Status | Meaning |
+| --- | --- |
+| RELEASE-READY | The exact candidate has passed every required pre-publication check in RELEASE_CHECKLIST.md. It permits publication with explicit maintainer authorization and does not imply platform qualification. |
+| RELEASED / UNQUALIFIED | Exact artifacts have been published; full native platform qualification remains pending. This is an acceptable, intentional state for 0.1.0 preview. |
+| PLATFORM QUALIFIED | Original immutable release artifacts passed all applicable native procedures for a precisely documented environment. This status applies only to that environment/route, not an OS family. |
+
+RELEASE-READY requires reviewed source/dependencies, correct version and artifact
+identity, required automated checks and human `nix flake check`, complete ZIP
+integrity/extracted-content/SHA-256 verification, Nix installation verification
+and JAR payload equivalence, reviewed licenses/dependency/security disclosures,
+and [basic human functional smoke](qualification/PRE_RELEASE_SMOKE.md) through
+both intended launchers. No known unresolved critical security, vault-integrity
+or release-artifact defect may remain. Prior milestone smoke cannot pass the
+candidate. A serious smoke failure blocks readiness pending resolution.
+
+Full GUI, clipboard ownership/history, accessibility, packaged/menu integration,
+filesystem/provider, suspend/resume and lifecycle checks remain required for
+their platform claims. Incomplete native scenarios alone do not block preview
+publication. The four native procedures below remain authoritative and are not
+replaced or weakened by the shorter pre-publication smoke.
+
+Synchronization testing covers filesystem operations and observation, not a
+particular synchronization service. Neither release readiness nor native
+qualification requires Syncthing installation/configuration, network peers or
+end-to-end synchronization. Retain external valid changes, local refresh and
+observation, applicable watcher behavior, conflicts/merge, failure and retry
+coverage through deterministic tests and controlled external operations.
+Historical Syncthing observations remain evidence of only their original scope.
+
+Initial progressive qualification targets, all currently UNQUALIFIED:
+
+- NixOS: native Nix package.
+- NixOS: portable ZIP with Java 25.
+- Linux Mint: the same portable ZIP with independently installed Java 25.
+
+Windows and macOS remain UNQUALIFIED until separately tested. For each later
+attempt, acquire the exact original published ZIP/manifests and original Nix
+deployment where relevant, verify original checksums and all contained JAR
+identities, execute applicable procedures and append dated evidence identifying
+artifact, date, OS/environment, filesystem, exact Java runtime and actual results.
+Update this current support index with links to the appended evidence. Never
+rebuild application artifacts, move release tags, replace assets or rewrite
+historical results to claim retroactive qualification. Preserve failures; a
+product defect should lead to a subsequent corrective release. See the
+[release plan](docs/RELEASE_0_1_0.md) and
+[preparation report](review/M4B_R3_DESKTOP_0_1_0_RELEASE_PREPARATION_REPORT.md).
 
 ## Current qualification process
 
@@ -32,6 +173,8 @@ Freeze consumed inputs before owner Nix. Use Git-aware intent-to-add membership
 for new intended files, keep tracked edits unstaged and require
 `git diff --cached --quiet`. Changed consumed inputs invalidate affected evidence.
 DOCS_ONLY input-invariant changes need static checks rather than full rebuilds.
+
+## Historical evidence (not 0.1.0 candidate readiness)
 
 The owner expressly approved this policy transition for the Nix-first/Java 25
 milestone. Previous normal-plus-strict gate requirements are superseded; historical
@@ -66,8 +209,8 @@ cancellation preserving the previous vault, and external Syncthing changes
 appearing, in response to the focused concealed/revealed layout and no-F5 smoke
 request. Focused milestone smoke: PASS (human-reported). Detailed native
 environment, logs and the broader GUI checklist were not supplied.
-The full native qualification matrix remains UNQUALIFIED. VERSION remains
-`0.0.0-dev`, NOT QUALIFIED.
+The full native qualification matrix remained UNQUALIFIED. At that historical
+milestone VERSION remained `0.0.0-dev`, NOT QUALIFIED.
 
 Current dependency: released Java 0.2.0 / Totipo Vault Format v1/r19.
 Historical filesystem and native/package evidence below is not a PASS for this
@@ -123,7 +266,8 @@ Manual checklists:
 - [Clipboard](qualification/CLIPBOARD_SMOKE.md)
 - [Accessibility](qualification/ACCESSIBILITY_SMOKE.md)
 - [Packaged launch](qualification/PACKAGED_LAUNCH.md)
-- [Blocking release checklist](RELEASE_CHECKLIST.md)
+- [Pre-publication smoke](qualification/PRE_RELEASE_SMOKE.md)
+- [Release-readiness checklist](RELEASE_CHECKLIST.md)
 
 Build, runtime-loading and reproducibility evidence is recorded separately in
 [the M4a report](review/M4A_RELEASE_HARDENING_REPORT.md).
@@ -135,8 +279,9 @@ ZIP: original separate application/core/storage/BC JARs, both generated launcher
 embedded icons/resources and license notices. No Java runtime is bundled. The
 Nix deployment supplies the pinned managed JDK and desktop integration. Both
 initial native routes must pass before 0.1.0 is advertised as qualified; package
-construction alone qualifies neither. VERSION remains `0.0.0-dev` in this
-infrastructure milestone.
+construction alone qualifies neither. VERSION was `0.0.0-dev` in M4b-R2;
+the current preview candidate is `0.1.0`. Full native qualification is no longer
+a prerequisite for preview publication under the M4b-R3 policy above.
 
 [Packaged launch](qualification/PACKAGED_LAUNCH.md) gives the exact commands for
 obtaining the same-build ZIP/Nix outputs, comparing actual hashes, extracting,
@@ -159,8 +304,8 @@ launchers must exercise ordinary application functionality, and NixOS must pass
 managed runtime, installed graphical-menu launch and desktop/icon integration.
 The existing native checklists remain authoritative; record unperformed items.
 
-Windows/macOS begin UNQUALIFIED. Later qualification may append support evidence
-against the original immutable 0.1.0 ZIP with its original SHA-256 and size,
+All initial targets, Windows and macOS begin UNQUALIFIED. Later qualification may
+append support evidence against the original immutable 0.1.0 ZIP with its original SHA-256 and size,
 without rebuilding, moving tags or replacing artifacts. Failure on a later
 platform leaves that environment UNQUALIFIED. TAR publication and independent TAR
 qualification are no longer required. Fat JARs, bundled runtimes, native installers

@@ -1,8 +1,14 @@
 # Development and packaging
 
 Contributor and operator procedures for working from source. For everyday use,
-see the [user guide](USER_GUIDE.md). The application remains **NOT QUALIFIED** and
-has not completed first-release qualification. [Qualification](../QUALIFICATION.md)
+see the [user guide](USER_GUIDE.md). Totipo Desktop 0.1.0 is the first desktop
+preview. Check the [0.1.0 release page](https://github.com/totipo-org/totipo-desktop/releases/tag/v0.1.0)
+for publication status and downloads; assets are available once published.
+The portable ZIP requires a separately installed desktop-capable Java 25 runtime;
+the Linux Nix deployment provides managed Java 25. Full native qualification
+remains pending for every platform; Windows and macOS are UNQUALIFIED and support
+is not claimed. See [installation instructions](RELEASE_0_1_0.md#retrieving-artifacts-after-authorized-publication).
+[Qualification](../QUALIFICATION.md)
 owns evidence; the [release checklist](../RELEASE_CHECKLIST.md) owns release gates.
 Building or running does not declare a release.
 
@@ -96,10 +102,13 @@ storage permissions or fabricate vault-format metadata.
 
 ## Packaging and qualification
 
-No first release has been declared. **Linux portable ZIP and native NixOS package
-are the initial required qualification targets.** Current release status is **NOT QUALIFIED**; see the exact evidence in
-[QUALIFICATION.md](../QUALIFICATION.md) and the blocking
-[RELEASE_CHECKLIST.md](../RELEASE_CHECKLIST.md). Build success is not native GUI,
+Preview publication requires RELEASE-READY
+status: reviewed candidate, automated and human Nix checks, verified artifacts,
+disclosures and basic human smoke. Full native qualification can follow publication
+against original immutable artifacts. Initial targets are NixOS (Nix package and
+ZIP with Java 25) and Linux Mint (the same ZIP with independently installed Java 25).
+See [QUALIFICATION.md](../QUALIFICATION.md), [RELEASE_CHECKLIST.md](../RELEASE_CHECKLIST.md)
+and the [0.1.0 release plan](RELEASE_0_1_0.md). Build success is not native GUI,
 clipboard, accessibility, or filesystem support qualification.
 
 Development uses `gradle run` and focused tests. The owner and CI use
@@ -121,7 +130,7 @@ build/install/totipo-desktop/bin/totipo-desktop
 available for internal use; TAR publication and separate qualification are not required.
 The ZIP contains generated launchers,
 the application JAR, core/storage-nio/Bouncy Castle runtime JARs, and licenses.
-They **do not include Java**: install **Java 25 or newer** and set `JAVA_HOME` or
+They **do not include Java**: install a **desktop-capable Java 25 runtime** and set `JAVA_HOME` or
 provide `java` on PATH. `verifyDistribution` checks installed and final ZIP
 inventory, duplicates, CRC/size, extracted bytes, original JAR/license identities,
 application entry point/icons and launcher policy. Its report at
@@ -131,9 +140,8 @@ construction. Generated launchers disable JVM Attach
 API availability with `-XX:+DisableAttachMechanism`; this does not prevent
 same-user process inspection or memory attacks. Development `run` is unchanged.
 
-`VERSION` is the single application-version source. It currently names an
-unreleased development state. `gradle validateVersion -PreleaseBuild=true`
-intentionally fails until an actual candidate version replaces the sentinel.
+`VERSION` is the single application-version source. `gradle validateVersion -PreleaseBuild=true`
+must pass for a release; it rejects the `0.0.0-dev` development sentinel.
 Missing, empty, whitespace-bearing, or unsafe filename versions fail configuration.
 
 ### Nix package — single normal qualification gate
@@ -155,6 +163,29 @@ checks. It exports the verified canonical ZIP and manifests in its `portable`
 output from the same application build, and checks actual installed JAR hashes
 against that ZIP. Nix can reuse an already qualified store result; this is not a
 forced rebuild. CI uses the pinned Nix environment and this single gate.
+
+To collect release artifact evidence with the tools and exact outputs selected
+by this flake:
+
+```sh
+nix run .#collect-release-evidence
+```
+
+The helper creates a private `build/release-evidence/<UTC timestamp>/` directory;
+optionally choose a new directory with
+`nix run .#collect-release-evidence -- /absolute/path/to/new-evidence`.
+It refuses to overwrite existing evidence and records failures as well as success.
+Keep the entire directory and share `summary.txt`, `result.txt` and the manifests
+for review. It records out/portable/derivation/NAR identities, runtime closure,
+managed Java diagnostics, source revision metadata and original manifests;
+checks ZIP size/hash, extraction/inventory, installed JAR equivalence and the
+complete deployment inventory; and checksums its evidence files. `source.json`
+records revision/dirty status when available; the derivation and manifests
+identify actual artifacts even for a dirty worktree. It retains no vault data.
+The ZIP remains in the original portable store output; retain that output/closure
+separately. `nix run` may materialize missing outputs but requests no forced
+rebuild. Collection itself performs read-only Nix queries and file verification,
+without GUI launch, a new gate, native qualification or proof of fresh tests.
 
 `nix build .` materializes the default package and creates a local `result`
 link when wanted, for example for `./result/bin/totipo-desktop` native testing.
@@ -179,8 +210,9 @@ The current dependency pin is Java 0.2.0 / v1/r19; BC 1.86 is unchanged.
 Gradle locks and verification hashes track reviewed Maven Central artifacts.
 Human cache regeneration and review passed. Prior human Nix results are recorded
 in the historical r19 reconciliation report; they do not qualify later changes.
-Native qualification remains UNQUALIFIED; application
-release status remains NOT QUALIFIED. See [dependency provenance](../TOTIPO_JAVA_DEPENDENCY.md).
+For current release readiness and native qualification, consult
+[QUALIFICATION.md](../QUALIFICATION.md).
+See [dependency provenance](../TOTIPO_JAVA_DEPENDENCY.md).
 
 Only when dependency inputs change, generate/refresh using the flake app, which runs the
 official Gradle dependency-cache update script for the current system:

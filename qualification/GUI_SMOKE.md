@@ -28,7 +28,7 @@ Do not record passwords, secrets, live TOTP codes or production vault paths.
 
 Focused refresh/create/layout smoke — UNQUALIFIED until human execution:
 
-- [ ] While OPEN, an external synchronized object arrival becomes visible without F5; Vault → Refresh / F5 still works. Notifications do not establish synchronization completion.
+- [ ] While OPEN, a controlled external valid object arrival becomes visible without F5; Vault → Refresh / F5 still works. Use a separate local writer/test vault; no synchronization service or peer is required. Notifications do not establish synchronization completion.
 - [ ] Lock stops the old watcher; reopen starts watching again. Change Vault/Exit retire it too.
 - [ ] With remembered vault A locked, Create New Vault is available on the form and Vault menu. Cancel folder/password selection and confirm A remains selected after restart.
 - [ ] Create disposable B from locked A; B opens and is remembered after restart.

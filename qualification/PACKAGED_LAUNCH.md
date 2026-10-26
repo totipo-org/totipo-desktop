@@ -1,5 +1,10 @@
 # Packaged launch qualification — UNQUALIFIED until executed
 
+This full procedure establishes route-specific platform qualification. Preview
+publication uses the separate [minimal pre-publication smoke](PRE_RELEASE_SMOKE.md)
+and release-readiness checklist; incomplete native items here do not alone block
+0.1.0 preview publication. All items remain required for their platform claims.
+
 Use the reviewed candidate commit and immutable ZIP. Record the evidence fields
 in QUALIFICATION.md. Run these procedures on a physical native desktop; headless
 entry-point loading and Xvfb do not establish native PASS. Use disposable vaults.
@@ -11,6 +16,23 @@ After source/input freeze, run the single automatic gate:
 ```sh
 nix flake check
 ```
+
+For automatic identity capture and file verification, run:
+
+```sh
+nix run .#collect-release-evidence
+```
+
+This selects the matching default/portable outputs and managed JDK, records
+derivation/store/runtime identities, verifies original ZIP/extracted/deployment
+hashes and writes a private timestamped evidence directory under
+`build/release-evidence/`. An optional new destination follows `--`.
+Keep the complete bundle, including `verification.log`, `result.txt`, original
+manifests and evidence `SHA256SUMS`. Failure retains its evidence and returns
+nonzero. It does not run the GUI or establish native PASS, fresh test execution,
+independent reproducibility or another Nix gate. See
+[development](../docs/DEVELOPMENT.md) for details. The manual equivalents below
+remain available for inspection and later original-artifact qualification.
 
 To obtain its outputs for inspection/native launch (materialization, not another
 gate or independent build), from that same checkout:

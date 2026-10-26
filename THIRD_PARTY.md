@@ -2,11 +2,11 @@
 
 | Component | Version/revision | Upstream | License |
 | --- | --- | --- | --- |
-| Totipo Desktop | [VERSION](VERSION) (unreleased development) | https://github.com/totipo-org/totipo-desktop | Apache-2.0; packaged LICENSE |
+| Totipo Desktop | [VERSION](VERSION) (0.1.0 preview candidate) | https://github.com/totipo-org/totipo-desktop | Apache-2.0; packaged LICENSE |
 | `org.totipo:totipo-storage-nio` | 0.2.0 | https://github.com/totipo-org/totipo-java/tree/v0.2.0 | Apache-2.0; licenses/TOTIPO_JAVA_LICENSE |
 | `org.totipo:totipo-core` (transitive) | 0.2.0 | https://github.com/totipo-org/totipo-java/tree/v0.2.0 | Apache-2.0; licenses/TOTIPO_JAVA_LICENSE |
 | Bouncy Castle bcprov-jdk18on | 1.86 | https://www.bouncycastle.org/ | MIT; licenses/BOUNCY_CASTLE_LICENSE.html |
-| Nix full OpenJDK runtime | jdk25 from nixpkgs 39ad350a0602fa0a58a544344e3e9187526ea45c; installed build environment 25.0.4.1+1 | https://openjdk.org/ | GPL-2.0 with Classpath exception; runtime legal notices remain in its Nix store closure |
+| Nix full OpenJDK runtime | jdk25 from nixpkgs 319e4cebef10cbb636c6ea392137b52ad105336a; installed build environment 25.0.4.1+1 | https://openjdk.org/ | GPL-2.0 with Classpath exception; runtime legal notices remain in its Nix store closure |
 
 The generic distribution supplies only the first four rows and requires a
 user-supplied Java 25 or newer runtime. Nix selects the full JDK as a managed

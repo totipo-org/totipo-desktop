@@ -1,74 +1,103 @@
-# Blocking release checklist
+# Preview release-readiness checklist
 
-Current status: **NOT QUALIFIED**. M4a establishes build/qualification machinery;
-no first release has been declared. Prepare the actual 0.1.0 release candidate and
-complete Linux ZIP and native NixOS qualification before considering release.
-Every required box must have evidence; UNQUALIFIED is a blocker, not PASS.
-A green Gradle build alone cannot pass this checklist.
+Current candidate: **0.1.0 preview, unpublished; RELEASE-READY pending**.
+All native platforms remain **UNQUALIFIED**. No publication is authorized here.
+The maintainer-approved M4b-R3 policy separates release readiness from platform
+qualification; see [QUALIFICATION.md](QUALIFICATION.md). Required pre-publication
+boxes need exact-candidate evidence. Full native checklists remain authoritative
+for platform support claims and can be completed after preview publication.
 
-## Source/repository
+Checked items refer to the exact frozen candidate and
+[M4b-R3 evidence](review/M4B_R3_DESKTOP_0_1_0_RELEASE_PREPARATION_REPORT.md).
+The 485-test Gradle result was reused; human Nix gate PASS does not establish
+fresh execution without logs. All nine minimal human smoke steps passed.
 
-- [ ] Clean worktree and reviewed release commit; no untracked packaging inputs.
-- [ ] Exact `org.totipo:totipo-storage-nio:0.2.0` locked; core is transitive `org.totipo:totipo-core:0.2.0`; protocol v1/r19 confirmed.
-- [ ] Gradle verification hashes and released provenance in TOTIPO_JAVA_DEPENDENCY.md reviewed.
-- [ ] VERSION contains the intended version and is **not `0.0.0-dev`**.
-- [ ] `gradle validateVersion -PreleaseBuild=true` passes; intended tag equals VERSION.
-- [ ] Dependency/verification/lock/cache changes reviewed; no unexpected dependencies.
+## Required before RELEASE-READY
 
-## Build and qualification
+- [ ] Reviewed release source/dependencies and eventual clean release commit;
+      no untracked consumed inputs. Record preparation HEAD plus unstaged input
+      manifest now, then exact release commit before tagging. Verify unchanged
+      consumed bytes when moving from prepared worktree to that commit.
+- [x] VERSION is `0.1.0`; `gradle validateVersion -PreleaseBuild=true` passes;
+      intended tag is `v0.1.0` (version prefixed with `v`). Gradle and Nix derive
+      application version from VERSION.
+- [x] Java storage-nio/core **0.2.0**, Vault Format **v1/r19**, BC **1.86**,
+      provenance, strict locks/verification and fixed cache reviewed; no unexpected
+      dependencies. No Java/protocol/cryptographic change in this release preparation.
+- [x] Supported JDK 25 / Gradle 9.8.0 identities, flake inputs and package source
+      filtering reviewed. All unit and real-NIO integration tests pass; distinguish
+      fresh execution from UP-TO-DATE/cache reuse.
+- [x] Consumed inputs frozen, intended new files have Git membership, tracked
+      changes unstaged during agent preparation; `git diff --cached --quiet` passes.
+- [x] Human `nix flake check` PASS for frozen candidate on the recorded Linux Nix
+      architecture. Record derivation/out/portable paths, runtime and closure
+      identity, logs or explicitly unavailable fresh-execution/store-reuse details.
+      A changed consumed input requires this gate again. No mandatory duplicate
+      normal/strict/offline full suites or ordinary extra Nix build gate.
+- [x] Canonical `totipo-desktop-0.1.0.zip` and manifests retained from the existing
+      derivation's same-build `portable` output. A local Gradle preview alone is
+      not that output. Run existing complete `verifyDistribution`: exact inventory,
+      duplicates/extra/missing entries, CRC/size, extracted bytes, every file hash,
+      original JAR/notices, resources, relative launchers and ZIP SHA-256/size.
+- [x] Nix installation verification passed: managed Java 25, hardened launcher,
+      desktop entry/icons/notices, original JARs and no test/development material.
+      Installed four JAR hashes equal canonical ZIP manifest. Retain
+      `portable.sha256` and `nix-deployment.sha256`; record Nix derivation/store
+      identity separately from ZIP identity. Compare actual outputs using
+      [PACKAGED_LAUNCH.md](qualification/PACKAGED_LAUNCH.md).
+- [ ] Both packaged launchers preserve `-XX:+DisableAttachMechanism`; no secret
+      logging, accidental credentials, host paths, source/cache material or
+      unexpected shipped dependencies found. No inflated attach-hardening claim.
+- [ ] LICENSE, THIRD_PARTY.md, upstream license notices, managed runtime legal
+      disclosures and [security/backup/synchronization limits](docs/USER_GUIDE.md#security-backups-and-recovery)
+      reviewed. No unresolved critical security, vault-integrity or artifact defect.
+- [x] Human [minimal smoke](qualification/PRE_RELEASE_SMOKE.md) PASS on intended
+      exact portable and Nix artifacts; record each step, runtime, date, artifact,
+      environment and actual results. Serious functional/crypto/integrity failure
+      blocks readiness. Prior generic smoke or headless tests cannot supply PASS.
+- [ ] Preview notes and immutable-source retrieval/publication plan in
+      [docs/RELEASE_0_1_0.md](docs/RELEASE_0_1_0.md) reviewed, including explicit
+      RELEASED / UNQUALIFIED status and progressive qualification plan.
 
-- [ ] Select/review the real non-development VERSION before qualification; source/version changes invalidate affected evidence.
-- [ ] Supported Nix JDK 25 / Gradle 9.8.0 identities reviewed; strict locks, verification metadata, fixed cache and source filtering preserved.
-- [ ] Owner `nix flake check` passes on each claimed Linux Nix architecture. Record store reuse or actual execution accurately; package tests and essential install checks are included.
-- [ ] Final canonical Gradle portable ZIP and SHA-256 inventory retained. Prefer the same-build Nix `portable` output; `gradle verifyDistribution -PreleaseBuild=true` verifies a local build. Independently built payloads require explicit matching JAR hashes.
-- [ ] Final ZIP complete inventory, duplicate/extra/missing checks, CRC, extracted bytes, per-file hashes, notices/resources and ZIP SHA-256/size verified; actual extracted Java 25 launch qualified outside checkout, including paths with spaces.
-- [ ] Current reviewed package-deps.json matches dependencies; regenerate only for genuine resolved-input changes.
-- [ ] Nix wrapper invokes the installed application with managed Java 25; desktop entry/icons/notices inspected and actual native launch qualified. Materialize a result link only when needed.
-- [ ] Actual Nix application/dependency SHA-256 identities equal the canonical ZIP; original signed BC bytes retained. Deployment-specific wrapper/runtime/desktop/icons identified separately.
-- [ ] For each reproducibility claim, deliberately build separately and compare final artifacts/hashes with exact source/toolchain/builders recorded. Reused Nix output is not an independent build. Nix `nix build --rebuild .` is a separate human release-only comparison when claiming that package reproducible.
-- [ ] Unexpected differences resolved/documented; no redundant full online/offline suites solely to construct the same application repeatedly.
+## Required only for a PLATFORM QUALIFIED claim
 
-## Tests
+These requirements remain intact; unchecked native scenarios do not automatically
+block preview publication. No blanket Linux/NixOS qualification is implied.
 
-- [ ] All unit and real-NIO integration tests pass.
-- [ ] Declared dependencies and shipped runtime inventory reviewed; no local fallback or test/development artifacts.
-- [ ] Separate filesystem harness runs against exact extracted release JARs on **every claimed filesystem/runtime/provider**, with source identity and cleanup confirmed; no development classes substituted.
+- [ ] Exact dated environment/route rows in QUALIFICATION.md identify original
+      artifact, OS/distribution, architecture, Java vendor/build, filesystem/provider,
+      desktop/display, clipboard/history/paste and accessibility scope.
+- [ ] [GUI](qualification/GUI_SMOKE.md) passed, including AdditionalConflict evidence.
+- [ ] [Clipboard](qualification/CLIPBOARD_SMOKE.md) passed; expiry/ownership/history
+      limitations recorded, with actual native interoperability evidence.
+- [ ] [Accessibility](qualification/ACCESSIBILITY_SMOKE.md) passed; screen-reader
+      scope accurate; lifecycle/suspend/resume limitations recorded.
+- [ ] [Packaged launch](qualification/PACKAGED_LAUNCH.md) passed for each claimed
+      route, outside checkout including spaces for ZIP, installed launcher/menu,
+      managed runtime and desktop/icon integration for NixOS.
+- [ ] Separate filesystem harness passed against exact original release JARs for
+      every claimed filesystem/runtime/provider, harness identity/cleanup recorded.
+      Controlled external valid changes, refresh/observation, applicable watcher,
+      conflicts/merge and failure/retry coverage retained. No Syncthing or other
+      synchronization service/peer/end-to-end setup required.
+- [ ] Shared common application evidence cites all matching JAR hashes; runtime,
+      OS/filesystem/GUI/clipboard/accessibility results do not transfer automatically.
+- [ ] Later dated append-only evidence uses original downloaded/acquired release
+      bytes and checksums. Failed/unperformed cases preserved. Product defects
+      recommend a subsequent corrective release; no rebuild/replaced asset/moved tag.
 
-## Native UI — blocking for every claimed platform/package
+## Publication — separate explicit maintainer authorization
 
-- [ ] QUALIFICATION.md has complete dated environment rows, not generic “Linux supported” claims.
-- [ ] qualification/GUI_SMOKE.md passed; AdditionalConflict presentation evidence recorded.
-- [ ] qualification/CLIPBOARD_SMOKE.md passed; clipboard manager/history limitations recorded.
-- [ ] qualification/ACCESSIBILITY_SMOKE.md keyboard/accessibility checks passed; screen-reader scope stated accurately.
-- [ ] qualification/PACKAGED_LAUNCH.md passed from the canonical extracted ZIP on Linux and installed Nix launcher/menu on native NixOS. Both initial targets required, exact environments recorded.
-- [ ] Shared common application evidence cites matching JAR hashes; no OS/filesystem/runtime/GUI/clipboard/accessibility PASS automatically transferred between routes.
-- [ ] Java 25 tested with actual package launch; Java 17 is not supported.
-- [ ] Unperformed GUI/clipboard/filesystem checks leave release status **NOT QUALIFIED**.
+- [ ] Every required pre-publication box above passed; mark exact candidate
+      RELEASE-READY. Native qualification status remains separately recorded.
+- [ ] Maintainer accepts proposed policy/notes and explicitly authorizes release.
+- [ ] Reviewed clean release commit recorded; tag `v0.1.0` points to it and agrees
+      with VERSION. Follow existing signing policy; no new signing requirement.
+- [ ] Publish only original verified ZIP, checksum inventory and deployment
+      manifest/checksums per release plan. TAR is internal, not a public asset.
+- [ ] Record publication URL/date, source/tag/commit and original artifact hashes;
+      set RELEASED / UNQUALIFIED until applicable platform matrices pass.
 
-## Security
-
-- [ ] No secret logging, accidental credentials, host paths or source/cache material in artifacts/launchers.
-- [ ] Resolved runtime dependency inventory unchanged or deliberately reviewed.
-- [ ] `-XX:+DisableAttachMechanism` present in packaged launchers; no inflated security claims.
-- [ ] Clipboard policy smoke passed with native interoperability evidence.
-- [ ] Uncertainty/stale workflows reviewed; no implied synchronization/freshness.
-- [ ] THIRD_PARTY.md, upstream licenses, notices and runtime legal material reviewed.
-- [ ] No updater/network check, default vault directory, or packaging-dependent vault behavior.
-
-## Artifacts
-
-- [ ] Canonical ZIP filename/version correct; final ZIP inspected. TAR is optional internal output, with no release publication or independent qualification requirement.
-- [ ] Licenses/notices included; intended runtime only; no developer environment requirement.
-- [ ] Final artifact SHA-256 generated with `sha256sum -- FILE...` and retained alongside exact artifacts.
-- [ ] Original immutable ZIP, size and per-file manifest retained for later Windows/macOS qualification; those platforms initially UNQUALIFIED. Later dated append-only support evidence must use original bytes without rebuilding, replacing artifacts or moving tags.
-- [ ] Any missing intentional application icon recorded as polish work, not replaced by placeholder branding.
-
-## Release — requires explicit owner authorization
-
-- [ ] Release notes reviewed; precise qualified scope and limitations stated.
-- [ ] All preceding gates pass before any tag is created.
-- [ ] Tag equals chosen VERSION and identifies the reviewed release commit.
-- [ ] Upload only final verified artifacts/checksums after explicit release authorization.
-
-Manual updates only. Signing/notarization, native installers and auto-update need
-separate decisions; this checklist does not authorize implementing or publishing them.
+Independent rebuild comparison is required only for an explicit reproducibility
+claim; store reuse is not such a comparison. Signing/notarization, installers,
+fat JARs, bundled runtimes and auto-update remain outside this milestone.

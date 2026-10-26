@@ -718,8 +718,8 @@ Nix derivation exports that verified ZIP from the same build, compares installed
 application/dependency SHA-256 identities with it, and fixes JAVA_HOME to the
 full pinned desktop-capable JDK; it does not introduce another application entry
 point or storage policy. Generic archives rely on user-supplied Java 25 or newer.
-VERSION is shared by Gradle and Nix; it identifies a development state until a
-candidate is deliberately chosen. Package construction does not declare a release.
+VERSION is shared by Gradle and Nix; it now identifies the unpublished 0.1.0
+preview candidate. Package construction does not declare a release.
 
 Only generated launch scripts default to `-XX:+DisableAttachMechanism`, reducing
 JVM Attach API availability in this password/TOTP application. It does not prevent
@@ -728,8 +728,13 @@ Distribution verification checks complete final ZIP inventory, duplicate entries
 CRC/size, extracted content hashes, original runtime JAR and notice bytes,
 application entry point/icons and launcher policy. Standard Gradle constructs the ZIP.
 Nix wrapper, managed runtime and desktop integration have separate identities and
-native qualification. Both Linux ZIP and native NixOS are initial 0.1.0 gates;
-common application evidence may be shared only with matching payload hashes.
+native qualification. Preview release readiness requires automated verification
+and basic human smoke through both launchers; complete native qualification can
+follow publication against original immutable artifacts. Initial qualification
+targets are NixOS (Nix package and ZIP/Java 25) and Linux Mint (the same ZIP with
+independently installed Java 25). Common application evidence may be shared only
+with matching payload hashes. See QUALIFICATION.md for the distinct RELEASE-READY,
+RELEASED / UNQUALIFIED and PLATFORM QUALIFIED statuses.
 No runtime reduction, update network path, icon, default vault path or installer
 framework is introduced. Packaging and vault storage remain separate.
 

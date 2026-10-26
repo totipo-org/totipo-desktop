@@ -7,14 +7,16 @@ that you choose on your computer.
 
 ## Platform and availability
 
-Linux is the first desktop target, with a Linux-only Nix package definition and
-a source-run workflow. The application is unreleased, **NOT QUALIFIED**, and has
-not completed first-release qualification. See [qualification status and
-limitations](QUALIFICATION.md). Windows and macOS are not qualified or claimed
-as supported desktop platforms.
-
-The current version is `0.0.0-dev`. The instructions below run the application
-from source; they do not require a downloadable desktop release.
+Totipo Desktop 0.1.0 is the first desktop **preview**. Check the
+[0.1.0 release page](https://github.com/totipo-org/totipo-desktop/releases/tag/v0.1.0)
+for publication status and downloads; assets are available once published.
+The portable ZIP requires a separately installed desktop-capable Java 25 runtime;
+the Linux Nix deployment provides managed Java 25. Full native qualification
+remains pending for every platform, including Linux and NixOS. Windows and macOS
+are UNQUALIFIED; platform support is not claimed.
+See [current qualification status](QUALIFICATION.md) and
+[0.1.0 installation instructions](docs/RELEASE_0_1_0.md#retrieving-artifacts-after-authorized-publication).
+The instructions below run from source.
 
 ## What you can do
 
