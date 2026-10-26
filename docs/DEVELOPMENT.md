@@ -1,13 +1,12 @@
 # Development and packaging
 
 Contributor and operator procedures for working from source. For everyday use,
-see the [user guide](USER_GUIDE.md). Totipo Desktop 0.1.0 is the first desktop
-preview. Check the [0.1.0 release page](https://github.com/totipo-org/totipo-desktop/releases/tag/v0.1.0)
-for publication status and downloads; assets are available once published.
+see the [user guide](USER_GUIDE.md). Downloads are on the
+[latest release page](https://github.com/totipo-org/totipo-desktop/releases/latest).
 The portable ZIP requires a separately installed desktop-capable Java 25 runtime;
 the Linux Nix deployment provides managed Java 25. Full native qualification
 remains pending for every platform; Windows and macOS are UNQUALIFIED and support
-is not claimed. See [installation instructions](GITHUB_RELEASE_0_1_0.md#downloads-and-installation).
+is not claimed. See [installation instructions](USER_GUIDE.md#download-and-install).
 [Qualification](../QUALIFICATION.md)
 owns evidence; the [release checklist](../RELEASE_CHECKLIST.md) owns release gates.
 Building or running does not declare a release.
@@ -102,7 +101,7 @@ storage permissions or fabricate vault-format metadata.
 
 ## Packaging and qualification
 
-Preview publication requires RELEASE-READY
+Publication requires RELEASE-READY
 status: reviewed candidate, automated and human Nix checks, verified artifacts,
 disclosures and basic human smoke. Full native qualification can follow publication
 against original immutable artifacts. Initial targets are NixOS (Nix package and
@@ -143,6 +142,11 @@ same-user process inspection or memory attacks. Development `run` is unchanged.
 `VERSION` is the single application-version source. `gradle validateVersion -PreleaseBuild=true`
 must pass for a release; it rejects the `0.0.0-dev` development sentinel.
 Missing, empty, whitespace-bearing, or unsafe filename versions fail configuration.
+Gradle copies that input into the application classpath as
+`org/totipo/desktop/application-version.txt` during `processResources`.
+**Help → About Totipo…** reads this embedded resource for `gradle run`, the
+portable ZIP and the Nix package; no external runtime version file is needed.
+`verifyDistribution` compares the packaged resource with the canonical input.
 
 ### Nix package — single normal qualification gate
 

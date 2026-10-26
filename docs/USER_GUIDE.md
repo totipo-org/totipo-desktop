@@ -1,17 +1,41 @@
 # Totipo Desktop user guide
 
 Totipo Desktop stores time-based one-time password (TOTP) authenticator entries
-in encrypted vault folders. Totipo Desktop 0.1.0 is the first desktop preview.
-Check the [0.1.0 release page](https://github.com/totipo-org/totipo-desktop/releases/tag/v0.1.0)
-for publication status and downloads; assets are available once published.
+in encrypted vault folders. Downloads are on the
+[latest release page](https://github.com/totipo-org/totipo-desktop/releases/latest).
 The portable ZIP requires a separately installed desktop-capable Java 25 runtime;
 the Linux Nix deployment provides managed Java 25.
 Full native qualification remains pending for every platform. Linux and NixOS
 are initial test targets; Windows and macOS are UNQUALIFIED and support is not
 claimed. See [current qualification](../QUALIFICATION.md) and
-[installation instructions](GITHUB_RELEASE_0_1_0.md#downloads-and-installation).
+[installation instructions](#download-and-install).
 For running from source, start with the [README](../README.md); build and package
 procedures are in [development](DEVELOPMENT.md).
+
+## Download and install
+
+From the [latest release](https://github.com/totipo-org/totipo-desktop/releases/latest),
+download the portable `totipo-desktop-<version>.zip`, `portable.sha256`,
+`nix-deployment.sha256` and `SHA256SUMS` into the same folder. On systems with
+the SHA-256 utility, run `sha256sum --check SHA256SUMS` before extracting.
+The release notes identify the exact source and artifact qualification.
+
+Extract the ZIP into a folder you can keep. With desktop-capable Java 25 installed,
+run `bin/totipo-desktop` inside the extracted folder on Linux/macOS, or
+`bin\totipo-desktop.bat` on Windows. Set `JAVA_HOME` to your Java installation
+or make `java` available on PATH. If the Unix launcher lost its executable bit,
+restore it with `chmod +x bin/totipo-desktop`. Keep the complete extracted folder,
+including its `lib` directory and notices. The ZIP does not bundle Java.
+
+For the Linux Nix package and its managed Java runtime, follow
+[development and packaging](DEVELOPMENT.md#nix-package--single-normal-qualification-gate)
+using the immutable release source identified in the release notes. Consult
+[current qualification](../QUALIFICATION.md) before choosing a platform or route.
+
+Choose **Help → About Totipo…** to see the installed application version and
+project repository. The repository reference is selectable for copying. Close
+the dialog with **Close**, Enter or Escape. **Vault → About This Vault…** shows
+separate vault details.
 
 ## Create, open, and remember vaults
 

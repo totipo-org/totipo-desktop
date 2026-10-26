@@ -1,4 +1,4 @@
-name: Desktop preview release
+name: Desktop release
 
 on:
   push:
@@ -75,7 +75,7 @@ jobs:
         with:
           name: desktop-release
           path: ${{ runner.temp }}/candidate
-      - name: Publish prerelease
+      - name: Publish release
         working-directory: ${{ runner.temp }}/candidate
         env:
           GH_TOKEN: ${{ github.token }}
@@ -84,6 +84,6 @@ jobs:
           version=${GITHUB_REF_NAME#v}
           cd assets
           sha256sum --strict --check SHA256SUMS
-          gh release create "$GITHUB_REF_NAME" --verify-tag --prerelease --latest=false \
-            --title "Totipo Desktop $version preview" --notes-file ../notes.md \
+          gh release create "$GITHUB_REF_NAME" --verify-tag \
+            --title "Totipo Desktop $version" --notes-file ../notes.md \
             "totipo-desktop-$version.zip" portable.sha256 nix-deployment.sha256 SHA256SUMS

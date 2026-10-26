@@ -1,3 +1,52 @@
+# Release-readiness checklist
+
+Current preparation targets **0.1.1**. No tag or publication is authorized.
+Qualification is specific to the exact candidate; the completed 0.1.0 checks below
+are historical evidence and do not qualify this version. See
+[current qualification](QUALIFICATION.md) and the
+[cleanup report](review/DESKTOP_RELEASE_VERSION_CLEANUP_REPORT.md).
+
+## Current release requirements
+
+- [ ] Review final clean main commit, dependencies, source membership and version.
+      Record the exact source and consumed-input identity before qualification.
+- [ ] Run `gradle validateVersion -PreleaseBuild=true` and affected Gradle checks;
+      confirm source, build, packaged runtime and Nix version agreement.
+- [ ] Freeze all consumed inputs and obtain human `nix flake check` PASS. Record
+      logs, derivation/output/runtime identities and fresh execution or store reuse.
+      Changed consumed inputs require qualification again.
+      Gate PASS human-reported 2026-10-26; all 182 frozen hashes still match.
+      Logs/output identities and execution/reuse details remain unprovided, so
+      this combined evidence item remains open.
+- [ ] Retain the same-build portable ZIP, portable and Nix deployment manifests;
+      verify complete distribution inventory, checksums and installed JAR equality.
+      Local Gradle output alone is not the Nix portable output.
+- [ ] Review licenses, dependency/security disclosures and launcher hardening.
+- [ ] Perform the existing minimal human functional smoke on both exact launchers,
+      recording per-step results and artifact/environment identities. Use the
+      scenarios in [pre-release smoke](qualification/PRE_RELEASE_SMOKE.md), with
+      current candidate paths and a new dated result record; preserve old results.
+      Check Help → About Totipo… from locked and unlocked screens, actual installed
+      version, selectable repository, keyboard access, Enter/Escape and dismissal.
+- [ ] Prepare and review version-specific GitHub notes required by the workflow,
+      including immutable source, retrieval instructions and exact qualification.
+- [ ] Mark RELEASE-READY only after all required candidate checks pass. Obtain
+      explicit maintainer release authorization, then follow the
+      [publication procedure](docs/DESKTOP_RELEASE_AUTOMATION.md). Ordinary versions
+      publish as normal releases titled `Totipo Desktop <version>`.
+- [ ] Record release URL/date/tag/commit and original hashes after publication.
+      Preserve every existing published tag and artifact.
+
+Full native GUI, clipboard, accessibility, filesystem and packaged-launch checks
+remain separate requirements for platform support claims. The historical platform
+checklist below retains its scope; apply its scenarios to new exact artifacts and
+record new results. No earlier PASS transfers through a version bump.
+
+## Historical 0.1.0 checklist (unchanged)
+
+The following records the original preparation state and policy. Its pending
+publication wording describes that historical record, not current release status.
+
 # Preview release-readiness checklist
 
 Current candidate: **0.1.0 preview, unpublished; RELEASE-READY pending**.

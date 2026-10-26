@@ -47,6 +47,15 @@ tasks.withType<JavaCompile>().configureEach {
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
     systemProperty("java.awt.headless", "true")
+    systemProperty("totipo.expectedVersion", applicationVersion)
+}
+
+// Embed the canonical input for both `run` and packaged classpaths.
+tasks.processResources {
+    from("VERSION") {
+        into("org/totipo/desktop")
+        rename { "application-version.txt" }
+    }
 }
 
 val totipoJavaVersion = "0.2.0"
@@ -135,6 +144,11 @@ val verifyDistribution = tasks.register("verifyDistribution") {
         }
         JarFile(root.resolve("lib/${applicationJar.get().asFile.name}")).use { jar ->
             check(jar.getJarEntry("org/totipo/desktop/TotipoDesktop.class") != null) { "Missing application entry point" }
+            val versionEntry = jar.getJarEntry("org/totipo/desktop/application-version.txt")
+            check(versionEntry != null) { "Missing runtime application version" }
+            check(jar.getInputStream(versionEntry).use { it.readBytes().toString(Charsets.UTF_8) } == legalSources.getValue("VERSION").readText()) {
+                "Runtime version differs from canonical VERSION"
+            }
             listOf(16, 32, 48, 64, 128, 256).forEach { size ->
                 val entry = jar.getJarEntry("org/totipo/desktop/icons/totipo-$size.png")
                 check(entry != null) { "Missing application icon: $size" }

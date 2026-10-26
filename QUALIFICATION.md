@@ -1,11 +1,27 @@
 # Qualification evidence
 
-Current candidate: **0.1.0 preview, unpublished; RELEASE-READY pending**.
-All native platforms remain **UNQUALIFIED**. No first release has been declared.
+Current preparation: **0.1.1; RELEASE-READY pending**. The version/application
+changes require new artifact qualification; 0.1.0 hashes and results do not
+qualify 0.1.1. See the [cleanup report](review/DESKTOP_RELEASE_VERSION_CLEANUP_REPORT.md)
+for current automated results and pending native checks. Published
+downloads are on the [latest release page](https://github.com/totipo-org/totipo-desktop/releases/latest).
+All native platforms remain **UNQUALIFIED**.
 No Linux, NixOS, Windows or macOS platform support claim is made.
 PASS below applies only to the named check and exact tested environment.
 Build success, headless component tests and source inspection are not native GUI
 or clipboard qualification.
+
+2026-10-26, desktop 0.1.1 release/version cleanup: the maintainer reports
+**`nix flake check` PASS**. All 182 frozen input hashes match after the result.
+This records the package-inclusive automatic gate; logs, output identities and
+fresh-execution/store-reuse details were not supplied. No native About, packaged
+launch, clipboard or accessibility PASS is inferred. Changes remain uncommitted;
+release readiness and publication authorization remain pending. See the
+[cleanup report](review/DESKTOP_RELEASE_VERSION_CLEANUP_REPORT.md).
+
+## Historical 0.1.0 and earlier evidence
+
+The dated records below retain their original preparation status and scope.
 
 2026-10-25, M4b-R3: the maintainer reports **`nix flake check` PASS** for the
 frozen 0.1.0 preview candidate. All 178 consumed-input hashes were rechecked

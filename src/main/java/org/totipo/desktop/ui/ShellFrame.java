@@ -86,11 +86,13 @@ public final class ShellFrame extends JFrame implements ShellView {
         JMenuItem about = new JMenuItem("About This Vault…"); about.setEnabled(selected != null && !busy && state != ShellState.VAULT_SELECTION);
         about.addActionListener(event -> aboutVault(state == ShellState.LOCKED ? "Locked" : "Cannot safely open", landing.error.getText()));
         vault.add(about);
-        bar.add(file); bar.add(vault); DesktopStyle.menus(bar); return bar;
+        bar.add(file); bar.add(vault); bar.add(AboutApplicationPanel.menu(this)); DesktopStyle.menus(bar); return bar;
     }
     void mount(VaultPanel panel) {
         mounted = panel; landing.clear(); getRootPane().setDefaultButton(null);
-        setContentPane(panel); setJMenuBar(panel.menuBar()); panel.lockAction(lock);
+        setContentPane(panel);
+        JMenuBar menus = panel.menuBar(); menus.add(AboutApplicationPanel.menu(this));
+        DesktopStyle.menus(menus); setJMenuBar(menus); panel.lockAction(lock);
         revalidate(); repaint();
         SwingUtilities.invokeLater(() -> { if (mounted == panel) { panel.focusSearch(); } });
     }

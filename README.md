@@ -7,15 +7,14 @@ that you choose on your computer.
 
 ## Platform and availability
 
-Totipo Desktop 0.1.0 is the first desktop **preview**. Check the
-[0.1.0 release page](https://github.com/totipo-org/totipo-desktop/releases/tag/v0.1.0)
-for publication status and downloads; assets are available once published.
+Download Totipo Desktop from the
+[latest release](https://github.com/totipo-org/totipo-desktop/releases/latest).
 The portable ZIP requires a separately installed desktop-capable Java 25 runtime;
 the Linux Nix deployment provides managed Java 25. Full native qualification
 remains pending for every platform, including Linux and NixOS. Windows and macOS
 are UNQUALIFIED; platform support is not claimed.
 See [current qualification status](QUALIFICATION.md) and
-[0.1.0 installation instructions](docs/GITHUB_RELEASE_0_1_0.md#downloads-and-installation).
+[installation instructions](docs/USER_GUIDE.md#download-and-install).
 The instructions below run from source.
 
 ## What you can do
