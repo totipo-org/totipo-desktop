@@ -1,89 +1,66 @@
 # Totipo Desktop
 
-Totipo Desktop is a desktop authenticator for time-based one-time passwords
-(TOTP), the short-lived codes used when signing in with two-factor authentication.
-It keeps your authenticator entries in password-protected, encrypted vault folders
-that you choose on your computer.
+## What is Totipo?
 
-## Platform and availability
+Totipo is an authenticator for time-based one-time passwords (TOTP), the
+short-lived codes used for two-factor authentication. It keeps your
+authenticator entries in a password-protected vault that you control.
 
-Download Totipo Desktop from the
+## Why use Totipo?
+
+**Your secrets stay encrypted.** The secret keys used to generate your one-time
+codes are encrypted while stored in your vault. You unlock the vault with your
+password when you need to use them.
+
+**Your data is yours.** Totipo uses an [open-source, publicly documented vault
+format](https://github.com/totipo-org/totipo-spec). Your vault is stored in a
+folder you control, making it easy to back up without relying on an online
+account or hosted service.
+
+**Use your vault across devices.** Compatible Totipo clients share the same vault
+format. You can synchronize your vault folder between devices using a file
+synchronization tool of your choice.
+
+Synchronization is optional and does not replace independent backups.
+
+## Getting started
+
+### Install Totipo
+
+Download the portable ZIP from the
 [latest release](https://github.com/totipo-org/totipo-desktop/releases/latest).
-The portable ZIP requires a separately installed desktop-capable Java 25 runtime;
-the Linux Nix deployment provides managed Java 25. Full native qualification
-remains pending for every platform, including Linux and NixOS. Windows and macOS
-are UNQUALIFIED; platform support is not claimed.
-See [current qualification status](QUALIFICATION.md) and
-[installation instructions](docs/USER_GUIDE.md#download-and-install).
-The instructions below run from source.
+Verify its checksums using the
+[installation guide](docs/USER_GUIDE.md#download-and-install), then extract the
+complete ZIP. Install a desktop-capable **Java 25** runtime and run
+`bin/totipo-desktop` on Linux or macOS, or `bin\totipo-desktop.bat` on Windows.
+Keep the extracted folder intact, including `lib`; Java must be available on
+`PATH` or through `JAVA_HOME`.
 
-## What you can do
-
-- Create or open a vault, remember multiple vault locations, and switch between
-  them with a separate password unlock each time.
-- Add authenticator entries from a pasted TOTP setup URI or a manual Base32 secret;
-  edit account details, replace a setup, or delete an entry.
-- Search by issuer or account, reveal a code when needed, and explicitly copy it.
-- Lock the vault manually or after 15 minutes of inactivity.
-- Review conflicting versions and choose one or combine their details.
-
-## Run the current application
-
-On Linux, install Nix and use a graphical desktop. From a terminal:
+On Linux with Nix, you can run a tagged release without installing Java
+separately. Replace `RELEASE_TAG` with the tag on the release page:
 
 ```sh
-git clone https://github.com/totipo-org/totipo-desktop.git
-cd totipo-desktop
-nix develop
-gradle run
+nix run github:totipo-org/totipo-desktop/RELEASE_TAG
 ```
 
-The repository environment supplies JDK 25 and Gradle; initial setup needs
-network access unless the required inputs are already cached. The window opens
-on your graphical desktop. See [development and packaging](docs/DEVELOPMENT.md)
-for direnv, local distributions, and the Linux Nix package workflow.
+Full native platform qualification is still in progress; Windows and macOS are
+not yet qualified. See the [current qualification status](QUALIFICATION.md).
 
-## Get started
+### Create your first vault
 
-1. Choose **Create New Vault** and a folder, then set and confirm a strong password.
-   To use an existing vault, choose **Select Vault** and browse to its folder.
-2. Unlock the vault and choose **Add**. Paste a service's `otpauth://totp` setup
-   URI and review it, or select manual entry and enter its Base32 secret.
-3. Find the entry, choose **Show Code**, then **Copy** if needed.
-4. Use **Vault → Lock** or **Ctrl+L** when finished. **Change Vault…** lets you
-   choose another remembered vault; it requires unlocking again.
+1. Choose **Vault → New Vault…**, select a folder, and set a strong password.
+2. Choose **Add**, paste the service's TOTP setup link and select **Review**, or
+   choose **Manual entry**. Review the details and select **Add** to save.
+3. Choose **Show Code** to view a code and **Copy** when you need it.
+4. Choose **Vault → Lock** when finished.
 
-See the [user guide](docs/USER_GUIDE.md) for token management, remembered vaults,
-conflict resolution, shortcuts, and recovery guidance.
+Keep your vault password safe: Totipo cannot recover it. Back up the complete
+vault folder and keep your services' recovery codes.
 
-## Security and synchronization
+## Learn more
 
-Keep your vault password and your services' recovery codes safe. There is no
-in-place vault password change or built-in password recovery/migration workflow.
-Back up the complete encrypted vault folder; remembering a vault location is not
-a backup. Deleting an entry hides it from the active list but retains secrets in
-encrypted history and any storage-provider copies.
-
-Saving acknowledges a write to the local configured storage. It does not mean
-another device has received it. External synchronization is your responsibility;
-**Refresh** observes local files and does not run or verify a synchronization
-service. Remote synchronization, rollback protection, and arbitrary filesystems
-are not qualified. If a save has an uncertain outcome, use its explicit retry
-options rather than creating the entry again.
-
-Clipboard clearing is best effort: Totipo tries to clear its current copy at code
-expiry or within 30 seconds, and on lock/exit. Clipboard history, other applications,
-and remote desktops may retain copies. Lock manually before leaving your device;
-focus loss alone does not lock, and OS-lock/suspend detection is platform dependent.
-See [security and recovery details](docs/USER_GUIDE.md#security-backups-and-recovery).
-
-## Documentation
-
-- [User guide](docs/USER_GUIDE.md): everyday workflows and limitations.
-- [Development](docs/DEVELOPMENT.md): environment, tests, packaging, and maintenance.
-- [Architecture](ARCHITECTURE.md): threading, session ownership, and invariants.
-- [Java dependency](TOTIPO_JAVA_DEPENDENCY.md): runtime and reviewed guidance pins.
-- [Qualification](QUALIFICATION.md) and [release checklist](RELEASE_CHECKLIST.md):
-  evidence, unperformed checks, and release blockers.
-- [Historical reports](review/): milestone decisions and their original evidence.
-- [Third-party notices](THIRD_PARTY.md) and [license](LICENSE).
+- [User guide](docs/USER_GUIDE.md) — Vault management, synchronization, security,
+  backups, and recovery.
+- **Totipo apps** — [Android](https://github.com/totipo-org/totipo-android) · iOS (planned).
+- [Development](docs/DEVELOPMENT.md) — Running from source, tests, and packaging.
+- [Qualification](QUALIFICATION.md) — Tested environments and current limitations.

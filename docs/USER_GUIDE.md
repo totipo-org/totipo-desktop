@@ -9,8 +9,8 @@ Full native qualification remains pending for every platform. Linux and NixOS
 are initial test targets; Windows and macOS are UNQUALIFIED and support is not
 claimed. See [current qualification](../QUALIFICATION.md) and
 [installation instructions](#download-and-install).
-For running from source, start with the [README](../README.md); build and package
-procedures are in [development](DEVELOPMENT.md).
+For running from source, builds, and packaging, see
+[development](DEVELOPMENT.md#run-from-source).
 
 ## Download and install
 
@@ -42,7 +42,7 @@ separate vault details.
 
 ## Create, open, and remember vaults
 
-Choose **Create New Vault** (or **Vault → New Vault…**) to select a folder and
+Choose **New Vault…** (or **Vault → New Vault…**) to select a folder and
 set and confirm its password. Choose a strong, unique password and retain it
 safely. Empty passwords require a separate explicit confirmation when creating
 or opening; they provide no meaningful password protection.

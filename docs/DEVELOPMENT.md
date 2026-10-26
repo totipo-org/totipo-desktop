@@ -13,11 +13,13 @@ Building or running does not declare a release.
 
 ## Run from source
 
-Clone normally:
+On Linux, install Nix and use a graphical desktop. Clone and activate the
+repository environment:
 
 ```sh
 git clone https://github.com/totipo-org/totipo-desktop.git
 cd totipo-desktop
+nix develop
 ```
 
 Gradle resolves `org.totipo:totipo-storage-nio:0.2.0` and its transitive
