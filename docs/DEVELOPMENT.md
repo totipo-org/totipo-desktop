@@ -28,7 +28,7 @@ for first resolution unless dependencies are already cached or Nix-provided.
 
 Supported development requires Nix: activate `nix develop` or allow the
 repository's direnv environment. Both select the same full **JDK 25** and patched
-**Gradle 9.8.0** as the Linux package and agent environment. Toolchain auto-download
+**Gradle 9.8.2** as the Linux package and agent environment. Toolchain auto-download
 is disabled. Desktop production, tests and qualification sources target Java 25.
 Non-Nix Gradle acquisition is not supported.
 
@@ -263,8 +263,8 @@ does not make Unicode paths representable under the C locale. After changing
 `package.nix`, regenerate the update script with the command above; an existing
 Nix-store script still references its original derivation/source snapshot.
 
-Root nixpkgs is locked at `319e4cebef10cbb636c6ea392137b52ad105336a`.
-Its Gradle **9.8.0** is explicitly overridden to use the shared JDK 25 in
+Root nixpkgs is locked at `e126e9e73c335158ff8279ac14d5f4afec153716`.
+Its Gradle **9.8.2** is explicitly overridden to use the shared JDK 25 in
 development, agent and package declarations. Nix's patched Gradle and official
 fetchDeps/setup hook are retained. The dependency cache, locks and verification
 metadata remain reviewed inputs.
