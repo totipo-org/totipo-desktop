@@ -214,12 +214,74 @@ the cost but cannot make weak passwords safe. Locking and separate vault
 passwords do not protect against a compromised application process or device.
 Secret cleanup in a Java application is best effort, not guaranteed memory erasure.
 
-Keep a separate backup of the complete encrypted vault folder and retain its
-password safely. A remembered path is not a backup; synchronization can propagate
+Use **Vault → Back Up Vault…** while the selected vault is unlocked. Choose a
+new ZIP filename outside the vault; the suggested timestamped name contains no
+token/account information. Confirm the source and destination. The ZIP uses the
+existing vault password and includes locally available encrypted history,
+including deleted entries and earlier secrets. Keep the password separately and
+keep independent copies of the ZIP. A lost password cannot be recovered.
+
+Backup captures one finite locally observed set, which may omit recent changes on
+other devices. Ordinary codes, search and editing remain available while ZIP output
+runs. State updates do not change the frozen capture. Wait for **Backup completed**;
+ZIP finish alone is insufficient. Desktop closes and forces the staging file,
+inspects its completed bytes, publishes without replacing an existing entry, forces
+the parent and verifies the final ZIP. A publication/barrier/readback failure can
+leave an uncertain completed output: preserve it and check it before relying on it.
+No success promises universal power-loss survival or remote completeness.
+
+Output currently requires a real local POSIX parent without group/other write
+permission, outside the source vault, with hard-link and file/directory force
+support. Existing outputs, links, aliased parents and unsafe staging locations are
+refused. Windows and other unsupported filesystem paths may be refused rather than
+receive weaker guarantees. Choose a suitable private local folder and later copy
+the completed ZIP elsewhere. Interrupted output may leave a hidden
+`.totipo-backup-*` staging directory beside the chosen output; it is not a finalized
+backup. Existing source vault files are preserved.
+
+Choose **Vault → Restore Backup to New Folder…** to restore a ZIP. If a vault is
+open, explicitly confirm Lock and the loss of unfinished editor input; restoration
+waits for normal session retirement. Select the ZIP and enter its original vault
+password. After authentication, choose an existing parent and enter a new child
+folder name. Review the destination, identity, encrypted object count and unresolved
+ancestry diagnostics, then explicitly choose **Restore**. An existing empty folder,
+file, vault or link is refused. No folder is allocated before confirmation.
+
+Restoration preserves exact encrypted bootstrap/history bytes, original identity
+and password. Missing ancestry is preserved and reported, not invented or repaired.
+Only COMPLETE offers **Open Restored Vault** or **Done**. Done leaves vault selection
+unchanged. Open selects the restored location's ordinary locked form and requires
+the password again; authentication for restoration never unlocks a session.
+
+If restoration is interrupted or reports PARTIAL, UNCERTAIN or REJECTED, preserve
+the allocated folder and every file, including `.totipo-restore-v1`. Even REJECTED
+can leave allocation/staging residue. Cancel, Lock and Exit request cancellation
+and wait for entered work; they do not undo filesystem writes. A valid bootstrap
+may open before history is installed, so ordinary opening does not prove that a
+restore completed. Do not rely on such a folder as a completed restored vault.
+
+Use **Vault → Resume Interrupted Restore…** with the **same exact ZIP**, authenticate
+again, select the retained incomplete folder and explicitly confirm Resume.
+Recovery requires the exact archive digest and shared local allocation marker.
+Changed ZIP bytes, missing/torn/mismatching markers, or incompatible occupied bytes
+are refused and retained. Do not delete, replace, manually repair or reuse the
+incomplete folder. Preserve it for investigation and choose another new child when
+recovery is unavailable. The marker remains after completion; it is local recovery
+evidence, never portable archive or token data.
+
+The shared limits are 4096 historical encrypted objects, 8192 observed direct
+entries and 6 MiB per ZIP. These are history/object limits, not active-account
+counts. Exceeding capacity fails without truncating history. Authentication and
+history diagnostics do not prove archive origin, absence of omissions or freshness.
+
+A remembered path is not a backup; synchronization can propagate
 loss or unwanted changes and is not a substitute for an independent backup.
 Keep service recovery codes separately so you can recover account access if the
-vault or password is lost. There is no built-in backup/restore, password recovery,
-in-place password change, or vault migration/cross-vault copy workflow. Password
+vault or password is lost. Restore-new creates a separate location; it does not add
+missing history to an existing vault, synchronize devices, overwrite an existing
+vault or resolve conflicts. Independent copies retain one identity and can develop
+conflicts if later combined. Adding missing history is not implemented here.
+There is no password recovery, in-place password change, or vault migration/cross-vault copy workflow. Password
 or encryption-setting changes require a new vault and a future migration workflow.
 
 Deleting an entry is logical deletion: earlier versions and secrets remain in

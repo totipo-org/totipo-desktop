@@ -99,6 +99,9 @@ public final class TestSupport {
             }
         }
         @Override public VaultId vaultId() { throw new AssertionError(); }
+        @Override public ObjectCandidateValidation validateObject(RevisionId id, byte[] bytes) { throw new AssertionError(); }
+        @Override public org.totipo.backup.BackupCapture captureBackup(org.totipo.backup.BackupLimits limits) throws java.io.IOException { throw new AssertionError(); }
+        @Override public org.totipo.backup.BackupImport prepareImport(java.io.InputStream input, org.totipo.backup.BackupLimits limits) throws java.io.IOException { throw new AssertionError(); }
         @Override public VaultState state() { throw new AssertionError(); }
     }
 

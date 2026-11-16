@@ -21,6 +21,55 @@ public final class ShellFrame extends JFrame implements ShellView {
     private ShellState state = ShellState.NO_VAULT;
     private transient Path selected;
     private VaultPanel mounted;
+    private final transient ArchiveDialogs archives = new ArchiveDialogs(this);
+    private transient Runnable backup = () -> { }, restore = () -> { }, recover = () -> { };
+    private JMenuItem backupItem, restoreItem, recoverItem;
+    private boolean backupAvailable, restoreAvailable;
+
+    @Override public void archiveActions(Runnable backup, Runnable restore, Runnable recover) {
+        this.backup = backup; this.restore = restore; this.recover = recover;
+    }
+    @Override public void archiveAvailability(boolean backup, boolean restore) {
+        backupAvailable = backup; restoreAvailable = restore;
+        if (backupItem != null) { backupItem.setEnabled(backup); restoreItem.setEnabled(restore); recoverItem.setEnabled(restore); }
+    }
+    private void archiveMenus(JMenuBar bar) {
+        for (int index = 0; index < bar.getMenuCount(); index++) {
+            JMenu menu = bar.getMenu(index);
+            if (menu != null && "Vault".equals(menu.getText())) {
+                menu.addSeparator();
+                backupItem = new JMenuItem("Back Up Vault…"); backupItem.addActionListener(event -> backup.run()); menu.add(backupItem);
+                restoreItem = new JMenuItem("Restore Backup to New Folder…"); restoreItem.addActionListener(event -> restore.run()); menu.add(restoreItem);
+                recoverItem = new JMenuItem("Resume Interrupted Restore…"); recoverItem.addActionListener(event -> recover.run()); menu.add(recoverItem);
+            }
+        }
+        archiveAvailability(backupAvailable, restoreAvailable);
+    }
+    @Override public Path chooseBackupOutput() { return archives.file(true); }
+    @Override public Path chooseBackupInput() { return archives.file(false); }
+    @Override public boolean confirmBackup(Path source, Path output) {
+        return archives.confirm("Back Up Vault", "Source vault:\n" + source + "\n\nDestination ZIP:\n" + output
+                + "\n\nContains encrypted history, including deleted entries and their secrets. Uses the existing vault password; keep that password separately."
+                + "\nCovers locally available history, possibly missing recent changes on other devices. No existing backup will be replaced."
+                + "\nLimit: 4096 objects, 8192 observed entries, 6 MiB ZIP. Output requires a trusted local parent, hard links and file/directory force support.", "Back Up");
+    }
+    @Override public boolean confirmLockForRestore() {
+        return archives.confirm("Lock Before Restoring", "Restoration requires closing the open vault. Lock and discard any unfinished editor or resolution input? Entered writes may still complete. Restoration waits for normal session retirement.", "Lock and Continue");
+    }
+    @Override public PasswordPromptResult archivePassword(Path zip) { return archives.password(zip); }
+    @Override public ArchiveView.Destination chooseRestoreDestination() { return archives.destination(); }
+    @Override public Path chooseInterruptedRestore() { return DirectoryPicker.ask(this, null, DirectoryPicker.Mode.EXISTING_VAULT); }
+    @Override public boolean confirmRestore(Path path, org.totipo.backup.BackupSummary summary, boolean recovery) {
+        return archives.confirmRestore(path, summary, recovery);
+    }
+    @Override public boolean restored(Path target) {
+        return JOptionPane.showOptionDialog(this, new JScrollPane(ArchiveDialogs.text("Restoration completed for the ZIP's encrypted history.\n" + target
+                + "\nOpen is separate and requires the original vault password again.")), "Restore Complete", JOptionPane.DEFAULT_OPTION,
+                JOptionPane.INFORMATION_MESSAGE, null, new Object[] {"Open Restored Vault", "Done"}, "Done") == 0;
+    }
+    @Override public void archiveProgress(String phase, Runnable cancel) { archives.progress(phase, cancel); }
+    @Override public void archiveProgressClosed() { archives.progressClosed(); }
+    @Override public void archiveMessage(String title, String message) { archives.message(title, message); }
     public ShellFrame() {
         super("Totipo"); Edt.require();
         setIconImages(ApplicationIcons.windowImages());
@@ -86,12 +135,12 @@ public final class ShellFrame extends JFrame implements ShellView {
         JMenuItem about = new JMenuItem("About This Vault…"); about.setEnabled(selected != null && !busy && state != ShellState.VAULT_SELECTION);
         about.addActionListener(event -> aboutVault(state == ShellState.LOCKED ? "Locked" : "Cannot safely open", landing.error.getText()));
         vault.add(about);
-        bar.add(file); bar.add(vault); bar.add(AboutApplicationPanel.menu(this)); DesktopStyle.menus(bar); return bar;
+        bar.add(file); bar.add(vault); archiveMenus(bar); bar.add(AboutApplicationPanel.menu(this)); DesktopStyle.menus(bar); return bar;
     }
     void mount(VaultPanel panel) {
         mounted = panel; landing.clear(); getRootPane().setDefaultButton(null);
         setContentPane(panel);
-        JMenuBar menus = panel.menuBar(); menus.add(AboutApplicationPanel.menu(this));
+        JMenuBar menus = panel.menuBar(); archiveMenus(menus); menus.add(AboutApplicationPanel.menu(this));
         DesktopStyle.menus(menus); setJMenuBar(menus); panel.lockAction(lock);
         revalidate(); repaint();
         SwingUtilities.invokeLater(() -> { if (mounted == panel) { panel.focusSearch(); } });
@@ -138,11 +187,13 @@ public final class ShellFrame extends JFrame implements ShellView {
     @Override public void showWindow() { setVisible(true); }
     @Override public void retireDialogs() {
         Edt.require(); landing.clear();
+        archives.progressClosed();
         retireOwned(this);
     }
     private static void retireOwned(java.awt.Window owner) {
         for (java.awt.Window child : owner.getOwnedWindows()) {
             retireOwned(child);
+            if (child instanceof java.awt.FileDialog file) { file.dispose(); }
             if (child instanceof JDialog dialog) {
                 // Password create prompts own their clearing/dismissal listener. Editors
                 // have already been retired by the session controller without confirmation.

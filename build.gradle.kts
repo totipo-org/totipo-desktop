@@ -58,9 +58,13 @@ tasks.processResources {
     }
 }
 
-val totipoJavaVersion = "0.2.0"
+val totipoJavaVersion = "0.3.2"
 dependencies {
     implementation("org.totipo:totipo-storage-nio:$totipoJavaVersion")
+    constraints {
+        implementation("org.totipo:totipo-core") { version { strictly(totipoJavaVersion) } }
+        implementation("org.bouncycastle:bcprov-jdk18on") { version { strictly("1.86") } }
+    }
     testImplementation(platform("org.junit:junit-bom:6.1.3"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
@@ -118,6 +122,10 @@ val verifyDistribution = tasks.register("verifyDistribution") {
         val root = rootDirectory.get().asFile
         val expectedArtifacts = runtimeArtifacts.get() + applicationJar.get().asFile
         val expectedJars = expectedArtifacts.map { it.name }.toSet()
+        check(expectedJars == setOf(applicationJar.get().asFile.name,
+            "totipo-core-0.3.2.jar", "totipo-storage-nio-0.3.2.jar", "bcprov-jdk18on-1.86.jar")) {
+            "Unexpected runtime dependency versions: $expectedJars"
+        }
         check(expectedJars.size == expectedArtifacts.size) { "Colliding runtime JAR filenames" }
         val notices = setOf("LICENSE", "THIRD_PARTY.md", "VERSION", "licenses/BOUNCY_CASTLE_LICENSE.html", "licenses/TOTIPO_JAVA_LICENSE")
         val expected = expectedJars.map { "lib/$it" }.toSet() + notices + setOf("bin/totipo-desktop", "bin/totipo-desktop.bat")

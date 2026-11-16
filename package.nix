@@ -29,6 +29,11 @@ let
     "LICENSE"
     "THIRD_PARTY.md"
   ];
+  dependencyCache = builtins.fromJSON (builtins.readFile ./package-deps.json);
+  centralCache = dependencyCache."https://repo.maven.apache.org/maven2/org" or { };
+  dependencyCacheReady = builtins.hasAttr "totipo#totipo-core/0.3.2" centralCache
+    && builtins.hasAttr "totipo#totipo-storage-nio/0.3.2" centralCache
+    && builtins.hasAttr "bouncycastle#bcprov-jdk18on/1.86" centralCache;
 in
 assert builtins.match "[A-Za-z0-9][A-Za-z0-9._+-]*" version != null;
 stdenv.mkDerivation (finalAttrs: {
@@ -36,6 +41,9 @@ stdenv.mkDerivation (finalAttrs: {
   # Export the canonical ZIP from this build, never a second application build.
   outputs = [ "out" "portable" ];
   inherit version;
+  # Informational/readiness boundary only: do not prevent evaluation of the
+  # human-owned fetchDeps update script while the old cache is still present.
+  passthru = { inherit dependencyCacheReady; };
   src = lib.cleanSourceWith {
     src = ./.;
     filter = path: type:

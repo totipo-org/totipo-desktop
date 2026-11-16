@@ -22,8 +22,8 @@ cd totipo-desktop
 nix develop
 ```
 
-Gradle resolves `org.totipo:totipo-storage-nio:0.2.0` and its transitive
-`org.totipo:totipo-core:0.2.0` from Maven Central. Internet access is needed
+Gradle resolves `org.totipo:totipo-storage-nio:0.3.2` and its transitive
+`org.totipo:totipo-core:0.3.2` from Maven Central. Internet access is needed
 for first resolution unless dependencies are already cached or Nix-provided.
 
 Supported development requires Nix: activate `nix develop` or allow the
@@ -212,9 +212,14 @@ Java configuration. The desktop entry is Totipo / Utility / Terminal=false, with
 no handlers, autostart or placeholder icon. Vaults remain user-selected paths;
 installation directories are never vault storage.
 
-The current dependency pin is Java 0.2.0 / v1/r19; BC 1.86 is unchanged.
+The current dependency pin is Java 0.3.2 / v1/r19; BC 1.86 is unchanged.
 Gradle locks and verification hashes track reviewed Maven Central artifacts.
-Human cache regeneration and review passed. Prior human Nix results are recorded
+The owner completed 0.3.2 cache regeneration; its artifact hashes were reviewed.
+The owner subsequently reports `nix flake check` PASS for the matching frozen
+inputs; logs/execution versus store-reuse details were not supplied. Native
+qualification remains separate. The explicit
+`desktop-dependency-cache` flake check reports stale cache membership without
+blocking evaluation of the update script. Prior human Nix results are recorded
 in the historical r19 reconciliation report; they do not qualify later changes.
 For current release readiness and native qualification, consult
 [QUALIFICATION.md](../QUALIFICATION.md).

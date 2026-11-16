@@ -29,6 +29,22 @@ final class VaultWindowController {
     private final TotpClipboard clipboard;
     private VaultFolderWatcher watcher;
     private boolean started;
+    private Runnable archiveCancellation;
+    private boolean closeQueued;
+    private boolean failureRetirement;
+    boolean isClosing() { Edt.require(); return closing; }
+
+    VaultSession acquireArchive(Runnable cancel) {
+        Edt.require();
+        if (closing || archiveCancellation != null) { return null; }
+        archiveCancellation = cancel;
+        return session;
+    }
+
+    void archiveRetired() {
+        Edt.require(); archiveCancellation = null;
+        if (closing) { closeSession(); }
+    }
 
     void watch(java.nio.file.Path directory) {
         watch(directory, (path, callback) -> new VaultFolderWatcher(path, callback, SwingUtilities::invokeLater));
@@ -137,6 +153,8 @@ final class VaultWindowController {
             return;
         }
         closing = true;
+        failureRetirement = failed;
+        if (archiveCancellation != null) { archiveCancellation.run(); }
         if (watcher != null) { watcher.close(); watcher = null; }
         if (failed && retirementReason == null) { retirementReason = "This vault session is unavailable. Try opening it again."; }
         subscriber.cancel();
@@ -159,7 +177,14 @@ final class VaultWindowController {
             catch (RuntimeException presentationFailure) {
                 System.err.println("Totipo: session failure presentation failure (details redacted).");
             }
-            executor.execute(() -> {
+            if (archiveCancellation == null) { closeSession(); }
+        }
+    }
+
+    private void closeSession() {
+        if (closeQueued) { return; }
+        closeQueued = true;
+        executor.execute(() -> {
                 boolean closeFailed = false;
                 try {
                     session.close();
@@ -168,7 +193,7 @@ final class VaultWindowController {
                     System.err.println("Totipo: unexpected session close failure (details redacted).");
                 } finally {
                     executor.shutdown();
-                    boolean reportFailure = closeFailed && !failed;
+                    boolean reportFailure = closeFailed && !failureRetirement;
                     boolean succeeded = !closeFailed;
                     SwingUtilities.invokeLater(() -> {
                         closeSucceeded = succeeded;
@@ -187,8 +212,7 @@ final class VaultWindowController {
                         }
                     });
                 }
-            });
-        }
+        });
     }
 
     boolean executorShutdown() {

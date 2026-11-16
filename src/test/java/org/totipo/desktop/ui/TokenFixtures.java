@@ -12,6 +12,7 @@ final class TokenFixtures {
     static RevisionId revision(int n) { return new RevisionId(String.format("%064x", n)); }
     static TokenHead head(int n, ClientMetadata metadata) {
         return new TokenHead() {
+            public List<TokenHead> parents() { return List.of(); }
             public TokenId tokenId() { return id(1); }
             public RevisionId revision() { return TokenFixtures.revision(n); }
             public ClientMetadata metadata() { return metadata; }

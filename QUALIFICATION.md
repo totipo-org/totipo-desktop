@@ -1,5 +1,16 @@
 # Qualification evidence
 
+D-BR1 backup/restore qualification is tracked separately in the
+[milestone report](review/DESKTOP_BACKUP_RESTORE_D_BR1_REPORT.md) and
+[bounded native smoke](qualification/BACKUP_RESTORE_SMOKE.md). Java now resolves
+0.3.2. The owner reports dependency-cache regeneration succeeded; its six updated
+artifact hashes were reviewed against Central. After the earlier stale-cache gate
+failure, the owner reports final **`nix flake check` PASS**. All frozen consumed
+input hashes still match. Successful-run logs/output identities and fresh execution
+versus store reuse were not supplied; no fresh tests or native launch are inferred.
+Headless and real-NIO tests do not qualify native NixOS, Linux, Windows
+or macOS behavior; all archive native platform claims remain UNQUALIFIED.
+
 Current preparation: **0.1.1; RELEASE-READY pending**. The version/application
 changes require new artifact qualification; 0.1.0 hashes and results do not
 qualify 0.1.1. See the [cleanup report](review/DESKTOP_RELEASE_VERSION_CLEANUP_REPORT.md)
@@ -228,7 +239,7 @@ environment, logs and the broader GUI checklist were not supplied.
 The full native qualification matrix remained UNQUALIFIED. At that historical
 milestone VERSION remained `0.0.0-dev`, NOT QUALIFIED.
 
-Current dependency: released Java 0.2.0 / Totipo Vault Format v1/r19.
+Historical 0.2.0 reconciliation dependency: released Java 0.2.0 / Totipo Vault Format v1/r19.
 Historical filesystem and native/package evidence below is not a PASS for this
 repin. Human Nix cache regeneration and artifact-hash review passed. The operator
 reports that `nix flake check path:.`, `nix build path:.` and

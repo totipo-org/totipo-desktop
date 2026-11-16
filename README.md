@@ -54,8 +54,11 @@ not yet qualified. See the [current qualification status](QUALIFICATION.md).
 3. Choose **Show Code** to view a code and **Copy** when you need it.
 4. Choose **Vault → Lock** when finished.
 
-Keep your vault password safe: Totipo cannot recover it. Back up the complete
-vault folder and keep your services' recovery codes.
+Keep your vault password safe: Totipo cannot recover it. Use **Vault → Back Up
+Vault…** and **Restore Backup to New Folder…** for portable encrypted backups.
+Interrupted restoration can be resumed explicitly. Keep the password separately
+and retain your services' recovery codes. See the
+[backup limits and filesystem requirements](docs/USER_GUIDE.md#security-backups-and-recovery).
 
 ## Learn more
 

@@ -5,7 +5,7 @@ import java.util.function.Consumer;
 import org.totipo.desktop.ShellState;
 
 /** One persistent application window; chooser/create dialogs may overlay it. EDT only. */
-public interface ShellView {
+public interface ShellView extends ArchiveView {
     void actions(Runnable select, Runnable create, Runnable exit);
     void openAction(Consumer<char[]> open);
     void lockAction(Runnable lock);

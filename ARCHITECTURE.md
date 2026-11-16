@@ -6,8 +6,8 @@ M2b added explicit field-oriented merge and frozen-resolution decisions to M2a
 manual token create/update and explicit publication retry/abandonment, building on
 M1a session/window lifecycle, observation/diagnostics and refresh, and M1b
 logical-token/TOTP browsing. The single-project Swing application consumes
-released Maven modules: desktop -> `org.totipo:totipo-storage-nio:0.2.0` ->
-`org.totipo:totipo-core:0.2.0`. Desktop does not build Java core/storage from
+released Maven modules: desktop -> `org.totipo:totipo-storage-nio:0.3.2` ->
+`org.totipo:totipo-core:0.3.2`. Desktop does not build Java core/storage from
 source. `org.totipo.storage.nio.NioTotipo` remains the filesystem entry point;
 `VaultSession`, `VaultState` and other `org.totipo` application APIs remain the
 core boundary. Desktop never consumes storage SPI or implementation internals.
@@ -65,7 +65,8 @@ neither authentication, intended identity nor recoverability.
 Each controller owns a separate single-thread executor named `totipo-session-N`.
 It runs token builder factory/setters/save/close, publication retry/capability
 cleanup and session close. Blocking open, create and close never run on the EDT.
-Executors are explicitly shut down; no shutdown interrupts an in-flight operation.
+Executors are explicitly shut down; ordinary session work is not interrupted.
+Archive cancellation uses its separate cooperative interruption contract below.
 The application uses neither SwingWorker nor virtual threads nor reactive libraries.
 Desktop compilation and runtime support target Java 25.
 
@@ -93,13 +94,14 @@ daemon worker performs directory listing off the EDT, closing each stream and
 rejecting stale navigation results by generation. Disposal invalidates publication
 and shuts down that worker. Application validation/remembering remains outside
 the picker, and Select stays activatable for non-vault folders.
-Desktop code does not create directories, recursively inspect them, or canonicalize
-paths. A bounded read of the public `TOTIPO-VLT` bootstrap signature recognizes
+Ordinary registry selection never canonicalizes paths. New Vault's picker can
+create a child folder; archive output separately checks real paths off EDT.
+A bounded read of the public `TOTIPO-VLT` bootstrap signature recognizes
 a target without authenticating it or accepting its version/length as valid. A
 recognizable selected path is normalized and registered immediately. Missing or
 clearly non-vault new targets do not replace it. Previously registered unavailable
 paths remain selectable, locked with a recovery warning. The NIO open result remains authoritative.
-Only one application operation is accepted at a time; actions stay disabled across
+Only one ordinary application lifecycle operation is accepted at a time; actions stay disabled across
 chooser/create prompts, work, result presentation and
 unclaimed-session cleanup. Modal dialogs can run nested EDT loops, so shutdown is
 checked after prompting as well as when the background result reaches the EDT.
@@ -304,7 +306,7 @@ notification still overlays that same result area. Conflict header padding is
 balanced above/below its vertically centered title and Resolve control; its
 semantic edge, children and resolver callbacks are preserved.
 Design v0.8 defines no inferred global Read-only state or Open Read-Only mode.
-Java 0.2.0 exposes no global storage access capability; desktop does not probe
+Java 0.3.2 exposes no global storage access capability; desktop does not probe
 permissions or infer one from operation failures. The single MutationGate owns
 workflow/session availability, including reservation and retirement. A future
 explicit read-only session/capability requires separate product design.
@@ -401,7 +403,7 @@ saved identity. Delete uses the target's descriptor with TOMBSTONED status and n
 secret ingress. No desktop protocol persistence is implemented.
 
 `SetupUri` is a small TOTP-only application ingress parser because the consumed
-published Java 0.2.0 JAR has no enrollment parser. It rejects HOTP, malformed URIs,
+published Java 0.3.2 JAR has no enrollment parser. It rejects HOTP, malformed URIs,
 ambiguous/repeated or unsupported parameters, issuer disagreement, invalid Base32,
 unsupported algorithms/digits, and out-of-domain periods. URI secrets use strict
 Base32. `SetupValidation` applies Java's identity UTF-8 limits and setup bounds;
@@ -778,3 +780,54 @@ widths are handled without splitting surrogate pairs. Rendering alone uses the
 elided string; literal full metadata appears in a tooltip only when clipped.
 HTML remains disabled for labels and tooltips. Resize and reveal/conceal only
 relayout existing rows; no semantic model or reveal lifetime changes.
+
+## Portable archives (D-BR1)
+
+`ArchiveWorkflow` admits one bounded archive workflow across the application.
+This is Desktop product policy, independent of token `MutationGate` admission.
+The workflow owns one `totipo-archive` executor until all handles and I/O retire.
+`ArchiveView`/`ArchiveDialogs` provide Vault-menu actions, native ZIP choosers,
+existing-folder navigation, original-password authentication, explicit destination
+confirmation and an owned modeless phase/Cancel surface. Text is literal, and
+errors are mapped from coarse enums or generic messages without exception text.
+
+Backup takes an explicit controller lease. Capture is synchronous authenticated
+provider work, using Java's provider gate, off EDT; ZIP output is detached frozen
+ciphertext work. Neither occupies the session worker used by TOTP nor reserves
+the token gate. New observations do not invalidate capture. Controller retirement
+requests cancellation immediately, retires normal UI/watchers/subscription, and
+defers session close until the archive lease releases. Shutdown waits for both
+archive cleanup and normal controller/application retirement. No worker waits for
+EDT callbacks. Cooperative interruption cannot force blocked providers to stop.
+
+`BackupOutput` closes/forces an operation-owned file in a private sibling staging
+directory outside the source vault, verifies it through Java's reader and exact
+archive digest, then uses exclusive hard-link publication and directory force.
+It never falls back to moves or overwrites. Final readback must match before
+success. After entering publication, unacknowledged failures are uncertain; final
+output is never removed to simulate rollback. This initial implementation refuses
+non-POSIX output, aliased parents, group/other-writable parents and unsupported
+barriers. The trusted-local namespace assumption excludes hostile same-user path
+replacement, like the shared NIO provider. Cleanup only targets its private stage;
+failures may retain that stage and are disclosed. Directory/file force is bounded
+provider acknowledgement, not universal power-loss durability.
+
+Restore/recovery are application-owned session-free operations. An open session
+requires explicit Lock/editor-discard confirmation followed by normal retirement.
+Shared inspection precedes detached password authentication of the entire bounded
+ZIP. The returned `BackupRestore` retains ciphertext only. Parent/name selection
+allocates nothing; explicit authenticated preview precedes `NioRestore.reserve`
+or explicit `NioRestore.recover`, then `plan.install` transfers reservation ownership.
+Close/cancel preserves all allocation/canonical bytes and the shared digest-bound
+marker. Recovery always prepares the same ZIP anew; no token publication retry
+handle or ordinary new-vault creation is used. COMPLETE alone offers Open/Done.
+Opening waits for handle cleanup, then uses ordinary selection and a fresh password;
+Done and incomplete outcomes do not change the registry or selection. Late results
+after Lock/shutdown cannot open dialogs or select a vault. PARTIAL, UNCERTAIN and
+REJECTED show preservation/recovery guidance, including possible reservation residue.
+No completeness claim follows merely from an opened bootstrap.
+
+The retained reviewed operation pin predates archive APIs. D-BR1 additionally uses
+the exact 0.3.2 release archive guidance listed in
+[dependency provenance](TOTIPO_JAVA_DEPENDENCY.md). R0's missing API prerequisite
+is resolved; its Add History proposal remains outside this implementation.

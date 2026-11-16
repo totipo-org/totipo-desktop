@@ -2,14 +2,14 @@
 
 | Component | Version/revision | Upstream | License |
 | --- | --- | --- | --- |
-| Totipo Desktop | [VERSION](VERSION) (0.1.0 preview candidate) | https://github.com/totipo-org/totipo-desktop | Apache-2.0; packaged LICENSE |
-| `org.totipo:totipo-storage-nio` | 0.2.0 | https://github.com/totipo-org/totipo-java/tree/v0.2.0 | Apache-2.0; licenses/TOTIPO_JAVA_LICENSE |
-| `org.totipo:totipo-core` (transitive) | 0.2.0 | https://github.com/totipo-org/totipo-java/tree/v0.2.0 | Apache-2.0; licenses/TOTIPO_JAVA_LICENSE |
+| Totipo Desktop | [VERSION](VERSION) | https://github.com/totipo-org/totipo-desktop | Apache-2.0; packaged LICENSE |
+| `org.totipo:totipo-storage-nio` | 0.3.2 | https://github.com/totipo-org/totipo-java/tree/v0.3.2 | Apache-2.0; licenses/TOTIPO_JAVA_LICENSE |
+| `org.totipo:totipo-core` (transitive) | 0.3.2 | https://github.com/totipo-org/totipo-java/tree/v0.3.2 | Apache-2.0; licenses/TOTIPO_JAVA_LICENSE |
 | Bouncy Castle bcprov-jdk18on | 1.86 | https://www.bouncycastle.org/ | MIT; licenses/BOUNCY_CASTLE_LICENSE.html |
-| Nix full OpenJDK runtime | jdk25 from nixpkgs 319e4cebef10cbb636c6ea392137b52ad105336a; installed build environment 25.0.4.1+1 | https://openjdk.org/ | GPL-2.0 with Classpath exception; runtime legal notices remain in its Nix store closure |
+| Nix full OpenJDK runtime | jdk25 from the source checkout's pinned nixpkgs; qualification reports record the exact runtime | https://openjdk.org/ | GPL-2.0 with Classpath exception; runtime legal notices remain in its Nix store closure |
 
 The generic distribution supplies only the first four rows and requires a
-user-supplied Java 25 or newer runtime. Nix selects the full JDK as a managed
+user-supplied Java 25 runtime. Nix selects the full JDK as a managed
 runtime dependency; current package qualification is recorded separately in QUALIFICATION.md.
 The JDK's own legal directory includes additional third-party notices.
 JUnit and other test dependencies are not shipped. Gradle is a build tool, not
@@ -19,5 +19,5 @@ identified by Nix `sourceProvenance.binaryBytecode`.
 The Bouncy Castle notice is copied unchanged from
 https://raw.githubusercontent.com/bcgit/bc-java/r1rv86/LICENSE.html.
 The already-packaged Totipo Java Apache-2.0 license notice is retained unchanged.
-Java components are released Maven Central artifacts from source tag `v0.2.0`;
+Java components are released Maven Central artifacts from source tag `v0.3.2`;
 storage-nio exposes core transitively, and core brings BC 1.86 at runtime.

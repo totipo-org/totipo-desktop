@@ -52,6 +52,11 @@
         # intentionally references the same derivation as packages.default.
         checks = pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
           desktop = desktop;
+          desktop-dependency-cache = pkgs.runCommand "totipo-desktop-dependency-cache-ready" { }
+            (if desktop.dependencyCacheReady then "touch $out" else ''
+              echo "Dependency cache is stale. Owner: run nix run .#update-package-deps, review, then nix flake check." >&2
+              exit 1
+            '');
         };
 
         apps = pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {

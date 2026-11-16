@@ -24,6 +24,14 @@ contract discrepancy, compare guidance with released 0.2.0 source/tests at
 See [the desktop audit](review/DESKTOP_JAVA_OPERATION_MODEL_AUDIT.md) for existing
 policy decisions and evidence gaps.
 
+For archive operations also read released Java 0.3.2 `API_DESIGN.md` and
+`docs/BACKUP_ARCHIVE.md` at `af11553659dd8bd4157064c7e3de27bed8980ac5`.
+These additional contracts define capture, detached restore and NIO recovery,
+which did not exist at the retained reviewed guidance pin. Compare archive
+contracts against that exact released source/tests. The 0.2.0 comparison above
+remains the basis for historical operation-audit discrepancies. See
+[active provenance](TOTIPO_JAVA_DEPENDENCY.md) for both guidance identities.
+
 **A newer VaultState is not, by itself, a generic cancellation signal.**
 Consult the operation-specific Java contract before cancelling asynchronous work,
 disabling the entire desktop UI, rebasing builders, discarding historical

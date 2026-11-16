@@ -25,6 +25,8 @@ public final class DesktopApplication {
     private final InactivityLock inactivity;
     private final Timer timer;
     private final DesktopEvents events;
+    private final ArchiveWorkflow archives;
+    private Boolean restoreAfterClose;
     private VaultWindowController controller;
     private ShellState state = ShellState.NO_VAULT;
     private Path selected;
@@ -63,6 +65,7 @@ public final class DesktopApplication {
         Edt.require();
         this.access = access; this.shell = shell; this.content = content;
         this.clipboard = clipboard; this.registry = new VaultRegistry(preferences);
+        archives = new ArchiveWorkflow(shell, this::archiveChanged);
         executor = Executors.newSingleThreadExecutor(task -> new Thread(task, "totipo-application"));
         inactivity = new InactivityLock(clock, this::lock);
         timer = new Timer(1000, event -> eventsPoll());
@@ -70,6 +73,7 @@ public final class DesktopApplication {
         shell.openAction(this::open);
         shell.vaultSelectionAction(this::selectionAction);
         shell.lockAction(this::lock);
+        shell.archiveActions(this::backup, () -> restore(false), () -> restore(true));
         shell.retryAction(() -> {
             if (!busy && state == ShellState.BLOCKING_VAULT_STATE) { state = ShellState.LOCKED; notice = ""; render(); }
         });
@@ -107,6 +111,8 @@ public final class DesktopApplication {
             }
             shell.renderShell(state, selected, notice, busy);
             shell.busy(notice, busy);
+            shell.archiveAvailability(controller != null && state == ShellState.UNLOCKED && !busy && !archives.active(),
+                    !busy && !archives.active());
         }
     }
     void open(char[] password) {
@@ -219,7 +225,8 @@ public final class DesktopApplication {
     void lock() {
         Edt.require();
         if (shuttingDown) { return; }
-        generation++; chooseAfterClose = false;
+        generation++; chooseAfterClose = false; restoreAfterClose = null;
+        archives.cancel();
         inactivity.retired(); timer.stop();
         shell.retireDialogs();
         if (selected != null && state != ShellState.VAULT_SELECTION) { state = ShellState.LOCKED; }
@@ -313,6 +320,36 @@ public final class DesktopApplication {
         } finally { if (!handedOff) { finishOperation(); } }
     }
     private void create() { choose(true); }
+    private void archiveChanged() { render(); finishShutdown(); }
+    private void backup() {
+        Edt.require();
+        if (busy || shuttingDown || archives.active() || controller == null || state != ShellState.UNLOCKED) { return; }
+        VaultWindowController owner = controller;
+        VaultSession session = owner.acquireArchive(archives::cancel);
+        if (session != null) { archives.backup(session, selected, owner::archiveRetired); }
+    }
+    private void restore(boolean recovery) {
+        Edt.require();
+        if (busy || shuttingDown || archives.active()) { return; }
+        if (controller != null) {
+            long attempt = generation;
+            busy = true; render();
+            boolean confirmed;
+            try { confirmed = shell.confirmLockForRestore(); }
+            finally { busy = controller != null && controller.isClosing(); render(); }
+            if (!confirmed || shuttingDown || attempt != generation) { return; }
+            lock(); restoreAfterClose = recovery;
+            return;
+        }
+        long restoreGeneration = generation;
+        busy = true; render();
+        archives.restore(recovery, () -> { busy = false; render(); finishShutdown(); }, target -> {
+            if (!shuttingDown && restoreGeneration == generation && controller == null && !busy) {
+                // Ordinary selected locked surface asks for a fresh password. No credentials transfer.
+                selectTarget(target, true, false);
+            }
+        });
+    }
     private void controllerClosed(VaultWindowController owner) {
         Edt.require();
         if (controller != owner) { return; }
@@ -323,21 +360,24 @@ public final class DesktopApplication {
             state = notice.isEmpty() ? ShellState.LOCKED : ShellState.BLOCKING_VAULT_STATE;
         }
         boolean choose = chooseAfterClose; chooseAfterClose = false;
+        Boolean restore = restoreAfterClose; restoreAfterClose = null;
         if (choose && !shuttingDown) { enterSelection(true); }
         else { render(); }
+        if (restore != null && !shuttingDown) { restore(restore); }
         finishShutdown();
     }
     void shutdown() {
         Edt.require();
         if (shuttingDown) { return; }
-        shuttingDown = true; generation++; chooseAfterClose = false;
+        shuttingDown = true; generation++; chooseAfterClose = false; restoreAfterClose = null;
+        archives.cancel();
         inactivity.retired(); timer.stop(); events.close();
         shell.retireDialogs(); clipboard.shutdown();
         if (controller != null) { controller.close(); }
         finishShutdown();
     }
     private void finishShutdown() {
-        if (shuttingDown && !busy && controller == null && !disposed) {
+        if (shuttingDown && !busy && !archives.active() && controller == null && !disposed) {
             disposed = true; executor.shutdown(); shell.dispose();
         }
     }
