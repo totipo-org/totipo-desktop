@@ -1,33 +1,32 @@
 # Release-readiness checklist
 
-Current preparation targets **0.1.1**. No tag or publication is authorized.
-Qualification is specific to the exact candidate; the completed 0.1.0 checks below
-are historical evidence and do not qualify this version. See
-[current qualification](QUALIFICATION.md) and the
-[cleanup report](review/DESKTOP_RELEASE_VERSION_CLEANUP_REPORT.md).
-The About link changes application bytes again; the earlier 0.1.1 human gate
-below no longer qualifies the current candidate. See the
-[About link report](review/DESKTOP_0_1_1_ABOUT_LINK_REPORT.md) for current evidence
-and the replacement human gate/About dialog smoke PASS reported 2026-10-26.
+Current preparation targets **0.1.2; RELEASE-READY pending**. No tag or
+publication is authorized. Qualification is specific to the exact candidate;
+earlier 0.1.0/0.1.1 and backup/restore milestone results do not qualify this
+version's changed application bytes. See [current qualification](QUALIFICATION.md)
+and the [0.1.2 preparation report](review/DESKTOP_0_1_2_RELEASE_PREPARATION_REPORT.md).
 Full native platform qualification remains separate and UNQUALIFIED.
 
 ## Current release requirements
 
 - [ ] Review final clean main commit, dependencies, source membership and version.
       Record the exact source and consumed-input identity before qualification.
-- [ ] Run `gradle validateVersion -PreleaseBuild=true` and affected Gradle checks;
+- [x] Run `gradle validateVersion -PreleaseBuild=true` and affected Gradle checks;
       confirm source, build, packaged runtime and Nix version agreement.
+      Local 0.1.2 Gradle validation, full 582-test suite and distribution
+      verification PASS; collector verifies matching Nix/ZIP artifacts and
+      runtime, and both launch routes have human-reported quick smoke PASS.
 - [ ] Freeze all consumed inputs and obtain human `nix flake check` PASS. Record
       logs, derivation/output/runtime identities and fresh execution or store reuse.
       Changed consumed inputs require qualification again.
-      Replacement gate PASS human-reported 2026-10-26 for the selectable-URL
-      candidate; all 182 hashes in `build/about-url-frozen-inputs.sha256` still
-      match. The earlier gate in the cleanup report remains historical.
-      Logs/output identities and execution/reuse details remain unprovided, so
-      this combined evidence item remains open.
-- [ ] Retain the same-build portable ZIP, portable and Nix deployment manifests;
+      Owner reports 0.1.2 gate PASS; all 200 frozen hashes still match. Output
+      identities collected; gate logs and execution/store-reuse details unprovided,
+      so this combined evidence item stays open. Earlier gates remain historical.
+- [x] Retain the same-build portable ZIP, portable and Nix deployment manifests;
       verify complete distribution inventory, checksums and installed JAR equality.
       Local Gradle output alone is not the Nix portable output.
+      Collector PASS at `build/release-evidence/20261117T025843Z/`; all 18
+      evidence checksums verified, canonical ZIP matches local Gradle bytes.
 - [ ] Review licenses, dependency/security disclosures and launcher hardening.
 - [ ] Perform the existing minimal human functional smoke on both exact launchers,
       recording per-step results and artifact/environment identities. Use the
@@ -36,12 +35,23 @@ Full native platform qualification remains separate and UNQUALIFIED.
       Check Help → About Totipo… from locked and unlocked screens, actual installed
       version, selectable URL, mouse/keyboard/browser activation, Close/Escape
       and dismissal. Use the About link report's short native smoke procedure.
-      About dialog smoke PASS human-reported 2026-10-26; launch route,
-      artifact/environment identities and individual step results were not
-      supplied. This does not establish the full pre-release smoke on both routes.
+      Apply [backup/restore smoke](qualification/BACKUP_RESTORE_SMOKE.md) to the
+      exact 0.1.2 artifacts, including native choosers, restore, Add History and
+      interrupted-restore recovery. Record platform limitations and failures.
+      Owner confirms backup/restore/Add Missing History were tested before the
+      metadata-only version bump. Credit that implementation evidence; no full
+      repeat is required solely for the bump. Unreported archive scenarios
+      are not inferred to have passed.
+      Subsequently, owner reports the `nix run .` launch and quick smoke look
+      good: Nix-route smoke PASS, with per-step/environment/output details
+      unprovided. Owner subsequently reports the extracted canonical ZIP also
+      looks good after requested About 0.1.2 and add/reveal/copy/lock/reopen checks:
+      portable-route quick smoke PASS. Detailed per-step/native qualification
+      evidence remains unprovided; this combined full evidence item stays open.
 - [ ] Prepare and review version-specific GitHub notes required by the workflow,
       including immutable source, retrieval instructions and exact qualification.
-      [0.1.1 notes](docs/GITHUB_RELEASE_0_1_1.md) prepared; human review pending.
+      [0.1.2 notes](docs/GITHUB_RELEASE_0_1_2.md) use the supplied release text;
+      human review pending.
 - [ ] Mark RELEASE-READY only after all required candidate checks pass. Obtain
       explicit maintainer release authorization, then follow the
       [publication procedure](docs/DESKTOP_RELEASE_AUTOMATION.md). Ordinary versions

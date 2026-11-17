@@ -1,5 +1,27 @@
 # Qualification evidence
 
+Current preparation: **0.1.2; RELEASE-READY pending**. The version bump changes
+application and distribution bytes. The owner reports **`nix flake check` PASS**
+after the 0.1.2 freeze; all 200 consumed-input hashes still match. Successful-run
+gate logs and execution/store-reuse details were not supplied; artifact identities
+were subsequently collected below.
+The owner reports the `nix run .` launch and quick functional smoke look good:
+Nix-route smoke PASS, without individual step/environment/output details.
+Artifact identity collection PASS: `build/release-evidence/20261117T025843Z/`,
+all 18 evidence checksums verified; canonical ZIP and installed payload agree.
+The owner also reports the extracted canonical ZIP looks good in response to
+the requested About 0.1.2 and add/reveal/copy/lock/reopen checks: portable-route
+quick smoke PASS (human-reported). Detailed native environment and per-step
+results remain unprovided. See the
+[0.1.2 preparation report](review/DESKTOP_0_1_2_RELEASE_PREPARATION_REPORT.md)
+and [release checklist](RELEASE_CHECKLIST.md). Earlier automatic gates and native
+feedback retain their original scope; they do not qualify the 0.1.2 artifacts.
+All native platforms remain **UNQUALIFIED**. Backup export requires filesystem
+capabilities not generally available on Windows. Published downloads are on the
+[latest release page](https://github.com/totipo-org/totipo-desktop/releases/latest).
+
+## Earlier milestone and 0.1.1 evidence
+
 D-BR1 backup/restore qualification is tracked separately in the
 [milestone report](review/DESKTOP_BACKUP_RESTORE_D_BR1_REPORT.md) and
 [bounded native smoke](qualification/BACKUP_RESTORE_SMOKE.md). Java now resolves
@@ -11,7 +33,7 @@ versus store reuse were not supplied; no fresh tests or native launch are inferr
 Headless and real-NIO tests do not qualify native NixOS, Linux, Windows
 or macOS behavior; all archive native platform claims remain UNQUALIFIED.
 
-Current preparation: **0.1.1; RELEASE-READY pending**. The version/application
+Historical preparation: **0.1.1; RELEASE-READY pending**. The version/application
 changes require new artifact qualification; 0.1.0 hashes and results do not
 qualify 0.1.1. See the [cleanup report](review/DESKTOP_RELEASE_VERSION_CLEANUP_REPORT.md)
 for current automated results and pending native checks. Published
