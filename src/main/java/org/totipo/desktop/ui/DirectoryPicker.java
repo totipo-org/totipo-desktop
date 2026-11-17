@@ -17,7 +17,7 @@ import javax.swing.*;
 /** App-owned folder navigation. Vault recognition and creation belong to the application. */
 final class DirectoryPicker extends JPanel implements AutoCloseable {
     private static final long serialVersionUID = 1L;
-    enum Mode { EXISTING_VAULT, NEW_VAULT }
+    enum Mode { EXISTING_VAULT, NEW_VAULT, RESTORE_PARENT }
     final JLabel location = new JLabel();
     final JLabel status = new JLabel();
     final JList<Path> directories = new JList<>(new DefaultListModel<>());
@@ -70,6 +70,12 @@ final class DirectoryPicker extends JPanel implements AutoCloseable {
         location.getAccessibleContext().setAccessibleName("Current folder");
         JPanel navigation = new JPanel(new BorderLayout(12, 0));
         navigation.add(location, BorderLayout.CENTER); navigation.add(up, BorderLayout.EAST);
+        if (mode == Mode.RESTORE_PARENT) {
+            JLabel guidance = new JLabel("Choose the parent for the new restored folder.");
+            guidance.setBorder(BorderFactory.createEmptyBorder(0, 0, 12, 0));
+            navigation.add(guidance, BorderLayout.NORTH);
+            select.setText("Select Parent Folder");
+        }
         if (mode == Mode.NEW_VAULT) {
             JPanel creation = new JPanel(new BorderLayout(8, 8));
             JLabel label = SwingUsability.label("Folder name", folderName); label.setDisplayedMnemonic(KeyEvent.VK_F);
@@ -86,7 +92,8 @@ final class DirectoryPicker extends JPanel implements AutoCloseable {
         add(navigation, BorderLayout.NORTH); add(scroll, BorderLayout.CENTER);
         directories.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         directories.getAccessibleContext().setAccessibleName("Folders");
-        directories.getAccessibleContext().setAccessibleDescription("Select Folder chooses the highlighted folder, or the current folder if none is highlighted. Enter or double-click to enter a folder.");
+        directories.getAccessibleContext().setAccessibleDescription(select.getText()
+                + " chooses the highlighted folder, or the current folder if none is highlighted. Enter or double-click to enter a folder.");
         directories.setCellRenderer(new DefaultListCellRenderer() {
             private static final long serialVersionUID = 1L;
             @Override public java.awt.Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean selected, boolean focus) {
@@ -226,7 +233,11 @@ final class DirectoryPicker extends JPanel implements AutoCloseable {
     }
     static Path ask(java.awt.Window owner, Path initial, Mode mode) {
         Edt.require();
-        String title = mode == Mode.NEW_VAULT ? "Select New Vault Folder" : "Select Vault Folder";
+        String title = switch (mode) {
+            case EXISTING_VAULT -> "Select Vault Folder";
+            case NEW_VAULT -> "Select New Vault Folder";
+            case RESTORE_PARENT -> "Restore Backup — Choose Parent Folder";
+        };
         JDialog dialog = new JDialog(owner, title, java.awt.Dialog.ModalityType.APPLICATION_MODAL);
         Path[] result = {null};
         DirectoryPicker picker = new DirectoryPicker(initial, mode, path -> { result[0] = path; dialog.dispose(); }, dialog::dispose);

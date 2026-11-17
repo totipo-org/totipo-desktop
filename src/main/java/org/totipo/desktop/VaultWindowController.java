@@ -32,7 +32,18 @@ final class VaultWindowController {
     private Runnable archiveCancellation;
     private boolean closeQueued;
     private boolean failureRetirement;
+    private boolean importing;
+    private Runnable mutationChanged = () -> { };
     boolean isClosing() { Edt.require(); return closing; }
+
+    void mutationChanged(Runnable changed) { Edt.require(); mutationChanged = changed; }
+    boolean canImport() { Edt.require(); return !closing && gate.available(); }
+    VaultSession acquireImport(Runnable cancel) {
+        Edt.require();
+        if (closing || archiveCancellation != null || !gate.acquire(this)) { return null; }
+        importing = true;
+        return acquireArchive(cancel);
+    }
 
     VaultSession acquireArchive(Runnable cancel) {
         Edt.require();
@@ -43,6 +54,7 @@ final class VaultWindowController {
 
     void archiveRetired() {
         Edt.require(); archiveCancellation = null;
+        if (importing) { importing = false; gate.release(this); }
         if (closing) { closeSession(); }
     }
 
@@ -83,7 +95,7 @@ final class VaultWindowController {
         this.view = view;
         this.closed = closed;
         executor = Executors.newSingleThreadExecutor(task -> new Thread(task, "totipo-session-" + number));
-        gate = new MutationGate(view::writeAvailability);
+        gate = new MutationGate(available -> { view.writeAvailability(available); mutationChanged.run(); });
         writes = new TokenWriteController(executor, view, this::close, gate);
         subscriber = new StateSubscriber(this::render, () -> close(true), this::close);
     }

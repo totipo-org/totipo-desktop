@@ -25,6 +25,38 @@ public final class ShellFrame extends JFrame implements ShellView {
     private transient Runnable backup = () -> { }, restore = () -> { }, recover = () -> { };
     private JMenuItem backupItem, restoreItem, recoverItem;
     private boolean backupAvailable, restoreAvailable;
+    private transient Runnable addHistory = () -> { };
+    private JMenuItem importItem;
+    private boolean importAvailable;
+
+    @Override public void importAction(Runnable action) { addHistory = action; }
+    @Override public void importAvailability(boolean available) {
+        importAvailable = available;
+        if (importItem != null) {
+            importItem.setEnabled(available);
+            importItem.setToolTipText(available ? "Add missing encrypted history to this matching vault"
+                    : "Unlock a vault and finish or cancel the current change or archive operation first.");
+        }
+    }
+    @Override public boolean confirmImport(Path zip, org.totipo.backup.BackupSummary summary) {
+        return archives.confirm("Add History from Backup", UntrustedText.display(zip.getFileName().toString())
+                + "\n\nAdd missing history to this vault? Existing data will be kept, but older versions or conflicts may appear.", "Add History");
+    }
+    @Override public boolean backupLocationFailure(String message) {
+        return archives.confirm("Backup Location Unavailable", message, "Choose Another Location");
+    }
+    @Override public void archiveStatus(String message) { archives.status(message); }
+    @Override public boolean importResult(org.totipo.backup.ImportResult result, boolean retryAllowed) {
+        if (result.outcome() == org.totipo.backup.ImportResult.Outcome.COMPLETE
+                || result.outcome() == org.totipo.backup.ImportResult.Outcome.NO_OP) {
+            archiveStatus(ArchiveView.importMessage(result)); return false;
+        }
+        if (retryAllowed) {
+            return archives.confirm("Add History from Backup", ArchiveView.importMessage(result)
+                    + "\n\nRetry uses the same backup evidence and keeps existing files.", "Retry Same Evidence");
+        }
+        archives.message("Add History from Backup", ArchiveView.importMessage(result)); return false;
+    }
 
     @Override public void archiveActions(Runnable backup, Runnable restore, Runnable recover) {
         this.backup = backup; this.restore = restore; this.recover = recover;
@@ -41,41 +73,35 @@ public final class ShellFrame extends JFrame implements ShellView {
                 backupItem = new JMenuItem("Back Up Vault…"); backupItem.addActionListener(event -> backup.run()); menu.add(backupItem);
                 restoreItem = new JMenuItem("Restore Backup to New Folder…"); restoreItem.addActionListener(event -> restore.run()); menu.add(restoreItem);
                 recoverItem = new JMenuItem("Resume Interrupted Restore…"); recoverItem.addActionListener(event -> recover.run()); menu.add(recoverItem);
+                importItem = new JMenuItem("Add History from Backup…"); importItem.addActionListener(event -> addHistory.run()); menu.add(importItem);
             }
         }
         archiveAvailability(backupAvailable, restoreAvailable);
+        importAvailability(importAvailable);
     }
     @Override public Path chooseBackupOutput() { return archives.file(true); }
     @Override public Path chooseBackupInput() { return archives.file(false); }
-    @Override public boolean confirmBackup(Path source, Path output) {
-        return archives.confirm("Back Up Vault", "Source vault:\n" + source + "\n\nDestination ZIP:\n" + output
-                + "\n\nContains encrypted history, including deleted entries and their secrets. Uses the existing vault password; keep that password separately."
-                + "\nCovers locally available history, possibly missing recent changes on other devices. No existing backup will be replaced."
-                + "\nLimit: 4096 objects, 8192 observed entries, 6 MiB ZIP. Output requires a trusted local parent, hard links and file/directory force support.", "Back Up");
+    @Override public boolean confirmLimitedRestore() {
+        return archives.confirm("Some Earlier History Is Missing", "This backup is missing some earlier history. Restore the available history?", "Restore");
     }
     @Override public boolean confirmLockForRestore() {
-        return archives.confirm("Lock Before Restoring", "Restoration requires closing the open vault. Lock and discard any unfinished editor or resolution input? Entered writes may still complete. Restoration waits for normal session retirement.", "Lock and Continue");
+        return archives.confirm("Discard Unfinished Changes?", "Restoring will close this vault. Discard unfinished editor or conflict-resolution input? Entered writes may still finish.", "Discard and Restore");
     }
-    @Override public PasswordPromptResult archivePassword(Path zip) { return archives.password(zip); }
-    @Override public ArchiveView.Destination chooseRestoreDestination() { return archives.destination(); }
-    @Override public Path chooseInterruptedRestore() { return DirectoryPicker.ask(this, null, DirectoryPicker.Mode.EXISTING_VAULT); }
-    @Override public boolean confirmRestore(Path path, org.totipo.backup.BackupSummary summary, boolean recovery) {
-        return archives.confirmRestore(path, summary, recovery);
-    }
-    @Override public boolean restored(Path target) {
-        return JOptionPane.showOptionDialog(this, new JScrollPane(ArchiveDialogs.text("Restoration completed for the ZIP's encrypted history.\n" + target
-                + "\nOpen is separate and requires the original vault password again.")), "Restore Complete", JOptionPane.DEFAULT_OPTION,
-                JOptionPane.INFORMATION_MESSAGE, null, new Object[] {"Open Restored Vault", "Done"}, "Done") == 0;
-    }
+    @Override public ArchiveView.RestoreInput restoreInput(Path zip, boolean recovery) { return archives.restoreInput(zip, recovery); }
     @Override public void archiveProgress(String phase, Runnable cancel) { archives.progress(phase, cancel); }
     @Override public void archiveProgressClosed() { archives.progressClosed(); }
     @Override public void archiveMessage(String title, String message) { archives.message(title, message); }
+    private void mountContent(java.awt.Container content) {
+        JPanel frame = new JPanel(new java.awt.BorderLayout());
+        frame.add(content, java.awt.BorderLayout.CENTER); frame.add(archives.status, java.awt.BorderLayout.SOUTH);
+        setContentPane(frame);
+    }
     public ShellFrame() {
         super("Totipo"); Edt.require();
         setIconImages(ApplicationIcons.windowImages());
         landing.detailsAction(() -> aboutVault("Cannot safely open", landing.error.getText()));
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
-        setContentPane(landing);
+        mountContent(landing);
         setMinimumSize(VaultPanel.MINIMUM_SIZE);
         setPreferredSize(VaultPanel.INITIAL_SIZE); pack();
         SwingUsability.fit(this, VaultPanel.INITIAL_SIZE.width, VaultPanel.INITIAL_SIZE.height);
@@ -104,17 +130,28 @@ public final class ShellFrame extends JFrame implements ShellView {
             mounted = null;
             if (next == ShellState.VAULT_SELECTION) {
                 if (enteringSelection) { selection.navigationEntered(); }
-                landing.clear(); setContentPane(selection); selection.status(message); selection.defaultButton(getRootPane());
-            } else { setContentPane(landing); landing.render(next, target, message, busy); }
+                landing.clear(); mountContent(selection); selection.status(message); selection.defaultButton(getRootPane());
+            } else { mountContent(landing); landing.render(next, target, message, busy); }
             setJMenuBar(landingMenus(busy));
         } else { landing.clear(); }
         revalidate(); repaint();
         if (enteringSelection) {
-            SwingUtilities.invokeLater(() -> { if (state == ShellState.VAULT_SELECTION) { selection.focusList(); } });
+            SwingUtilities.invokeLater(() -> { if (state == ShellState.VAULT_SELECTION && !hasVisibleModalDialog(this)) { selection.focusList(); } });
         }
         if (next == ShellState.LOCKED && !busy) {
-            SwingUtilities.invokeLater(() -> { if (state == ShellState.LOCKED) { landing.password.requestFocusInWindow(); } });
+            SwingUtilities.invokeLater(() -> {
+                if (state == ShellState.LOCKED && landing.password.isEnabled() && !hasVisibleModalDialog(this)) {
+                    landing.password.requestFocusInWindow();
+                }
+            });
         }
+    }
+    static boolean hasVisibleModalDialog(java.awt.Window owner) {
+        for (java.awt.Window child : owner.getOwnedWindows()) {
+            if (child instanceof java.awt.Dialog dialog && dialog.isShowing() && dialog.isModal()) { return true; }
+            if (hasVisibleModalDialog(child)) { return true; }
+        }
+        return false;
     }
     public void aboutVault(String availability, String diagnostics) {
         if (selected == null) { return; }
@@ -139,7 +176,7 @@ public final class ShellFrame extends JFrame implements ShellView {
     }
     void mount(VaultPanel panel) {
         mounted = panel; landing.clear(); getRootPane().setDefaultButton(null);
-        setContentPane(panel);
+        mountContent(panel);
         JMenuBar menus = panel.menuBar(); archiveMenus(menus); menus.add(AboutApplicationPanel.menu(this));
         DesktopStyle.menus(menus); setJMenuBar(menus); panel.lockAction(lock);
         revalidate(); repaint();
@@ -187,7 +224,7 @@ public final class ShellFrame extends JFrame implements ShellView {
     @Override public void showWindow() { setVisible(true); }
     @Override public void retireDialogs() {
         Edt.require(); landing.clear();
-        archives.progressClosed();
+        archives.retire();
         retireOwned(this);
     }
     private static void retireOwned(java.awt.Window owner) {

@@ -11,6 +11,8 @@ final class MutationGate {
 
     MutationGate(Consumer<Boolean> availability) { this.availability = availability; }
 
+    boolean available() { Edt.require(); return !closing && owner == null; }
+
     boolean acquire(Object candidate) {
         Edt.require();
         if (closing || owner != null) { return false; }

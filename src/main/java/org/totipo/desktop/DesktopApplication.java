@@ -26,7 +26,7 @@ public final class DesktopApplication {
     private final Timer timer;
     private final DesktopEvents events;
     private final ArchiveWorkflow archives;
-    private Boolean restoreAfterClose;
+    private Runnable restoreAfterClose;
     private VaultWindowController controller;
     private ShellState state = ShellState.NO_VAULT;
     private Path selected;
@@ -74,6 +74,7 @@ public final class DesktopApplication {
         shell.vaultSelectionAction(this::selectionAction);
         shell.lockAction(this::lock);
         shell.archiveActions(this::backup, () -> restore(false), () -> restore(true));
+        shell.importAction(this::addHistory);
         shell.retryAction(() -> {
             if (!busy && state == ShellState.BLOCKING_VAULT_STATE) { state = ShellState.LOCKED; notice = ""; render(); }
         });
@@ -111,6 +112,7 @@ public final class DesktopApplication {
             }
             shell.renderShell(state, selected, notice, busy);
             shell.busy(notice, busy);
+            shell.importAvailability(controller != null && state == ShellState.UNLOCKED && !busy && !archives.active() && controller.canImport());
             shell.archiveAvailability(controller != null && state == ShellState.UNLOCKED && !busy && !archives.active(),
                     !busy && !archives.active());
         }
@@ -123,7 +125,7 @@ public final class DesktopApplication {
     /** Takes ownership of the submitted buffer, even on rejection. */
     void begin(Path directory, char[] password, boolean create) {
         Edt.require();
-        if (busy || shuttingDown || controller != null) { Arrays.fill(password, '\0'); return; }
+        if (busy || shuttingDown || archives.active() || controller != null) { Arrays.fill(password, '\0'); return; }
         if (!PasswordInput.valid(password)) {
             Arrays.fill(password, '\0');
             notice = "Enter valid Unicode using at most 1024 UTF-8 bytes."; render(); return;
@@ -176,6 +178,7 @@ public final class DesktopApplication {
             }
             state = ShellState.UNLOCKED; notice = "";
             VaultWindowController owner = controller;
+            owner.mutationChanged(this::render);
             view.quitAction(this::shutdown);
             view.changeVaultAction(() -> { if (controller == owner) { changeVault(); } });
             render();
@@ -321,6 +324,13 @@ public final class DesktopApplication {
     }
     private void create() { choose(true); }
     private void archiveChanged() { render(); finishShutdown(); }
+    private void addHistory() {
+        Edt.require();
+        if (busy || shuttingDown || archives.active() || controller == null || state != ShellState.UNLOCKED) { return; }
+        VaultWindowController owner = controller;
+        VaultSession session = owner.acquireImport(archives::cancel);
+        if (session != null) { archives.addHistory(session, owner::archiveRetired, owner::refresh); }
+    }
     private void backup() {
         Edt.require();
         if (busy || shuttingDown || archives.active() || controller == null || state != ShellState.UNLOCKED) { return; }
@@ -331,23 +341,28 @@ public final class DesktopApplication {
     private void restore(boolean recovery) {
         Edt.require();
         if (busy || shuttingDown || archives.active()) { return; }
-        if (controller != null) {
-            long attempt = generation;
-            busy = true; render();
-            boolean confirmed;
-            try { confirmed = shell.confirmLockForRestore(); }
-            finally { busy = controller != null && controller.isClosing(); render(); }
-            if (!confirmed || shuttingDown || attempt != generation) { return; }
-            lock(); restoreAfterClose = recovery;
-            return;
-        }
         long restoreGeneration = generation;
         busy = true; render();
-        archives.restore(recovery, () -> { busy = false; render(); finishShutdown(); }, target -> {
+        archives.restore(recovery, () -> { restoreAfterClose = null; busy = controller != null && controller.isClosing(); render(); finishShutdown(); }, target -> {
             if (!shuttingDown && restoreGeneration == generation && controller == null && !busy) {
                 // Ordinary selected locked surface asks for a fresh password. No credentials transfer.
                 selectTarget(target, true, false);
             }
+        }, continuation -> {
+            if (shuttingDown || restoreGeneration != generation || (controller != null && controller.isClosing())) {
+                archives.cancel(); return;
+            }
+            if (controller == null) { continuation.run(); return; }
+            // A held mutation gate includes editors, resolution and publication decisions.
+            // Do not silently retire their input. Detached preparation uses no session.
+            if (!controller.canImport() && !shell.confirmLockForRestore()) { archives.cancel(); return; }
+            if (shuttingDown || restoreGeneration != generation || controller == null || controller.isClosing()) {
+                archives.cancel(); return;
+            }
+            restoreAfterClose = continuation;
+            inactivity.retired(); timer.stop(); shell.retireDialogs();
+            shell.archiveProgress("Closing current vault…", archives::cancel);
+            state = ShellState.LOCKED; notice = ""; controller.close(); render();
         });
     }
     private void controllerClosed(VaultWindowController owner) {
@@ -360,10 +375,10 @@ public final class DesktopApplication {
             state = notice.isEmpty() ? ShellState.LOCKED : ShellState.BLOCKING_VAULT_STATE;
         }
         boolean choose = chooseAfterClose; chooseAfterClose = false;
-        Boolean restore = restoreAfterClose; restoreAfterClose = null;
+        Runnable restore = restoreAfterClose; restoreAfterClose = null;
         if (choose && !shuttingDown) { enterSelection(true); }
         else { render(); }
-        if (restore != null && !shuttingDown) { restore(restore); }
+        if (restore != null && !shuttingDown) { busy = true; render(); restore.run(); }
         finishShutdown();
     }
     void shutdown() {

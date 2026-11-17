@@ -781,15 +781,34 @@ elided string; literal full metadata appears in a tooltip only when clipped.
 HTML remains disabled for labels and tooltips. Resize and reveal/conceal only
 relayout existing rows; no semantic model or reveal lifetime changes.
 
-## Portable archives (D-BR1)
+## Portable archives (D-BR1 and D-BR2)
 
 `ArchiveWorkflow` admits one bounded archive workflow across the application.
-This is Desktop product policy, independent of token `MutationGate` admission.
+This is Desktop product policy. Add History additionally reserves `MutationGate`;
+backup and session-free restoration retain their existing admission rules.
 The workflow owns one `totipo-archive` executor until all handles and I/O retire.
-`ArchiveView`/`ArchiveDialogs` provide Vault-menu actions, native ZIP choosers,
-existing-folder navigation, original-password authentication, explicit destination
-confirmation and an owned modeless phase/Cancel surface. Text is literal, and
-errors are mapped from coarse enums or generic messages without exception text.
+`ArchiveView`/`ArchiveDialogs` provide Vault-menu actions, AWT native ZIP choosers,
+existing-folder navigation and compact restore/recovery forms. `NativeArchiveChooser`
+uses SAVE for backup and LOAD for restore/import, single selection, application
+modality and a ZIP convenience filter. It parents to the live requested frame or
+its visible modal blocker, preferring the active modal branch. Selection inside
+the Restore form uses that dialog as parent; optional Choose ZIP changes only
+unsubmitted form input. The submitted ZIP path, destination and original password
+are authenticated together on the archive worker. No destination browsing change
+or allocation is introduced.
+
+A reusable in-window status strip shows progress/Cancel and ordinary results;
+no separate progress window or success modal is used. Text is literal and errors
+use fixed messages/coarse enums without exception text. Native selection/disposal
+run on EDT; retirement invalidates the chooser generation and disposes the active
+peer, so even a late native selection cannot become a workflow input. No Swing
+file chooser fallback, focus timers, raising loop, always-on-top or delays are used.
+The installed JDK's GTK peer creates a separate widget asynchronously; actual
+Cinnamon/X11 stacking remains a human qualification boundary. Pending shell/form
+focus callbacks yield to visible modal children. Folder browsing retains the
+existing worker-backed picker owned by the form, returning without allocation.
+Full new-path and original-password entry share one form with Cancel/Restore,
+a default action and Escape dismissal.
 
 Backup takes an explicit controller lease. Capture is synchronous authenticated
 provider work, using Java's provider gate, off EDT; ZIP output is detached frozen
@@ -812,22 +831,63 @@ replacement, like the shared NIO provider. Cleanup only targets its private stag
 failures may retain that stage and are disclosed. Directory/file force is bounded
 provider acknowledgement, not universal power-loss durability.
 
-Restore/recovery are application-owned session-free operations. An open session
-requires explicit Lock/editor-discard confirmation followed by normal retirement.
-Shared inspection precedes detached password authentication of the entire bounded
-ZIP. The returned `BackupRestore` retains ciphertext only. Parent/name selection
-allocates nothing; explicit authenticated preview precedes `NioRestore.reserve`
-or explicit `NioRestore.recover`, then `plan.install` transfers reservation ownership.
-Close/cancel preserves all allocation/canonical bytes and the shared digest-bound
-marker. Recovery always prepares the same ZIP anew; no token publication retry
-handle or ordinary new-vault creation is used. COMPLETE alone offers Open/Done.
-Opening waits for handle cleanup, then uses ordinary selection and a fresh password;
-Done and incomplete outcomes do not change the registry or selection. Late results
-after Lock/shutdown cannot open dialogs or select a vault. PARTIAL, UNCERTAIN and
-REJECTED show preservation/recovery guidance, including possible reservation residue.
-No completeness claim follows merely from an opened bootstrap.
+Restore/recovery are application-owned detached workflows. ZIP selection, the
+combined form and worker authentication can run while the current session remains
+open; the plan retains ciphertext only and the password is wiped before retirement
+admission. Failed preparation/cancellation leaves unfinished input alone. At commit,
+a held mutation gate requires focused discard confirmation. Desktop then retires
+the controller normally and defers allocation until its close callback. This is
+Desktop application policy, not a Java requirement that detached preparation needs
+session retirement. Ordinary open admission also rejects an active archive job.
+
+No folder is allocated before Restore and authenticated preparation. Only known
+missing ancestry adds a focused available-history decision. `NioRestore.reserve`
+or exact `recover`, then `plan.install`, retain their create-only/recovery authority.
+Close/cancel preserves allocation/canonical bytes and the digest-bound marker.
+Successful cleanup selects the ordinary locked form when the form's Open restored
+vault choice is checked; unchecked is Done with unchanged selection. No password
+transfer or completion modal occurs. Incomplete results never select/register.
+PARTIAL, UNCERTAIN and REJECTED retain distinct plain-language recovery guidance,
+including possible reservation residue. User cancellation after entered installation
+still presents recovery knowledge; lifecycle cancellation suppresses late UI and
+opening while retaining admission through worker cleanup.
 
 The retained reviewed operation pin predates archive APIs. D-BR1 additionally uses
 the exact 0.3.2 release archive guidance listed in
 [dependency provenance](TOTIPO_JAVA_DEPENDENCY.md). R0's missing API prerequisite
-is resolved; its Add History proposal remains outside this implementation.
+is resolved. D-BR2 implements its Add History proposal with the same release.
+
+Add History takes the controller archive lease and reserves its mutation gate before
+the chooser; an existing editor/resolver/retry decision is never displaced. Gate
+availability updates the menu as workflows acquire/release admission. It does not
+disable search, refresh, local TOTP or copy. One shared archive worker calls
+`session.prepareImport(stream, BackupLimits.DEFAULT)` once, closes the stream and
+reads the authenticated summary off EDT. Java freezes/verifies the complete ZIP,
+authenticates all objects, compares the exact bootstrap and preflights destinations.
+The immutable authenticated summary stays available internally; confirmation shows
+the selected filename and a short preservation/conflict decision. Neither a new state nor a changed
+input file rebases/substitutes that frozen handle.
+
+`BackupImport.apply()` runs on the same archive worker. Java revalidates and uses
+create-only publication; Desktop neither extracts files nor calls storage SPI.
+No existing canonical object or VAULT is rewritten, deleted, renamed or replaced.
+Import authors no assertion, tombstone or resolution. Cumulative `ImportResult` knowledge remains intact internally. NO_OP and COMPLETE
+produce non-modal status; FAILED, PARTIAL and UNCERTAIN produce concise actionable
+warnings without internal enum names/counts. Explicit retry calls the same handle again; it does
+not use `PublicationRetry`. After permanent cancellation/retirement a new preparation
+is required. Reads alone never acknowledge uncertain publication.
+
+Each entered apply queues an ordinary controller refresh, including cancellation
+or unexpected failure with possible effects. It relies on neither watcher delivery
+nor watcher counts, and claims no observation barrier. Ordinary StateSubscriber
+rendering supplies heads/conflicts; there is no synthetic state, row patch or reveal.
+The existing presentation policy controls search/selection and same-alternative
+reveal retention. Changed/conflicting alternatives require ordinary authorization.
+
+User cancellation interrupts cooperatively and retains admission until apply and
+handle cleanup retire; its returned receipt still reports actual effects. Lifecycle
+cancellation additionally suppresses late dialogs. Lock/close/shutdown keep session
+ownership until the worker closes the prepared handle. Summary/apply/cleanup may
+wait on Java's provider gate and never run on EDT; local TOTP keeps its separate
+session executor. Blocked provider/stream calls have no forced deadline. The trusted
+local namespace/provider assumptions and platform qualification limits remain.

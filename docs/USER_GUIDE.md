@@ -216,14 +216,20 @@ Secret cleanup in a Java application is best effort, not guaranteed memory erasu
 
 Use **Vault → Back Up Vault…** while the selected vault is unlocked. Choose a
 new ZIP filename outside the vault; the suggested timestamped name contains no
-token/account information. Confirm the source and destination. The ZIP uses the
+token/account information. Choosing the filename starts backup. The ZIP uses the
 existing vault password and includes locally available encrypted history,
 including deleted entries and earlier secrets. Keep the password separately and
 keep independent copies of the ZIP. A lost password cannot be recovered.
 
+The three archive actions have different purposes:
+
+- **Back Up Vault** — Save an independent copy of locally available encrypted history.
+- **Restore Backup to New Folder** — Reconstruct the same vault at another location.
+- **Add History from Backup** — Add missing historical evidence to an existing matching vault.
+
 Backup captures one finite locally observed set, which may omit recent changes on
 other devices. Ordinary codes, search and editing remain available while ZIP output
-runs. State updates do not change the frozen capture. Wait for **Backup completed**;
+runs. State updates do not change the frozen capture. Wait for **Backup saved.** in the window status;
 ZIP finish alone is insufficient. Desktop closes and forces the staging file,
 inspects its completed bytes, publishes without replacing an existing entry, forces
 the parent and verifies the final ZIP. A publication/barrier/readback failure can
@@ -239,19 +245,28 @@ the completed ZIP elsewhere. Interrupted output may leave a hidden
 `.totipo-backup-*` staging directory beside the chosen output; it is not a finalized
 backup. Existing source vault files are preserved.
 
-Choose **Vault → Restore Backup to New Folder…** to restore a ZIP. If a vault is
-open, explicitly confirm Lock and the loss of unfinished editor input; restoration
-waits for normal session retirement. Select the ZIP and enter its original vault
-password. After authentication, choose an existing parent and enter a new child
-folder name. Review the destination, identity, encrypted object count and unresolved
-ancestry diagnostics, then explicitly choose **Restore**. An existing empty folder,
-file, vault or link is refused. No folder is allocated before confirmation.
+Choose **Vault → Restore Backup to New Folder…**, then select the ZIP. In the
+**Restore Backup** form, enter a full new folder path and the original vault password.
+**Choose ZIP…** can change the selected backup within the same form; canceling
+that native chooser keeps the previous selection and entered fields.
+**Browse…** selects an existing parent and returns to the same form; you can edit
+the new folder name in the path. Browsing and editing allocate nothing. Click
+**Restore** to begin. An existing empty folder, file, vault or link is refused.
+The form creates a new folder and never replaces an existing folder.
 
-Restoration preserves exact encrypted bootstrap/history bytes, original identity
-and password. Missing ancestry is preserved and reported, not invented or repaired.
-Only COMPLETE offers **Open Restored Vault** or **Done**. Done leaves vault selection
-unchanged. Open selects the restored location's ordinary locked form and requires
-the password again; authentication for restoration never unlocks a session.
+The current vault stays open through selection and backup checking. Before
+installation it closes normally. If an editor, conflict resolution or publication
+decision is unfinished, a focused discard confirmation lets you keep that work.
+Canceling selection/the form or failing backup authentication leaves the session
+open. Lock and Exit still cancel the workflow.
+
+Restoration preserves the original password and exact encrypted history. A backup
+with known missing earlier history asks whether to restore the available history;
+it does not invent or repair missing data. On success the form is already closed,
+and **Backup restored.** appears in the window status without a completion dialog.
+The selected **Open restored vault** checkbox brings you to the ordinary locked
+view after cleanup. Enter the password again to unlock. Clear that checkbox for
+the unobtrusive Done path, leaving the selected location unchanged.
 
 If restoration is interrupted or reports PARTIAL, UNCERTAIN or REJECTED, preserve
 the allocated folder and every file, including `.totipo-restore-v1`. Even REJECTED
@@ -269,6 +284,42 @@ incomplete folder. Preserve it for investigation and choose another new child wh
 recovery is unavailable. The marker remains after completion; it is local recovery
 evidence, never portable archive or token data.
 
+Choose **Vault → Add History from Backup…** with the destination vault unlocked.
+Finish or cancel any token editor, conflict-resolution or publication-retry workflow
+first. Select a Totipo backup ZIP. The open session authenticates and freezes the
+complete archive without another password. Its exact encrypted bootstrap must match
+the currently authenticated vault and the destination; a different vault is refused.
+Confirm the selected ZIP and choose **Add History**. Existing data is kept, but
+older versions or conflicts may appear. The confirmation
+uses frozen evidence even if the selected ZIP subsequently changes.
+
+Add History is **not rollback**. It never deletes, overwrites, renames or rewrites
+existing canonical objects or the `vault` file. Only missing authenticated objects
+are installed; unsafe, unavailable or occupied-different targets are refused without
+repair. Older evidence, additional branches or tombstones can change the observed
+heads and introduce conflicts while every existing stored byte stays unchanged.
+Use the ordinary conflict workflow to review them; no winner is chosen automatically.
+Newly imported secrets are never automatically revealed or copied. Search, selection,
+reveal and clipboard continue to follow their ordinary policies.
+
+Ordinary completion appears in the window status without another dialog:
+**History added. Your vault may show new versions or conflicts.** Repeating a
+backup that adds nothing shows **No new history to add.** Incomplete results warn
+that some history was added or that saving could not be confirmed; published
+history is kept. **Retry Same Evidence**, when offered, revalidates and replays the
+same frozen backup. It does not repair occupied files. Cancellation never undoes
+writes. After dismissal, Cancel, Lock or Exit, select and prepare a backup again to
+retry in an open matching session.
+
+Installation results and token observation are separate. Desktop requests ordinary
+local observation after each entered application, including incomplete or cancelled
+attempts, even without watcher events. The request returning does not mean observation
+has finished. Wait for ordinary state/diagnostics and use Refresh if needed; watcher
+notifications and object counts do not establish import completion or synchronization.
+Codes and search remain available during archive work, subject to shared Java
+session/provider coordination. Lock and Exit immediately retire presentation and
+request cancellation, then wait for entered I/O and handle cleanup before session close.
+
 The shared limits are 4096 historical encrypted objects, 8192 observed direct
 entries and 6 MiB per ZIP. These are history/object limits, not active-account
 counts. Exceeding capacity fails without truncating history. Authentication and
@@ -280,7 +331,7 @@ Keep service recovery codes separately so you can recover account access if the
 vault or password is lost. Restore-new creates a separate location; it does not add
 missing history to an existing vault, synchronize devices, overwrite an existing
 vault or resolve conflicts. Independent copies retain one identity and can develop
-conflicts if later combined. Adding missing history is not implemented here.
+conflicts if later combined. Add History combines evidence only for the exact matching vault.
 There is no password recovery, in-place password change, or vault migration/cross-vault copy workflow. Password
 or encryption-setting changes require a new vault and a future migration workflow.
 
